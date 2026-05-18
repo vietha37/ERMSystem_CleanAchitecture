@@ -78,8 +78,16 @@ export type DashboardStats = {
   pendingAppointments: number;
   completedAppointments: number;
   cancelledAppointments: number;
+  revisitAppointmentsToday: number;
   completionRatePercent: number;
   cancellationRatePercent: number;
+  revisitRatePercent: number;
+  totalInvoices: number;
+  paidInvoices: number;
+  issuedAmountThisMonth: number;
+  collectedAmountThisMonth: number;
+  outstandingBalanceAmount: number;
+  collectionRatePercent: number;
   topDiagnoses: Record<string, number>;
 };
 

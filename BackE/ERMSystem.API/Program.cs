@@ -26,6 +26,7 @@ builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection("Ra
 builder.Services.Configure<OutboxPublisherOptions>(builder.Configuration.GetSection("OutboxPublisher"));
 builder.Services.Configure<NotificationConsumerOptions>(builder.Configuration.GetSection("NotificationConsumer"));
 builder.Services.Configure<NotificationDispatchOptions>(builder.Configuration.GetSection("NotificationDispatch"));
+builder.Services.Configure<RetentionCleanupOptions>(builder.Configuration.GetSection("RetentionCleanup"));
 builder.Services.AddSingleton<ApiMetricsCollector>();
 builder.Services.AddSingleton<IBusinessMetricsRecorder, BusinessMetricsRecorder>();
 
@@ -155,6 +156,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddSingleton<IAuthSecurityMonitor, AuthSecurityMonitor>();
 builder.Services.AddScoped<IHospitalIdentityBridgeService, HospitalIdentityBridgeService>();
+builder.Services.AddScoped<IComplianceAuditRecorder, ComplianceAuditRecorder>();
 
 // ── DI – Patient ──────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
@@ -210,6 +212,7 @@ builder.Services.AddSingleton<INotificationChannelSender, MockSmsNotificationSen
 builder.Services.AddHostedService<HospitalOutboxPublisherService>();
 builder.Services.AddHostedService<HospitalNotificationConsumerService>();
 builder.Services.AddHostedService<HospitalNotificationDispatchService>();
+builder.Services.AddHostedService<RetentionCleanupService>();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                    ?? new[] { "http://localhost:3000", "http://localhost:3001" };

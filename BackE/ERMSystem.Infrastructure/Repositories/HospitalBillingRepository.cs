@@ -267,6 +267,62 @@ public class HospitalBillingRepository : IHospitalBillingRepository
         };
     }
 
+    public async Task<HospitalBillingDashboardSnapshot> GetDashboardSnapshotAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken ct = default)
+    {
+        var invoicePaymentTotals = await _hospitalDbContext.Payments
+            .AsNoTracking()
+            .Where(x => x.PaymentStatus == "Captured" || x.PaymentStatus == "Refunded")
+            .GroupBy(x => x.InvoiceId)
+            .Select(g => new
+            {
+                InvoiceId = g.Key,
+                PaidAmount = g.Sum(x => x.Amount)
+            })
+            .ToListAsync(ct);
+
+        var paidLookup = invoicePaymentTotals.ToDictionary(x => x.InvoiceId, x => x.PaidAmount);
+
+        var invoices = await _hospitalDbContext.Invoices
+            .AsNoTracking()
+            .Select(x => new
+            {
+                x.Id,
+                x.InvoiceStatus,
+                x.TotalAmount,
+                x.IssuedAtUtc
+            })
+            .ToListAsync(ct);
+
+        var totalInvoices = invoices.Count;
+        var paidInvoices = invoices.Count(x => x.InvoiceStatus == "Paid");
+        var issuedAmountInRange = invoices
+            .Where(x => x.IssuedAtUtc >= fromUtc && x.IssuedAtUtc <= toUtc)
+            .Sum(x => x.TotalAmount);
+        var outstandingBalanceAmount = invoices
+            .Sum(x => x.TotalAmount - paidLookup.GetValueOrDefault(x.Id));
+
+        var collectedAmountInRange = await _hospitalDbContext.Payments
+            .AsNoTracking()
+            .Where(x =>
+                (x.PaymentStatus == "Captured" || x.PaymentStatus == "Refunded") &&
+                x.PaidAtUtc.HasValue &&
+                x.PaidAtUtc.Value >= fromUtc &&
+                x.PaidAtUtc.Value <= toUtc)
+            .SumAsync(x => x.Amount, ct);
+
+        return new HospitalBillingDashboardSnapshot
+        {
+            TotalInvoices = totalInvoices,
+            PaidInvoices = paidInvoices,
+            IssuedAmountInRange = issuedAmountInRange,
+            CollectedAmountInRange = collectedAmountInRange,
+            OutstandingBalanceAmount = outstandingBalanceAmount
+        };
+    }
+
     public Task AddInvoiceAsync(HospitalInvoiceCreateCommand command, CancellationToken ct = default)
     {
         _hospitalDbContext.Invoices.Add(new HospitalInvoiceEntity

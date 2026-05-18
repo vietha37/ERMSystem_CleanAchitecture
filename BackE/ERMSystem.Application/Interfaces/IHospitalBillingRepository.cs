@@ -12,6 +12,7 @@ public interface IHospitalBillingRepository
     Task<HospitalInvoiceAggregateSnapshot?> GetByIdAsync(Guid invoiceId, CancellationToken ct = default);
     Task<HospitalBillingEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default);
     Task<HospitalBillingEncounterSnapshot?> GetEncounterForInvoiceAsync(Guid encounterId, CancellationToken ct = default);
+    Task<HospitalBillingDashboardSnapshot> GetDashboardSnapshotAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
     Task AddInvoiceAsync(HospitalInvoiceCreateCommand command, CancellationToken ct = default);
     Task AddInvoiceItemAsync(HospitalInvoiceItemCreateCommand command, CancellationToken ct = default);
     Task AddPaymentAsync(HospitalPaymentCreateCommand command, CancellationToken ct = default);
@@ -87,6 +88,15 @@ public class HospitalBillingEncounterSnapshot
     public Guid? ExistingInvoiceId { get; set; }
     public string? ExistingInvoiceNumber { get; set; }
     public HospitalBillableLineSnapshot[] BillableLines { get; set; } = Array.Empty<HospitalBillableLineSnapshot>();
+}
+
+public class HospitalBillingDashboardSnapshot
+{
+    public int TotalInvoices { get; set; }
+    public int PaidInvoices { get; set; }
+    public decimal IssuedAmountInRange { get; set; }
+    public decimal CollectedAmountInRange { get; set; }
+    public decimal OutstandingBalanceAmount { get; set; }
 }
 
 public class HospitalBillableLineSnapshot

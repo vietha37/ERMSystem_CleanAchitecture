@@ -37,6 +37,14 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat("vi-VN").format(value);
 }
 
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 function chartPoints(values: number[], width: number, height: number, padding: number): string {
   if (values.length === 0) return "";
   const max = Math.max(...values, 1);
@@ -446,11 +454,19 @@ export default function DashboardPage() {
   const pending = stats?.pendingAppointments ?? 0;
   const completed = stats?.completedAppointments ?? 0;
   const cancelled = stats?.cancelledAppointments ?? 0;
+  const revisitAppointmentsToday = stats?.revisitAppointmentsToday ?? 0;
+  const totalInvoices = stats?.totalInvoices ?? 0;
+  const paidInvoices = stats?.paidInvoices ?? 0;
+  const issuedAmountThisMonth = stats?.issuedAmountThisMonth ?? 0;
+  const collectedAmountThisMonth = stats?.collectedAmountThisMonth ?? 0;
+  const outstandingBalanceAmount = stats?.outstandingBalanceAmount ?? 0;
 
   const patientsPercent = clamp((patients / 1000) * 100, 0, 100);
   const todayPercent = clamp((appointmentsToday / 50) * 100, 0, 100);
   const completedPercent = clamp(stats?.completionRatePercent ?? 0, 0, 100);
   const cancelledPercent = clamp(stats?.cancellationRatePercent ?? 0, 0, 100);
+  const revisitPercent = clamp(stats?.revisitRatePercent ?? 0, 0, 100);
+  const collectionPercent = clamp(stats?.collectionRatePercent ?? 0, 0, 100);
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -543,16 +559,50 @@ export default function DashboardPage() {
                     <p className="mt-1 text-2xl font-bold text-rose-900">{cancelledPercent.toFixed(0)}%</p>
                     <p className="mt-1 text-xs text-rose-700">{formatNumber(cancelled)} cancelled today</p>
                   </div>
+                  <div className="col-span-2 rounded-2xl bg-violet-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Revisit rate</p>
+                    <p className="mt-1 text-2xl font-bold text-violet-900">{revisitPercent.toFixed(0)}%</p>
+                    <p className="mt-1 text-xs text-violet-700">{formatNumber(revisitAppointmentsToday)} revisit appointments today</p>
+                  </div>
                 </div>
               </Card>
 
               <Card className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-                <p className="text-sm font-semibold text-slate-800">Daily Snapshot</p>
-                <div className="mt-4">
-                  <DailySnapshotDonut items={snapshotPieData} />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Finance Snapshot</p>
+                    <p className="text-xs text-slate-500">Issued and collected this month</p>
+                  </div>
+                  <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                    {collectionPercent.toFixed(0)}% collected
+                  </span>
+                </div>
+                <div className="mt-4 grid grid-cols-1 gap-3">
+                  <div className="rounded-2xl bg-cyan-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">Issued this month</p>
+                    <p className="mt-1 text-xl font-bold text-cyan-900">{formatCurrency(issuedAmountThisMonth)}</p>
+                    <p className="mt-1 text-xs text-cyan-700">{formatNumber(totalInvoices)} invoices in system</p>
+                  </div>
+                  <div className="rounded-2xl bg-emerald-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Collected this month</p>
+                    <p className="mt-1 text-xl font-bold text-emerald-900">{formatCurrency(collectedAmountThisMonth)}</p>
+                    <p className="mt-1 text-xs text-emerald-700">{formatNumber(paidInvoices)} invoices fully paid</p>
+                  </div>
+                  <div className="rounded-2xl bg-rose-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Outstanding balance</p>
+                    <p className="mt-1 text-xl font-bold text-rose-900">{formatCurrency(outstandingBalanceAmount)}</p>
+                    <p className="mt-1 text-xs text-rose-700">Current unpaid balance across invoices</p>
+                  </div>
                 </div>
               </Card>
             </div>
+
+            <Card className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
+              <p className="text-sm font-semibold text-slate-800">Daily Snapshot</p>
+              <div className="mt-4">
+                <DailySnapshotDonut items={snapshotPieData} />
+              </div>
+            </Card>
 
             {isTrendsLoading ? (
               <Card className="flex h-[390px] items-center justify-center rounded-3xl border border-slate-100 bg-white text-slate-500">

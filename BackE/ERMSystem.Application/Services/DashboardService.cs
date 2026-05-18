@@ -14,17 +14,20 @@ namespace ERMSystem.Application.Services
         private readonly IAppointmentRepository _appointmentRepository;
         private readonly IMedicalRecordRepository _medicalRecordRepository;
         private readonly IPrescriptionRepository _prescriptionRepository;
+        private readonly IHospitalBillingRepository _hospitalBillingRepository;
 
         public DashboardService(
             IPatientRepository patientRepository,
             IAppointmentRepository appointmentRepository,
             IMedicalRecordRepository medicalRecordRepository,
-            IPrescriptionRepository prescriptionRepository)
+            IPrescriptionRepository prescriptionRepository,
+            IHospitalBillingRepository hospitalBillingRepository)
         {
             _patientRepository = patientRepository;
             _appointmentRepository = appointmentRepository;
             _medicalRecordRepository = medicalRecordRepository;
             _prescriptionRepository = prescriptionRepository;
+            _hospitalBillingRepository = hospitalBillingRepository;
         }
 
         public async Task<DashboardStatsDto> GetDashboardStatsAsync(CancellationToken ct = default)
@@ -34,7 +37,11 @@ namespace ERMSystem.Application.Services
             var pendingAppointmentsCount = await _appointmentRepository.GetPendingAppointmentsTodayCountAsync(ct);
             var completedAppointmentsCount = await _appointmentRepository.GetCompletedAppointmentsTodayCountAsync(ct);
             var cancelledAppointmentsCount = await _appointmentRepository.GetCancelledAppointmentsTodayCountAsync(ct);
+            var revisitAppointmentsCount = await _appointmentRepository.GetRevisitAppointmentsTodayCountAsync(ct);
             var topDiagnoses = await _medicalRecordRepository.GetTopDiagnosesAsync(5, ct);
+            var monthStartUtc = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var nowUtc = DateTime.UtcNow;
+            var billingSnapshot = await _hospitalBillingRepository.GetDashboardSnapshotAsync(monthStartUtc, nowUtc, ct);
 
             var completionRate = todayAppointmentsCount == 0
                 ? 0m
@@ -42,6 +49,12 @@ namespace ERMSystem.Application.Services
             var cancellationRate = todayAppointmentsCount == 0
                 ? 0m
                 : Math.Round((decimal)cancelledAppointmentsCount * 100m / todayAppointmentsCount, 2);
+            var revisitRate = todayAppointmentsCount == 0
+                ? 0m
+                : Math.Round((decimal)revisitAppointmentsCount * 100m / todayAppointmentsCount, 2);
+            var collectionRate = billingSnapshot.IssuedAmountInRange == 0
+                ? 0m
+                : Math.Round(billingSnapshot.CollectedAmountInRange * 100m / billingSnapshot.IssuedAmountInRange, 2);
 
             return new DashboardStatsDto
             {
@@ -50,8 +63,16 @@ namespace ERMSystem.Application.Services
                 PendingAppointments = pendingAppointmentsCount,
                 CompletedAppointments = completedAppointmentsCount,
                 CancelledAppointments = cancelledAppointmentsCount,
+                RevisitAppointmentsToday = revisitAppointmentsCount,
                 CompletionRatePercent = completionRate,
                 CancellationRatePercent = cancellationRate,
+                RevisitRatePercent = revisitRate,
+                TotalInvoices = billingSnapshot.TotalInvoices,
+                PaidInvoices = billingSnapshot.PaidInvoices,
+                IssuedAmountThisMonth = billingSnapshot.IssuedAmountInRange,
+                CollectedAmountThisMonth = billingSnapshot.CollectedAmountInRange,
+                OutstandingBalanceAmount = billingSnapshot.OutstandingBalanceAmount,
+                CollectionRatePercent = collectionRate,
                 TopDiagnoses = topDiagnoses
             };
         }

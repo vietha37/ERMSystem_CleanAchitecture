@@ -1,0 +1,116 @@
+Session summary - 2026-05-18
+
+Scope
+- Continued strictly from the current phased plan without redesigning architecture.
+- Focused on remaining Phase 4 reporting, observability, compliance, and retention hardening.
+
+Completed work
+
+1. Reporting and dashboard expansion
+- Extended dashboard stats with operational KPIs:
+  - pendingAppointments
+  - cancelledAppointments
+  - completionRatePercent
+  - cancellationRatePercent
+- Corrected the old dashboard semantic issue where "Completed Today" had been using all-time completed appointments instead of today's completed appointments.
+- Extended dashboard trends with appointment activity based on AppointmentDate:
+  - points[].appointmentsCount
+  - currentAppointmentsTotal
+  - previousAppointmentsTotal
+- Extended financial KPI reporting in dashboard stats:
+  - totalInvoices
+  - paidInvoices
+  - issuedAmountThisMonth
+  - collectedAmountThisMonth
+  - outstandingBalanceAmount
+  - collectionRatePercent
+- Added revisit/follow-up KPI using existing legacy data:
+  - revisitAppointmentsToday
+  - revisitRatePercent
+- Updated dashboard frontend to render:
+  - status mix cards
+  - finance snapshot
+  - revisit rate
+  - 3-line trends chart for patients, appointments, prescriptions
+
+2. Observability and metrics
+- Added request observability middleware enhancements:
+  - X-Correlation-Id propagation
+  - request completion logging
+  - slow request warning
+  - 5xx error logging
+- Added global API error envelope handling with correlation id coverage.
+- Added API metrics endpoint:
+  - GET /metrics
+- Implemented HTTP metrics export:
+  - in-flight requests
+  - total requests
+  - slow requests
+  - server errors
+  - request totals by method, route template, status code
+  - duration sum/count/max by method and route
+- Added business metrics infrastructure:
+  - IBusinessMetricsRecorder
+  - BusinessMetricsRecorder
+  - ApiMetricsCollector business event family
+- Emitted business event metrics for:
+  - hospital_appointment: booked, checked_in, status_updated
+  - hospital_encounter: created, finalized, attachment_added
+  - hospital_prescription: issued, dispensed
+  - hospital_billing: invoice_issued, payment_received, payment_refunded
+
+3. Compliance and audit hardening
+- Added compliance audit abstraction and implementation:
+  - IComplianceAuditRecorder
+  - ComplianceAuditRecorder
+- Reused identity.SecurityEvents for compliance-sensitive actions.
+- Added audit recording for:
+  - PatientMerged
+  - InvoiceRefunded
+  - NotificationDeliveryRetried
+- Passed actor context from controllers into services where needed for audit attribution.
+- Applied privacy masking to audit/security event detail text:
+  - Username
+  - Email
+  - Phone
+  - MedicalRecordNumber
+- Masking was applied to both:
+  - auth security events
+  - compliance audit events
+
+4. Retention cleanup
+- Added retention cleanup worker:
+  - RetentionCleanupService
+  - RetentionCleanupOptions
+- Wired retention configuration into appsettings and hosted services.
+- Implemented cleanup rules:
+  - SecurityEvents retention: 180 days
+  - NotificationDeliveries retention: 90 days, terminal states only
+  - Published OutboxMessages retention: 30 days, only when no NotificationDelivery still references them
+- Cleanup runs on a configurable interval and deletes in batches.
+
+Verification completed
+- dotnet build D:\ERMSystem\BackE\ERMSystem.sln --no-restore
+- npm.cmd run build
+- npm.cmd run lint
+- Metrics endpoint probe confirmed expected metric families were present.
+
+Environment notes
+- NU1900 warnings remain because local environment cannot reach nuget.org vulnerability metadata feed.
+- RabbitMQ local remained unreachable during local runs, but this did not block compile-time verification.
+- Some deeper local runtime probes were affected by Windows EventLog/DataProtection environment permissions on this machine; these were environmental issues, not compile failures from the implemented changes.
+
+Current state
+- Phase 4 has been pushed substantially further:
+  - reporting KPIs expanded
+  - observability and metrics baseline added
+  - business metrics added
+  - compliance audit enhanced
+  - audit masking added
+  - retention cleanup added
+
+Most likely next steps
+- Revisit Phase 4 remaining hardening gaps:
+  - worker readiness and health depth
+  - tighter operational smoke/probes for metrics and retention
+  - final checklist pass against plan Phase 0-4

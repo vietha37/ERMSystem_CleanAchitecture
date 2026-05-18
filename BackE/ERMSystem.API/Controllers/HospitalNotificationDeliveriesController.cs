@@ -2,6 +2,7 @@ using ERMSystem.Application.Interfaces;
 using ERMSystem.Application.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace ERMSystem.API.Controllers;
 
@@ -35,7 +36,11 @@ public class HospitalNotificationDeliveriesController : ControllerBase
     [Authorize(Policy = AppPermissions.HospitalNotifications.Retry)]
     public async Task<IActionResult> RetryDelivery(Guid deliveryId, CancellationToken ct)
     {
-        var retried = await _service.RetryDeliveryAsync(deliveryId, ct);
+        var retried = await _service.RetryDeliveryAsync(
+            deliveryId,
+            ResolveActorUserId(),
+            ResolveActorUsername(),
+            ct);
         if (retried == Application.DTOs.NotificationDeliveryRetryResult.NotFound)
         {
             return NotFound(new { message = "Khong tim thay delivery can retry." });
@@ -48,4 +53,17 @@ public class HospitalNotificationDeliveriesController : ControllerBase
 
         return Ok(new { message = "Da dua delivery ve trang thai Queued." });
     }
+
+    private Guid? ResolveActorUserId()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                     ?? User.FindFirstValue(ClaimTypes.Name)
+                     ?? User.FindFirstValue("sub");
+        return Guid.TryParse(userId, out var parsedUserId) ? parsedUserId : null;
+    }
+
+    private string? ResolveActorUsername()
+        => User.FindFirstValue(ClaimTypes.Name)
+           ?? User.FindFirstValue(ClaimTypes.Upn)
+           ?? User.FindFirstValue("unique_name");
 }

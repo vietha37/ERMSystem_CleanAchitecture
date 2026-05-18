@@ -608,7 +608,7 @@ namespace ERMSystem.Infrastructure.Services
                     UserId = userId,
                     EventType = eventType,
                     Severity = severity,
-                    Detail = $"Username={username}; {detail}",
+                    Detail = SensitiveDataMasking.MaskAuditDetail($"Username={username}; {detail}"),
                     IpAddress = null,
                     UserAgent = null,
                     OccurredAtUtc = DateTime.UtcNow

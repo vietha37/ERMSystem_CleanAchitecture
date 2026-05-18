@@ -125,7 +125,11 @@ namespace ERMSystem.API.Controllers
 
             try
             {
-                var result = await _patientService.MergePatientsAsync(request, ct);
+                var result = await _patientService.MergePatientsAsync(
+                    request,
+                    ResolveActorUserId(),
+                    ResolveActorUsername(),
+                    ct);
                 return Ok(result);
             }
             catch (KeyNotFoundException ex)
@@ -158,5 +162,18 @@ namespace ERMSystem.API.Controllers
 
             return NoContent();
         }
+
+        private Guid? ResolveActorUserId()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                         ?? User.FindFirstValue(ClaimTypes.Name)
+                         ?? User.FindFirstValue("sub");
+            return Guid.TryParse(userId, out var parsedUserId) ? parsedUserId : null;
+        }
+
+        private string? ResolveActorUsername()
+            => User.FindFirstValue(ClaimTypes.Name)
+               ?? User.FindFirstValue(ClaimTypes.Upn)
+               ?? User.FindFirstValue("unique_name");
     }
 }

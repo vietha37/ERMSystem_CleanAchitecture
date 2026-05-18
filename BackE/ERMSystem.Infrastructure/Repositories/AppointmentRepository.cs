@@ -73,6 +73,17 @@ namespace ERMSystem.Infrastructure.Repositories
                 .CountAsync(ct);
         }
 
+        public async Task<int> GetRevisitAppointmentsTodayCountAsync(CancellationToken ct = default)
+        {
+            var today = DateTime.UtcNow.Date;
+            return await _context.Appointments
+                .Where(a => a.AppointmentDate.Date == today)
+                .Where(a => _context.Appointments.Any(previous =>
+                    previous.PatientId == a.PatientId &&
+                    previous.AppointmentDate < today))
+                .CountAsync(ct);
+        }
+
         public async Task<Dictionary<DateTime, int>> GetScheduledCountByDayAsync(
             DateTime fromUtc,
             CancellationToken ct = default)

@@ -14,6 +14,10 @@ namespace ERMSystem.Application.Interfaces
             int pageNumber,
             int pageSize,
             CancellationToken ct = default);
-        Task<NotificationDeliveryRetryResult> RetryDeliveryAsync(Guid deliveryId, CancellationToken ct = default);
+        Task<NotificationDeliveryRetryResult> RetryDeliveryAsync(
+            Guid deliveryId,
+            Guid? actorUserId,
+            string? actorUsername,
+            CancellationToken ct = default);
     }
 }

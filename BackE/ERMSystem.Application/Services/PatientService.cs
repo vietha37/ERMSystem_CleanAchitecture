@@ -13,10 +13,14 @@ namespace ERMSystem.Application.Services
     public class PatientService : IPatientService
     {
         private readonly IPatientRepository _patientRepository;
+        private readonly IComplianceAuditRecorder _complianceAuditRecorder;
 
-        public PatientService(IPatientRepository patientRepository)
+        public PatientService(
+            IPatientRepository patientRepository,
+            IComplianceAuditRecorder complianceAuditRecorder)
         {
             _patientRepository = patientRepository;
+            _complianceAuditRecorder = complianceAuditRecorder;
         }
 
         public async Task<PaginatedResult<PatientDto>> GetAllPatientsAsync(PaginationRequest request, CancellationToken ct = default)
@@ -108,7 +112,11 @@ namespace ERMSystem.Application.Services
             await _patientRepository.UpdateAsync(patient, ct);
         }
 
-        public async Task<MergePatientsResultDto> MergePatientsAsync(MergePatientsRequestDto request, CancellationToken ct = default)
+        public async Task<MergePatientsResultDto> MergePatientsAsync(
+            MergePatientsRequestDto request,
+            Guid? actorUserId,
+            string? actorUsername,
+            CancellationToken ct = default)
         {
             if (request.SourcePatientId == request.TargetPatientId)
             {
@@ -159,6 +167,14 @@ namespace ERMSystem.Application.Services
                 ct);
 
             await _patientRepository.MergeAsync(sourcePatient, targetPatient, ct);
+
+            await _complianceAuditRecorder.RecordAsync(
+                actorUserId,
+                actorUsername ?? "unknown",
+                "PatientMerged",
+                "Warning",
+                $"SourcePatientId={sourcePatient.Id}; TargetPatientId={targetPatient.Id}; ReassignedAppointments={reassignedAppointmentCount}; AppUserLinkMoved={appUserLinkMoved}.",
+                ct);
 
             return new MergePatientsResultDto
             {

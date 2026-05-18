@@ -14,6 +14,7 @@ namespace ERMSystem.Application.Interfaces
         Task<int> GetPendingAppointmentsTodayCountAsync(CancellationToken ct = default);
         Task<int> GetCompletedAppointmentsTodayCountAsync(CancellationToken ct = default);
         Task<int> GetCancelledAppointmentsTodayCountAsync(CancellationToken ct = default);
+        Task<int> GetRevisitAppointmentsTodayCountAsync(CancellationToken ct = default);
         Task<Dictionary<DateTime, int>> GetScheduledCountByDayAsync(DateTime fromUtc, CancellationToken ct = default);
         Task<List<Appointment>> GetByDateRangeAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
         Task<Appointment?> GetByIdAsync(Guid id, CancellationToken ct = default);

@@ -12,15 +12,18 @@ public class HospitalBillingService : IHospitalBillingService
     private readonly IHospitalBillingRepository _hospitalBillingRepository;
     private readonly IHospitalIdentityBridgeService _hospitalIdentityBridgeService;
     private readonly IBusinessMetricsRecorder _businessMetricsRecorder;
+    private readonly IComplianceAuditRecorder _complianceAuditRecorder;
 
     public HospitalBillingService(
         IHospitalBillingRepository hospitalBillingRepository,
         IHospitalIdentityBridgeService hospitalIdentityBridgeService,
-        IBusinessMetricsRecorder businessMetricsRecorder)
+        IBusinessMetricsRecorder businessMetricsRecorder,
+        IComplianceAuditRecorder complianceAuditRecorder)
     {
         _hospitalBillingRepository = hospitalBillingRepository;
         _hospitalIdentityBridgeService = hospitalIdentityBridgeService;
         _businessMetricsRecorder = businessMetricsRecorder;
+        _complianceAuditRecorder = complianceAuditRecorder;
     }
 
     public Task<PaginatedResult<HospitalInvoiceSummaryDto>> GetWorklistAsync(
@@ -317,6 +320,14 @@ public class HospitalBillingService : IHospitalBillingService
             ["invoice_status"] = newStatus,
             ["payment_method"] = request.PaymentMethod.Trim()
         });
+
+        await _complianceAuditRecorder.RecordAsync(
+            actorUserId,
+            actorUsername ?? "unknown",
+            "InvoiceRefunded",
+            "Warning",
+            $"InvoiceId={invoiceId}; InvoiceNumber={invoice.InvoiceNumber}; Amount={request.Amount}; PaymentMethod={request.PaymentMethod.Trim()}; InvoiceStatus={newStatus}; Reason={normalizedReason}.",
+            ct);
 
         var updated = await _hospitalBillingRepository.GetByIdAsync(invoiceId, ct)
             ?? throw new InvalidOperationException("Khong the tai lai hoa don sau khi ghi nhan hoan tien.");
