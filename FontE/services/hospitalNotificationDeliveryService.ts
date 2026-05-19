@@ -1,6 +1,7 @@
 import api from "./api";
 import {
   NotificationDeliveryListResult,
+  NotificationDeliverySummary,
   NotificationDeliveryStatus,
 } from "./types";
 
@@ -21,6 +22,14 @@ export const hospitalNotificationDeliveryService = {
 
     const response = await api.get<NotificationDeliveryListResult>(
       `/hospital-notification-deliveries?${params.toString()}`
+    );
+
+    return response.data;
+  },
+
+  getSummary: async (): Promise<NotificationDeliverySummary> => {
+    const response = await api.get<NotificationDeliverySummary>(
+      "/hospital-notification-deliveries/summary"
     );
 
     return response.data;

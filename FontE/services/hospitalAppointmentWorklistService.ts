@@ -1,6 +1,8 @@
 import api from "./api";
 import {
+  HospitalAppointmentCancelPayload,
   HospitalAppointmentCheckInPayload,
+  HospitalAppointmentReschedulePayload,
   HospitalAppointmentWorklistItem,
   HospitalAppointmentWorklistQuery,
   HospitalAppointmentWorklistStatus,
@@ -53,6 +55,30 @@ export const hospitalAppointmentWorklistService = {
     const response = await api.post<HospitalAppointmentWorklistItem>(
       `/hospital-appointments/${appointmentId}/status`,
       { status }
+    );
+
+    return response.data;
+  },
+
+  cancel: async (
+    appointmentId: string,
+    payload: HospitalAppointmentCancelPayload
+  ): Promise<HospitalAppointmentWorklistItem> => {
+    const response = await api.post<HospitalAppointmentWorklistItem>(
+      `/hospital-appointments/${appointmentId}/cancel`,
+      payload
+    );
+
+    return response.data;
+  },
+
+  reschedule: async (
+    appointmentId: string,
+    payload: HospitalAppointmentReschedulePayload
+  ): Promise<HospitalAppointmentWorklistItem> => {
+    const response = await api.post<HospitalAppointmentWorklistItem>(
+      `/hospital-appointments/${appointmentId}/reschedule`,
+      payload
     );
 
     return response.data;

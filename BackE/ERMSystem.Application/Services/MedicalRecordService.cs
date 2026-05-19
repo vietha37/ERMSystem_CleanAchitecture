@@ -13,10 +13,14 @@ namespace ERMSystem.Application.Services
     public class MedicalRecordService : IMedicalRecordService
     {
         private readonly IMedicalRecordRepository _medicalRecordRepository;
+        private readonly IDashboardQueryCache _dashboardQueryCache;
 
-        public MedicalRecordService(IMedicalRecordRepository medicalRecordRepository)
+        public MedicalRecordService(
+            IMedicalRecordRepository medicalRecordRepository,
+            IDashboardQueryCache dashboardQueryCache)
         {
             _medicalRecordRepository = medicalRecordRepository;
+            _dashboardQueryCache = dashboardQueryCache;
         }
 
         public async Task<PaginatedResult<MedicalRecordDto>> GetAllMedicalRecordsAsync(PaginationRequest request, CancellationToken ct = default)
@@ -60,6 +64,7 @@ namespace ERMSystem.Application.Services
             };
 
             await _medicalRecordRepository.AddAsync(record, ct);
+            await _dashboardQueryCache.InvalidateAsync(ct);
             return MapToDto(record);
         }
 
@@ -74,6 +79,7 @@ namespace ERMSystem.Application.Services
             record.Notes = dto.Notes;
 
             await _medicalRecordRepository.UpdateAsync(record, ct);
+            await _dashboardQueryCache.InvalidateAsync(ct);
         }
 
         public async Task DeleteMedicalRecordAsync(Guid id, CancellationToken ct = default)
@@ -83,6 +89,7 @@ namespace ERMSystem.Application.Services
                 throw new KeyNotFoundException($"MedicalRecord with ID {id} not found.");
 
             await _medicalRecordRepository.DeleteAsync(record, ct);
+            await _dashboardQueryCache.InvalidateAsync(ct);
         }
 
         private static MedicalRecordDto MapToDto(MedicalRecord r) => new MedicalRecordDto

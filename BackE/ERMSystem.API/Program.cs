@@ -27,8 +27,13 @@ builder.Services.Configure<OutboxPublisherOptions>(builder.Configuration.GetSect
 builder.Services.Configure<NotificationConsumerOptions>(builder.Configuration.GetSection("NotificationConsumer"));
 builder.Services.Configure<NotificationDispatchOptions>(builder.Configuration.GetSection("NotificationDispatch"));
 builder.Services.Configure<RetentionCleanupOptions>(builder.Configuration.GetSection("RetentionCleanup"));
+builder.Services.Configure<DashboardCacheOptions>(builder.Configuration.GetSection("DashboardCache"));
+builder.Services.Configure<RevisitReminderOptions>(builder.Configuration.GetSection("RevisitReminder"));
 builder.Services.AddSingleton<ApiMetricsCollector>();
 builder.Services.AddSingleton<IBusinessMetricsRecorder, BusinessMetricsRecorder>();
+builder.Services.AddSingleton<BackgroundWorkerHealthRegistry>();
+builder.Services.AddSingleton<DashboardCacheMetricsRegistry>();
+builder.Services.AddSingleton<NotificationPipelineMetricsReader>();
 
 // ── Database ──────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<ERMSystem.Infrastructure.Data.ApplicationDbContext>(options =>
@@ -183,6 +188,7 @@ builder.Services.AddScoped<IPrescriptionRepository, PrescriptionRepository>();
 builder.Services.AddScoped<IPrescriptionItemRepository, PrescriptionItemRepository>();
 builder.Services.AddScoped<IPrescriptionService, PrescriptionService>();
 builder.Services.AddScoped<IPrescriptionItemService, PrescriptionItemService>();
+builder.Services.AddScoped<IDashboardQueryCache, DashboardQueryCache>();
 
 // ── DI – Dashboard ────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IDashboardService, DashboardService>();
@@ -213,6 +219,7 @@ builder.Services.AddHostedService<HospitalOutboxPublisherService>();
 builder.Services.AddHostedService<HospitalNotificationConsumerService>();
 builder.Services.AddHostedService<HospitalNotificationDispatchService>();
 builder.Services.AddHostedService<RetentionCleanupService>();
+builder.Services.AddHostedService<RevisitReminderCampaignService>();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                    ?? new[] { "http://localhost:3000", "http://localhost:3001" };
@@ -330,10 +337,81 @@ app.MapGet("/health/live", () => Results.Ok(new
     utcNow = DateTime.UtcNow
 })).AllowAnonymous();
 
-app.MapGet("/metrics", (ApiMetricsCollector collector) =>
+app.MapGet("/metrics", async (
+    ApiMetricsCollector collector,
+    DashboardCacheMetricsRegistry dashboardCacheMetricsRegistry,
+    NotificationPipelineMetricsReader notificationPipelineMetricsReader,
+    BackgroundWorkerHealthRegistry backgroundWorkerHealthRegistry,
+    CancellationToken ct) =>
 {
+    var payload = collector.RenderPrometheus();
+    var builder = new StringBuilder(payload, payload.Length + 2048);
+
+    builder.AppendLine("# HELP ermsystem_dashboard_cache_hits_total Dashboard cache hits by segment.");
+    builder.AppendLine("# TYPE ermsystem_dashboard_cache_hits_total counter");
+    builder.AppendLine("# HELP ermsystem_dashboard_cache_misses_total Dashboard cache misses by segment.");
+    builder.AppendLine("# TYPE ermsystem_dashboard_cache_misses_total counter");
+    builder.AppendLine("# HELP ermsystem_dashboard_cache_writes_total Dashboard cache writes by segment.");
+    builder.AppendLine("# TYPE ermsystem_dashboard_cache_writes_total counter");
+    builder.AppendLine("# HELP ermsystem_dashboard_cache_invalidations_total Dashboard cache invalidations.");
+    builder.AppendLine("# TYPE ermsystem_dashboard_cache_invalidations_total counter");
+
+    foreach (var snapshot in dashboardCacheMetricsRegistry.GetSnapshots())
+    {
+        var labels = $"{{segment=\"{snapshot.CacheSegment}\"}}";
+        builder.Append("ermsystem_dashboard_cache_hits_total").Append(labels).Append(' ').Append(snapshot.Hits).AppendLine();
+        builder.Append("ermsystem_dashboard_cache_misses_total").Append(labels).Append(' ').Append(snapshot.Misses).AppendLine();
+        builder.Append("ermsystem_dashboard_cache_writes_total").Append(labels).Append(' ').Append(snapshot.Writes).AppendLine();
+        builder.Append("ermsystem_dashboard_cache_invalidations_total").Append(labels).Append(' ').Append(snapshot.Invalidations).AppendLine();
+    }
+
+    var pipelineMetrics = await notificationPipelineMetricsReader.GetSnapshotAsync(ct);
+    builder.AppendLine("# HELP ermsystem_notification_outbox_pending_total Pending outbox messages awaiting publish.");
+    builder.AppendLine("# TYPE ermsystem_notification_outbox_pending_total gauge");
+    builder.Append("ermsystem_notification_outbox_pending_total ").Append(pipelineMetrics.PendingOutboxCount).AppendLine();
+    builder.AppendLine("# HELP ermsystem_notification_outbox_oldest_age_seconds Age in seconds of the oldest pending outbox message.");
+    builder.AppendLine("# TYPE ermsystem_notification_outbox_oldest_age_seconds gauge");
+    builder.Append("ermsystem_notification_outbox_oldest_age_seconds ").Append(FormatAgeSeconds(pipelineMetrics.GeneratedAtUtc, pipelineMetrics.OldestPendingOutboxAtUtc)).AppendLine();
+    builder.AppendLine("# HELP ermsystem_notification_deliveries_queued_total Queued notification deliveries awaiting dispatch.");
+    builder.AppendLine("# TYPE ermsystem_notification_deliveries_queued_total gauge");
+    builder.Append("ermsystem_notification_deliveries_queued_total ").Append(pipelineMetrics.QueuedDeliveryCount).AppendLine();
+    builder.AppendLine("# HELP ermsystem_notification_deliveries_stale_total Queued notification deliveries older than 15 minutes.");
+    builder.AppendLine("# TYPE ermsystem_notification_deliveries_stale_total gauge");
+    builder.Append("ermsystem_notification_deliveries_stale_total ").Append(pipelineMetrics.StaleQueuedDeliveryCount).AppendLine();
+    builder.AppendLine("# HELP ermsystem_notification_deliveries_oldest_age_seconds Age in seconds of the oldest queued notification delivery.");
+    builder.AppendLine("# TYPE ermsystem_notification_deliveries_oldest_age_seconds gauge");
+    builder.Append("ermsystem_notification_deliveries_oldest_age_seconds ").Append(FormatAgeSeconds(pipelineMetrics.GeneratedAtUtc, pipelineMetrics.OldestQueuedDeliveryAtUtc)).AppendLine();
+
+    builder.AppendLine("# HELP ermsystem_background_worker_heartbeat_age_seconds Seconds since the last worker heartbeat.");
+    builder.AppendLine("# TYPE ermsystem_background_worker_heartbeat_age_seconds gauge");
+    builder.AppendLine("# HELP ermsystem_background_worker_status Worker health status encoded as 1 for the current state label.");
+    builder.AppendLine("# TYPE ermsystem_background_worker_status gauge");
+
+    var knownStatuses = new[] { "Starting", "Healthy", "Degraded", "Unhealthy", "Unknown" };
+    foreach (var snapshot in backgroundWorkerHealthRegistry.GetAll())
+    {
+        builder
+            .Append("ermsystem_background_worker_heartbeat_age_seconds{worker=\"")
+            .Append(snapshot.WorkerName)
+            .Append("\"} ")
+            .Append(FormatAgeSeconds(DateTime.UtcNow, snapshot.LastHeartbeatUtc))
+            .AppendLine();
+
+        foreach (var status in knownStatuses)
+        {
+            builder
+                .Append("ermsystem_background_worker_status{worker=\"")
+                .Append(snapshot.WorkerName)
+                .Append("\",status=\"")
+                .Append(status)
+                .Append("\"} ")
+                .Append(string.Equals(snapshot.Status, status, StringComparison.OrdinalIgnoreCase) ? "1" : "0")
+                .AppendLine();
+        }
+    }
+
     return Results.Text(
-        collector.RenderPrometheus(),
+        builder.ToString(),
         "text/plain; version=0.0.4; charset=utf-8");
 }).AllowAnonymous();
 
@@ -363,3 +441,14 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 app.MapControllers();
 
 app.Run();
+
+static string FormatAgeSeconds(DateTime nowUtc, DateTime? value)
+{
+    if (!value.HasValue)
+    {
+        return "0";
+    }
+
+    return Math.Max(0, Math.Round((nowUtc - value.Value).TotalSeconds, 0))
+        .ToString(System.Globalization.CultureInfo.InvariantCulture);
+}

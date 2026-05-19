@@ -13,6 +13,43 @@ namespace ERMSystem.Application.DTOs
         public IReadOnlyList<HospitalPatientPortalInvoiceDto> RecentInvoices { get; set; } = Array.Empty<HospitalPatientPortalInvoiceDto>();
     }
 
+    public class HospitalPatientVisitHistoryResultDto
+    {
+        public int TotalCount { get; set; }
+        public int PageNumber { get; set; }
+        public int PageSize { get; set; }
+        public IReadOnlyList<HospitalPatientVisitHistoryItemDto> Items { get; set; } = Array.Empty<HospitalPatientVisitHistoryItemDto>();
+    }
+
+    public class HospitalPatientVisitHistoryItemDto
+    {
+        public Guid AppointmentId { get; set; }
+        public string AppointmentNumber { get; set; } = string.Empty;
+        public string AppointmentStatus { get; set; } = string.Empty;
+        public string AppointmentType { get; set; } = string.Empty;
+        public string BookingChannel { get; set; } = string.Empty;
+        public DateTime AppointmentStartLocal { get; set; }
+        public DateTime? AppointmentEndLocal { get; set; }
+        public DateTime? CheckInTimeLocal { get; set; }
+        public string DoctorName { get; set; } = string.Empty;
+        public string SpecialtyName { get; set; } = string.Empty;
+        public string ClinicName { get; set; } = string.Empty;
+        public string? ChiefComplaint { get; set; }
+        public Guid? EncounterId { get; set; }
+        public string? EncounterNumber { get; set; }
+        public string? EncounterStatus { get; set; }
+        public DateTime? EncounterStartedLocal { get; set; }
+        public DateTime? EncounterEndedLocal { get; set; }
+        public string? PrimaryDiagnosisName { get; set; }
+        public string? ClinicalSummary { get; set; }
+        public int PrescriptionCount { get; set; }
+        public int ClinicalOrderCount { get; set; }
+        public int InvoiceCount { get; set; }
+        public decimal TotalInvoiceAmount { get; set; }
+        public decimal TotalPaidAmount { get; set; }
+        public decimal OutstandingBalanceAmount { get; set; }
+    }
+
     public class HospitalPatientPortalProfileDto
     {
         public Guid PatientId { get; set; }

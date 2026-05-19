@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using ERMSystem.Infrastructure.HospitalData;
+using ERMSystem.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -18,6 +19,7 @@ public class HospitalOutboxPublisherService : BackgroundService
     private readonly ILogger<HospitalOutboxPublisherService> _logger;
     private readonly RabbitMqOptions _rabbitMqOptions;
     private readonly OutboxPublisherOptions _publisherOptions;
+    private readonly BackgroundWorkerHealthRegistry _workerHealthRegistry;
 
     private IConnection? _connection;
     private IModel? _channel;
@@ -27,17 +29,20 @@ public class HospitalOutboxPublisherService : BackgroundService
         IServiceScopeFactory serviceScopeFactory,
         IOptions<RabbitMqOptions> rabbitMqOptions,
         IOptions<OutboxPublisherOptions> publisherOptions,
+        BackgroundWorkerHealthRegistry workerHealthRegistry,
         ILogger<HospitalOutboxPublisherService> logger)
     {
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
         _rabbitMqOptions = rabbitMqOptions.Value;
         _publisherOptions = publisherOptions.Value;
+        _workerHealthRegistry = workerHealthRegistry;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Khoi dong worker publish outbox sang RabbitMQ.");
+        _workerHealthRegistry.Report("hospital-outbox-publisher", "Starting", "Worker started.");
 
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(Math.Max(1, _publisherOptions.PollIntervalSeconds)));
 
@@ -54,6 +59,7 @@ public class HospitalOutboxPublisherService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Worker publish outbox gap loi khong mong muon.");
+                _workerHealthRegistry.Report("hospital-outbox-publisher", "Unhealthy", ex.Message, errorAtUtc: DateTime.UtcNow);
                 DisposeChannel();
             }
 
@@ -78,6 +84,7 @@ public class HospitalOutboxPublisherService : BackgroundService
     {
         if (!EnsureChannel())
         {
+            _workerHealthRegistry.Report("hospital-outbox-publisher", "Degraded", "RabbitMQ channel is not available.");
             return;
         }
 
@@ -93,6 +100,7 @@ public class HospitalOutboxPublisherService : BackgroundService
 
         if (pendingMessages.Count == 0)
         {
+            _workerHealthRegistry.Report("hospital-outbox-publisher", "Healthy", "No pending outbox messages.");
             return;
         }
 
@@ -129,12 +137,14 @@ public class HospitalOutboxPublisherService : BackgroundService
                     message.Id,
                     message.EventType);
 
+                _workerHealthRegistry.Report("hospital-outbox-publisher", "Degraded", ex.Message, errorAtUtc: nowUtc);
                 DisposeChannel();
                 break;
             }
         }
 
         await hospitalDbContext.SaveChangesAsync(ct);
+        _workerHealthRegistry.Report("hospital-outbox-publisher", "Healthy", $"Published batch size={pendingMessages.Count}.", successAtUtc: nowUtc);
     }
 
     private bool EnsureChannel()
@@ -186,12 +196,14 @@ public class HospitalOutboxPublisherService : BackgroundService
                 exchange: _rabbitMqOptions.Exchange,
                 routingKey: _rabbitMqOptions.NotificationRoutingPattern);
 
+            _workerHealthRegistry.Report("hospital-outbox-publisher", "Healthy", "RabbitMQ channel connected.", successAtUtc: nowUtc);
             return true;
         }
         catch (Exception ex)
         {
             _nextConnectAttemptUtc = nowUtc.AddSeconds(Math.Max(5, _publisherOptions.RetryDelaySeconds));
             _logger.LogWarning(ex, "Chua ket noi duoc RabbitMQ worker. Outbox se tiep tuc cho retry.");
+            _workerHealthRegistry.Report("hospital-outbox-publisher", "Degraded", ex.Message, errorAtUtc: nowUtc);
             DisposeChannel();
             return false;
         }

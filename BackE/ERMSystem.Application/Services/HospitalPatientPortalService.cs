@@ -17,5 +17,12 @@ namespace ERMSystem.Application.Services
 
         public Task<HospitalPatientPortalOverviewDto?> GetOverviewByUserIdAsync(Guid userId, CancellationToken ct = default)
             => _repository.GetOverviewByUserIdAsync(userId, ct);
+
+        public Task<HospitalPatientVisitHistoryResultDto?> GetVisitHistoryByUserIdAsync(
+            Guid userId,
+            int pageNumber,
+            int pageSize,
+            CancellationToken ct = default)
+            => _repository.GetVisitHistoryByUserIdAsync(userId, pageNumber, pageSize, ct);
     }
 }

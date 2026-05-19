@@ -14,20 +14,25 @@ public class RetentionCleanupService : BackgroundService
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<RetentionCleanupService> _logger;
     private readonly RetentionCleanupOptions _options;
+    private readonly BackgroundWorkerHealthRegistry _workerHealthRegistry;
 
     public RetentionCleanupService(
         IServiceScopeFactory serviceScopeFactory,
         IOptions<RetentionCleanupOptions> options,
+        BackgroundWorkerHealthRegistry workerHealthRegistry,
         ILogger<RetentionCleanupService> logger)
     {
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
         _options = options.Value;
+        _workerHealthRegistry = workerHealthRegistry;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Khoi dong worker retention cleanup.");
+        _logger.LogInformation("Retention cleanup interval={IntervalHours}h.", Math.Max(1, _options.PollIntervalHours));
+        _workerHealthRegistry.Report("retention-cleanup", "Starting", "Worker started.");
 
         using var timer = new PeriodicTimer(TimeSpan.FromHours(Math.Max(1, _options.PollIntervalHours)));
 
@@ -44,6 +49,7 @@ public class RetentionCleanupService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Retention cleanup gap loi khong mong muon.");
+                _workerHealthRegistry.Report("retention-cleanup", "Unhealthy", ex.Message, errorAtUtc: DateTime.UtcNow);
             }
 
             try
@@ -80,6 +86,12 @@ public class RetentionCleanupService : BackgroundService
                 deletedDeliveries,
                 deletedOutbox);
         }
+
+        _workerHealthRegistry.Report(
+            "retention-cleanup",
+            "Healthy",
+            $"Cleanup completed. SecurityEvents={deletedSecurityEvents}; NotificationDeliveries={deletedDeliveries}; OutboxMessages={deletedOutbox}.",
+            successAtUtc: nowUtc);
     }
 
     private static async Task<int> DeleteSecurityEventsAsync(

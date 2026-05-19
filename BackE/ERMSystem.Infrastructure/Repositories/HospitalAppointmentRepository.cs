@@ -56,12 +56,14 @@ public class HospitalAppointmentRepository : IHospitalAppointmentRepository
         Guid doctorProfileId,
         DateTime appointmentStartUtc,
         DateTime appointmentEndUtc,
+        Guid? excludingAppointmentId = null,
         CancellationToken ct = default)
     {
         return _hospitalDbContext.Appointments
             .AsNoTracking()
             .Where(x => x.DoctorProfileId == doctorProfileId)
             .Where(x => x.Status != "Cancelled")
+            .Where(x => !excludingAppointmentId.HasValue || x.Id != excludingAppointmentId.Value)
             .AnyAsync(
                 x => x.AppointmentStartUtc < appointmentEndUtc &&
                      (x.AppointmentEndUtc ?? x.AppointmentStartUtc) > appointmentStartUtc,
@@ -307,6 +309,27 @@ public class HospitalAppointmentRepository : IHospitalAppointmentRepository
         }
 
         appointment.Status = status;
+        appointment.UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public async Task UpdateScheduleAsync(
+        Guid appointmentId,
+        Guid clinicId,
+        DateTime appointmentStartUtc,
+        DateTime appointmentEndUtc,
+        string? notes,
+        CancellationToken ct = default)
+    {
+        var appointment = await _hospitalDbContext.Appointments.FirstOrDefaultAsync(x => x.Id == appointmentId, ct);
+        if (appointment == null)
+        {
+            throw new InvalidOperationException("Khong tim thay lich hen.");
+        }
+
+        appointment.ClinicId = clinicId;
+        appointment.AppointmentStartUtc = appointmentStartUtc;
+        appointment.AppointmentEndUtc = appointmentEndUtc;
+        appointment.Notes = notes;
         appointment.UpdatedAtUtc = DateTime.UtcNow;
     }
 

@@ -19,6 +19,7 @@ namespace ERMSystem.Application.Interfaces
             Guid doctorProfileId,
             DateTime appointmentStartUtc,
             DateTime appointmentEndUtc,
+            Guid? excludingAppointmentId = null,
             CancellationToken ct = default);
 
         Task AddPatientAsync(HospitalBookingPatientCreateCommand patient, CancellationToken ct = default);
@@ -36,6 +37,13 @@ namespace ERMSystem.Application.Interfaces
         Task AddCheckInAsync(HospitalAppointmentCheckInCommand checkIn, CancellationToken ct = default);
         Task AddQueueTicketAsync(HospitalAppointmentQueueTicketCreateCommand ticket, CancellationToken ct = default);
         Task UpdateStatusAsync(Guid appointmentId, string status, CancellationToken ct = default);
+        Task UpdateScheduleAsync(
+            Guid appointmentId,
+            Guid clinicId,
+            DateTime appointmentStartUtc,
+            DateTime appointmentEndUtc,
+            string? notes,
+            CancellationToken ct = default);
         Task SaveChangesAsync(CancellationToken ct = default);
     }
 

@@ -69,6 +69,7 @@ namespace ERMSystem.Application.Services
                 doctor.DoctorProfileId,
                 appointmentStartUtc,
                 appointmentEndUtc,
+                null,
                 ct);
 
             if (hasConflict)
@@ -236,10 +237,9 @@ namespace ERMSystem.Application.Services
             CancellationToken ct = default)
         {
             var normalizedStatus = request.Status.Trim();
-            var allowedStatuses = new[] { "Scheduled", "CheckedIn", "Completed", "Cancelled" };
-            if (!allowedStatuses.Contains(normalizedStatus, StringComparer.OrdinalIgnoreCase))
+            if (!string.Equals(normalizedStatus, "Completed", StringComparison.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException("Trang thai lich hen khong hop le.");
+                throw new InvalidOperationException("Endpoint nay chi dung de chuyen lich hen sang Completed.");
             }
 
             var appointment = await _hospitalAppointmentRepository.GetAppointmentAggregateAsync(appointmentId, ct);
@@ -251,6 +251,11 @@ namespace ERMSystem.Application.Services
             if (appointment.Status == "Cancelled" && !string.Equals(normalizedStatus, "Cancelled", StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException("Lich hen da huy khong the chuyen sang trang thai khac.");
+            }
+
+            if (string.Equals(appointment.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Lich hen da hoan thanh.");
             }
 
             var previousStatus = appointment.Status;
@@ -310,6 +315,183 @@ namespace ERMSystem.Application.Services
             return refreshed == null ? null : MapAggregateToWorklistItem(refreshed);
         }
 
+        public async Task<HospitalAppointmentWorklistItemDto?> CancelAsync(
+            Guid appointmentId,
+            HospitalAppointmentCancelRequestDto request,
+            CancellationToken ct = default)
+        {
+            var appointment = await _hospitalAppointmentRepository.GetAppointmentAggregateAsync(appointmentId, ct);
+            if (appointment == null)
+            {
+                return null;
+            }
+
+            if (!string.Equals(appointment.Status, "Scheduled", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Chi duoc huy lich hen dang Scheduled.");
+            }
+
+            var nowUtc = DateTime.UtcNow;
+            await _hospitalAppointmentRepository.UpdateStatusAsync(appointmentId, "Cancelled", ct);
+
+            var appointmentStartLocal = ConvertUtcToClinicLocal(appointment.AppointmentStartUtc);
+            var appointmentEndLocal = appointment.AppointmentEndUtc.HasValue
+                ? ConvertUtcToClinicLocal(appointment.AppointmentEndUtc.Value)
+                : (DateTime?)null;
+            var reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
+
+            await _hospitalAppointmentRepository.AddOutboxMessageAsync(new HospitalOutboxMessageCreateCommand
+            {
+                OutboxMessageId = Guid.NewGuid(),
+                AggregateType = "Appointment",
+                AggregateId = appointment.AppointmentId,
+                EventType = "AppointmentCancelled.v1",
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    appointmentId = appointment.AppointmentId,
+                    appointmentNumber = appointment.AppointmentNumber,
+                    patientId = appointment.PatientId,
+                    patientName = appointment.PatientName,
+                    phone = appointment.PatientPhone,
+                    email = appointment.PatientEmail,
+                    doctorProfileId = appointment.DoctorProfileId,
+                    doctorName = appointment.DoctorName,
+                    specialtyName = appointment.SpecialtyName,
+                    clinicName = appointment.ClinicName,
+                    appointmentStartLocal,
+                    appointmentEndLocal,
+                    previousStatus = appointment.Status,
+                    currentStatus = "Cancelled",
+                    channel = appointment.BookingChannel,
+                    reason
+                }, JsonOptions),
+                Status = "Pending",
+                AvailableAtUtc = nowUtc
+            }, ct);
+
+            await _hospitalAppointmentRepository.SaveChangesAsync(ct);
+
+            _businessMetricsRecorder.IncrementEvent("hospital_appointment", "cancelled", new Dictionary<string, string?>
+            {
+                ["channel"] = appointment.BookingChannel,
+                ["had_reason"] = string.IsNullOrWhiteSpace(reason) ? "false" : "true"
+            });
+
+            var refreshed = await _hospitalAppointmentRepository.GetAppointmentAggregateAsync(appointmentId, ct);
+            return refreshed == null ? null : MapAggregateToWorklistItem(refreshed);
+        }
+
+        public async Task<HospitalAppointmentWorklistItemDto?> RescheduleAsync(
+            Guid appointmentId,
+            HospitalAppointmentRescheduleRequestDto request,
+            CancellationToken ct = default)
+        {
+            var appointment = await _hospitalAppointmentRepository.GetAppointmentAggregateAsync(appointmentId, ct);
+            if (appointment == null)
+            {
+                return null;
+            }
+
+            if (!string.Equals(appointment.Status, "Scheduled", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Chi duoc doi lich hen dang Scheduled.");
+            }
+
+            var doctor = await _hospitalDoctorRepository.GetDoctorByIdAsync(appointment.DoctorProfileId, ct);
+            if (doctor == null)
+            {
+                throw new InvalidOperationException("Khong tim thay thong tin bac si cua lich hen.");
+            }
+
+            var matchingSchedule = doctor.Schedules
+                .Where(x => x.DayOfWeek == (byte)request.PreferredDate.DayOfWeek)
+                .Where(x => x.ValidFrom <= request.PreferredDate && (!x.ValidTo.HasValue || x.ValidTo.Value >= request.PreferredDate))
+                .Where(x => x.StartTime <= request.PreferredTime)
+                .Where(x => request.PreferredTime.AddMinutes(x.SlotMinutes) <= x.EndTime)
+                .OrderBy(x => x.StartTime)
+                .FirstOrDefault();
+
+            if (matchingSchedule == null)
+            {
+                throw new InvalidOperationException("Khung gio doi lich khong nam trong lich lam viec cua bac si.");
+            }
+
+            var nextStartLocal = request.PreferredDate.ToDateTime(request.PreferredTime);
+            var nextEndLocal = nextStartLocal.AddMinutes(matchingSchedule.SlotMinutes);
+            var nextStartUtc = ConvertLocalClinicTimeToUtc(nextStartLocal);
+            var nextEndUtc = ConvertLocalClinicTimeToUtc(nextEndLocal);
+            if (nextStartUtc <= DateTime.UtcNow)
+            {
+                throw new InvalidOperationException("Khong the doi lich sang thoi diem trong qua khu.");
+            }
+
+            var hasConflict = await _hospitalAppointmentRepository.HasDoctorConflictAsync(
+                appointment.DoctorProfileId,
+                nextStartUtc,
+                nextEndUtc,
+                appointment.AppointmentId,
+                ct);
+            if (hasConflict)
+            {
+                throw new InvalidOperationException("Khung gio doi lich da co lich hen khac. Vui long chon gio khac.");
+            }
+
+            var reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
+            var mergedNotes = BuildRescheduleNotes(reason, appointment.AppointmentStartUtc, nextStartUtc);
+            await _hospitalAppointmentRepository.UpdateScheduleAsync(
+                appointment.AppointmentId,
+                matchingSchedule.ClinicId,
+                nextStartUtc,
+                nextEndUtc,
+                mergedNotes,
+                ct);
+
+            await _hospitalAppointmentRepository.AddOutboxMessageAsync(new HospitalOutboxMessageCreateCommand
+            {
+                OutboxMessageId = Guid.NewGuid(),
+                AggregateType = "Appointment",
+                AggregateId = appointment.AppointmentId,
+                EventType = "AppointmentUpdated.v1",
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    appointmentId = appointment.AppointmentId,
+                    appointmentNumber = appointment.AppointmentNumber,
+                    patientId = appointment.PatientId,
+                    patientName = appointment.PatientName,
+                    phone = appointment.PatientPhone,
+                    email = appointment.PatientEmail,
+                    doctorProfileId = appointment.DoctorProfileId,
+                    doctorName = appointment.DoctorName,
+                    specialtyName = appointment.SpecialtyName,
+                    clinicName = matchingSchedule.ClinicName,
+                    previousStatus = appointment.Status,
+                    currentStatus = appointment.Status,
+                    previousAppointmentStartLocal = ConvertUtcToClinicLocal(appointment.AppointmentStartUtc),
+                    previousAppointmentEndLocal = appointment.AppointmentEndUtc.HasValue
+                        ? ConvertUtcToClinicLocal(appointment.AppointmentEndUtc.Value)
+                        : (DateTime?)null,
+                    appointmentStartLocal = nextStartLocal,
+                    appointmentEndLocal = nextEndLocal,
+                    channel = appointment.BookingChannel,
+                    changeType = "Rescheduled",
+                    reason
+                }, JsonOptions),
+                Status = "Pending",
+                AvailableAtUtc = DateTime.UtcNow
+            }, ct);
+
+            await _hospitalAppointmentRepository.SaveChangesAsync(ct);
+
+            _businessMetricsRecorder.IncrementEvent("hospital_appointment", "rescheduled", new Dictionary<string, string?>
+            {
+                ["channel"] = appointment.BookingChannel,
+                ["had_reason"] = string.IsNullOrWhiteSpace(reason) ? "false" : "true"
+            });
+
+            var refreshed = await _hospitalAppointmentRepository.GetAppointmentAggregateAsync(appointmentId, ct);
+            return refreshed == null ? null : MapAggregateToWorklistItem(refreshed);
+        }
+
         private static TimeZoneInfo ResolveClinicTimeZone()
         {
             try
@@ -348,6 +530,18 @@ namespace ERMSystem.Application.Services
 
             var merged = string.Join(" | ", parts);
             return string.IsNullOrWhiteSpace(merged) ? null : merged;
+        }
+
+        private static string BuildRescheduleNotes(string? reason, DateTime previousStartUtc, DateTime nextStartUtc)
+        {
+            var parts = new[]
+            {
+                $"RescheduledFromUtc: {previousStartUtc:O}",
+                $"RescheduledToUtc: {nextStartUtc:O}",
+                string.IsNullOrWhiteSpace(reason) ? null : $"RescheduleReason: {reason}"
+            }.Where(x => !string.IsNullOrWhiteSpace(x));
+
+            return string.Join(" | ", parts);
         }
 
         private static HospitalAppointmentWorklistItemDto MapAggregateToWorklistItem(HospitalAppointmentAggregateSnapshot aggregate)

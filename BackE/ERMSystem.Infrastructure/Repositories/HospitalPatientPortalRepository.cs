@@ -20,19 +20,7 @@ namespace ERMSystem.Infrastructure.Repositories
 
         public async Task<HospitalPatientPortalOverviewDto?> GetOverviewByUserIdAsync(Guid userId, CancellationToken ct = default)
         {
-            var account = await _hospitalDbContext.PatientAccounts
-                .AsNoTracking()
-                .Include(x => x.Patient)
-                .Where(x => x.UserId == userId)
-                .Where(x => x.Patient.DeletedAtUtc == null)
-                .Select(x => new
-                {
-                    x.PatientId,
-                    x.PortalStatus,
-                    x.ActivatedAtUtc,
-                    Patient = x.Patient
-                })
-                .FirstOrDefaultAsync(ct);
+            var account = await GetPortalAccountAsync(userId, ct);
 
             if (account == null)
             {
@@ -291,6 +279,145 @@ namespace ERMSystem.Infrastructure.Repositories
                 RecentClinicalOrders = clinicalOrders,
                 RecentInvoices = invoices
             };
+        }
+
+        public async Task<HospitalPatientVisitHistoryResultDto?> GetVisitHistoryByUserIdAsync(
+            Guid userId,
+            int pageNumber,
+            int pageSize,
+            CancellationToken ct = default)
+        {
+            var account = await GetPortalAccountAsync(userId, ct);
+            if (account == null)
+            {
+                return null;
+            }
+
+            pageNumber = Math.Max(1, pageNumber);
+            pageSize = Math.Clamp(pageSize, 1, 20);
+
+            var baseQuery = _hospitalDbContext.Appointments
+                .AsNoTracking()
+                .Where(x => x.PatientId == account.PatientId);
+
+            var totalCount = await baseQuery.CountAsync(ct);
+            var items = await baseQuery
+                .OrderByDescending(x => x.AppointmentStartUtc)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(x => new HospitalPatientVisitHistoryItemDto
+                {
+                    AppointmentId = x.Id,
+                    AppointmentNumber = x.AppointmentNumber,
+                    AppointmentStatus = x.Status,
+                    AppointmentType = x.AppointmentType,
+                    BookingChannel = x.BookingChannel,
+                    AppointmentStartLocal = ConvertUtcToClinicLocal(x.AppointmentStartUtc),
+                    AppointmentEndLocal = x.AppointmentEndUtc.HasValue
+                        ? ConvertUtcToClinicLocal(x.AppointmentEndUtc.Value)
+                        : null,
+                    CheckInTimeLocal = x.CheckIn != null
+                        ? ConvertUtcToClinicLocal(x.CheckIn.CheckInTimeUtc)
+                        : null,
+                    DoctorName = x.DoctorProfile.StaffProfile.FullName,
+                    SpecialtyName = x.DoctorProfile.Specialty.Name,
+                    ClinicName = x.Clinic.Name,
+                    ChiefComplaint = x.ChiefComplaint,
+                    EncounterId = _hospitalDbContext.Encounters
+                        .Where(e => e.AppointmentId == x.Id)
+                        .OrderByDescending(e => e.StartedAtUtc)
+                        .Select(e => (Guid?)e.Id)
+                        .FirstOrDefault(),
+                    EncounterNumber = _hospitalDbContext.Encounters
+                        .Where(e => e.AppointmentId == x.Id)
+                        .OrderByDescending(e => e.StartedAtUtc)
+                        .Select(e => e.EncounterNumber)
+                        .FirstOrDefault(),
+                    EncounterStatus = _hospitalDbContext.Encounters
+                        .Where(e => e.AppointmentId == x.Id)
+                        .OrderByDescending(e => e.StartedAtUtc)
+                        .Select(e => e.EncounterStatus)
+                        .FirstOrDefault(),
+                    EncounterStartedLocal = _hospitalDbContext.Encounters
+                        .Where(e => e.AppointmentId == x.Id)
+                        .OrderByDescending(e => e.StartedAtUtc)
+                        .Select(e => (DateTime?)ConvertUtcToClinicLocal(e.StartedAtUtc))
+                        .FirstOrDefault(),
+                    EncounterEndedLocal = _hospitalDbContext.Encounters
+                        .Where(e => e.AppointmentId == x.Id)
+                        .OrderByDescending(e => e.StartedAtUtc)
+                        .Select(e => e.EndedAtUtc.HasValue
+                            ? ConvertUtcToClinicLocal(e.EndedAtUtc.Value)
+                            : (DateTime?)null)
+                        .FirstOrDefault(),
+                    PrimaryDiagnosisName = _hospitalDbContext.Diagnoses
+                        .Where(d => d.Encounter.AppointmentId == x.Id)
+                        .Where(d => d.IsPrimary)
+                        .OrderByDescending(d => d.NotedAtUtc)
+                        .Select(d => d.DiagnosisName)
+                        .FirstOrDefault(),
+                    ClinicalSummary = _hospitalDbContext.Encounters
+                        .Where(e => e.AppointmentId == x.Id)
+                        .OrderByDescending(e => e.StartedAtUtc)
+                        .Select(e => e.Summary)
+                        .FirstOrDefault(),
+                    PrescriptionCount = _hospitalDbContext.Prescriptions
+                        .Count(p => p.OrderHeader.Encounter.AppointmentId == x.Id),
+                    ClinicalOrderCount = _hospitalDbContext.OrderHeaders
+                        .Count(o => o.Encounter.AppointmentId == x.Id &&
+                                    (o.OrderCategory == "Lab" || o.OrderCategory == "Imaging")),
+                    InvoiceCount = _hospitalDbContext.Invoices
+                        .Count(i => i.Encounter != null && i.Encounter.AppointmentId == x.Id),
+                    TotalInvoiceAmount = _hospitalDbContext.Invoices
+                        .Where(i => i.Encounter != null && i.Encounter.AppointmentId == x.Id)
+                        .Sum(i => (decimal?)i.TotalAmount) ?? 0m,
+                    TotalPaidAmount = _hospitalDbContext.Invoices
+                        .Where(i => i.Encounter != null && i.Encounter.AppointmentId == x.Id)
+                        .SelectMany(i => i.Payments)
+                        .Where(p => p.PaymentStatus == "Paid")
+                        .Sum(p => (decimal?)p.Amount) ?? 0m,
+                    OutstandingBalanceAmount = (_hospitalDbContext.Invoices
+                        .Where(i => i.Encounter != null && i.Encounter.AppointmentId == x.Id)
+                        .Sum(i => (decimal?)i.TotalAmount) ?? 0m) - (_hospitalDbContext.Invoices
+                        .Where(i => i.Encounter != null && i.Encounter.AppointmentId == x.Id)
+                        .SelectMany(i => i.Payments)
+                        .Where(p => p.PaymentStatus == "Paid")
+                        .Sum(p => (decimal?)p.Amount) ?? 0m)
+                })
+                .ToListAsync(ct);
+
+            return new HospitalPatientVisitHistoryResultDto
+            {
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                Items = items
+            };
+        }
+
+        private async Task<PortalAccountProjection?> GetPortalAccountAsync(Guid userId, CancellationToken ct)
+        {
+            return await _hospitalDbContext.PatientAccounts
+                .AsNoTracking()
+                .Include(x => x.Patient)
+                .Where(x => x.UserId == userId)
+                .Where(x => x.Patient.DeletedAtUtc == null)
+                .Select(x => new PortalAccountProjection
+                {
+                    PatientId = x.PatientId,
+                    PortalStatus = x.PortalStatus,
+                    ActivatedAtUtc = x.ActivatedAtUtc,
+                    Patient = x.Patient
+                })
+                .FirstOrDefaultAsync(ct);
+        }
+
+        private sealed class PortalAccountProjection
+        {
+            public Guid PatientId { get; set; }
+            public string PortalStatus { get; set; } = string.Empty;
+            public DateTime ActivatedAtUtc { get; set; }
+            public required ERMSystem.Infrastructure.HospitalData.Entities.HospitalPatientEntity Patient { get; set; }
         }
 
         private static string? BuildAddress(string? addressLine1, string? ward, string? district, string? province)

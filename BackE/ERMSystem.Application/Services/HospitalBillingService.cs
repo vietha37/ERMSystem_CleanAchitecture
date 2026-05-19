@@ -13,17 +13,20 @@ public class HospitalBillingService : IHospitalBillingService
     private readonly IHospitalIdentityBridgeService _hospitalIdentityBridgeService;
     private readonly IBusinessMetricsRecorder _businessMetricsRecorder;
     private readonly IComplianceAuditRecorder _complianceAuditRecorder;
+    private readonly IDashboardQueryCache _dashboardQueryCache;
 
     public HospitalBillingService(
         IHospitalBillingRepository hospitalBillingRepository,
         IHospitalIdentityBridgeService hospitalIdentityBridgeService,
         IBusinessMetricsRecorder businessMetricsRecorder,
-        IComplianceAuditRecorder complianceAuditRecorder)
+        IComplianceAuditRecorder complianceAuditRecorder,
+        IDashboardQueryCache dashboardQueryCache)
     {
         _hospitalBillingRepository = hospitalBillingRepository;
         _hospitalIdentityBridgeService = hospitalIdentityBridgeService;
         _businessMetricsRecorder = businessMetricsRecorder;
         _complianceAuditRecorder = complianceAuditRecorder;
+        _dashboardQueryCache = dashboardQueryCache;
     }
 
     public Task<PaginatedResult<HospitalInvoiceSummaryDto>> GetWorklistAsync(
@@ -121,6 +124,7 @@ public class HospitalBillingService : IHospitalBillingService
         }, ct);
 
         await _hospitalBillingRepository.SaveChangesAsync(ct);
+        await _dashboardQueryCache.InvalidateAsync(ct);
 
         _businessMetricsRecorder.IncrementEvent("hospital_billing", "invoice_issued", new Dictionary<string, string?>
         {
@@ -216,6 +220,7 @@ public class HospitalBillingService : IHospitalBillingService
         }, ct);
 
         await _hospitalBillingRepository.SaveChangesAsync(ct);
+        await _dashboardQueryCache.InvalidateAsync(ct);
 
         _businessMetricsRecorder.IncrementEvent("hospital_billing", "payment_received", new Dictionary<string, string?>
         {
@@ -314,6 +319,7 @@ public class HospitalBillingService : IHospitalBillingService
         }, ct);
 
         await _hospitalBillingRepository.SaveChangesAsync(ct);
+        await _dashboardQueryCache.InvalidateAsync(ct);
 
         _businessMetricsRecorder.IncrementEvent("hospital_billing", "payment_refunded", new Dictionary<string, string?>
         {

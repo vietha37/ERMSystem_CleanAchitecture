@@ -32,6 +32,14 @@ public class HospitalNotificationDeliveriesController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("summary")]
+    [Authorize(Policy = AppPermissions.HospitalNotifications.Read)]
+    public async Task<IActionResult> GetSummary(CancellationToken ct)
+    {
+        var result = await _service.GetSummaryAsync(ct);
+        return Ok(result);
+    }
+
     [HttpPost("{deliveryId:guid}/retry")]
     [Authorize(Policy = AppPermissions.HospitalNotifications.Retry)]
     public async Task<IActionResult> RetryDelivery(Guid deliveryId, CancellationToken ct)

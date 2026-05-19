@@ -8,6 +8,7 @@ import { getApiErrorMessage } from "@/services/error";
 import { hospitalNotificationDeliveryService } from "@/services/hospitalNotificationDeliveryService";
 import {
   NotificationDelivery,
+  NotificationDeliverySummary,
   NotificationDeliveryStatus,
 } from "@/services/types";
 
@@ -63,6 +64,7 @@ function canRetry(status: NotificationDeliveryStatus): boolean {
 export default function NotificationsPage() {
   const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([]);
   const [statusFilter, setStatusFilter] = useState<DeliveryStatusFilter>("All");
+  const [summary, setSummary] = useState<NotificationDeliverySummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
@@ -83,14 +85,18 @@ export default function NotificationsPage() {
       }
 
       try {
-        const response = await hospitalNotificationDeliveryService.getAll(
-          statusFilter,
-          pageNumber,
-          pageSize
-        );
+        const [response, summaryResponse] = await Promise.all([
+          hospitalNotificationDeliveryService.getAll(
+            statusFilter,
+            pageNumber,
+            pageSize
+          ),
+          hospitalNotificationDeliveryService.getSummary(),
+        ]);
 
         setDeliveries(response.items);
         setTotalCount(response.totalCount);
+        setSummary(summaryResponse);
       } catch (error: unknown) {
         toast.error(getApiErrorMessage(error, "Không thể tải danh sách gửi thông báo."));
       } finally {
@@ -114,19 +120,13 @@ export default function NotificationsPage() {
   }, [fetchDeliveries]);
 
   const metrics = useMemo(() => {
-    return deliveries.reduce(
-      (acc, delivery) => {
-        acc[delivery.deliveryStatus] += 1;
-        return acc;
-      },
-      {
-        Queued: 0,
-        Delivered: 0,
-        Failed: 0,
-        Skipped: 0,
-      } as Record<NotificationDeliveryStatus, number>
-    );
-  }, [deliveries]);
+    return {
+      Queued: summary?.queuedCount ?? 0,
+      Delivered: summary?.deliveredCount ?? 0,
+      Failed: summary?.failedCount ?? 0,
+      Skipped: summary?.skippedCount ?? 0,
+    } as Record<NotificationDeliveryStatus, number>;
+  }, [summary]);
 
   const handleRetry = async (delivery: NotificationDelivery) => {
     setRetryingId(delivery.id);
@@ -250,6 +250,44 @@ export default function NotificationsPage() {
           </p>
           <p className="mt-2 text-sm text-slate-600">
             Thường do thiếu template hoặc không đủ dữ liệu người nhận.
+          </p>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="border border-violet-100 bg-violet-50/70 p-5 shadow-sm hover:shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-700">
+            Cần can thiệp
+          </p>
+          <p className="mt-3 text-3xl font-bold text-violet-950">
+            {summary?.actionRequiredCount ?? 0}
+          </p>
+          <p className="mt-2 text-sm text-violet-800">
+            Failed + Skipped cần operator kiểm tra hoặc retry.
+          </p>
+        </Card>
+
+        <Card className="border border-orange-100 bg-orange-50/70 p-5 shadow-sm hover:shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-700">
+            Queued quá 15 phút
+          </p>
+          <p className="mt-3 text-3xl font-bold text-orange-950">
+            {summary?.staleQueuedCount ?? 0}
+          </p>
+          <p className="mt-2 text-sm text-orange-800">
+            Dùng như backlog monitor cơ bản cho queue dispatch.
+          </p>
+        </Card>
+
+        <Card className="border border-cyan-100 bg-cyan-50/70 p-5 shadow-sm hover:shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">
+            Queued lâu nhất
+          </p>
+          <p className="mt-3 text-lg font-bold text-cyan-950">
+            {formatDateTime(summary?.oldestQueuedAtUtc)}
+          </p>
+          <p className="mt-2 text-sm text-cyan-800">
+            Cập nhật gần nhất: {formatDateTime(summary?.generatedAtUtc)}
           </p>
         </Card>
       </div>

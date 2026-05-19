@@ -145,6 +145,18 @@ export type NotificationDeliveryListResult = {
   items: NotificationDelivery[];
 };
 
+export type NotificationDeliverySummary = {
+  totalCount: number;
+  queuedCount: number;
+  deliveredCount: number;
+  failedCount: number;
+  skippedCount: number;
+  actionRequiredCount: number;
+  staleQueuedCount: number;
+  oldestQueuedAtUtc?: string | null;
+  generatedAtUtc: string;
+};
+
 export type HospitalPatientPortalProfile = {
   patientId: Id;
   medicalRecordNumber: string;
@@ -179,6 +191,41 @@ export type HospitalPatientPortalOverview = {
   recentPrescriptions: HospitalPatientPortalPrescription[];
   recentClinicalOrders: HospitalPatientPortalClinicalOrder[];
   recentInvoices: HospitalPatientPortalInvoice[];
+};
+
+export type HospitalPatientVisitHistoryItem = {
+  appointmentId: Id;
+  appointmentNumber: string;
+  appointmentStatus: string;
+  appointmentType: string;
+  bookingChannel: string;
+  appointmentStartLocal: string;
+  appointmentEndLocal?: string | null;
+  checkInTimeLocal?: string | null;
+  doctorName: string;
+  specialtyName: string;
+  clinicName: string;
+  chiefComplaint?: string | null;
+  encounterId?: Id | null;
+  encounterNumber?: string | null;
+  encounterStatus?: string | null;
+  encounterStartedLocal?: string | null;
+  encounterEndedLocal?: string | null;
+  primaryDiagnosisName?: string | null;
+  clinicalSummary?: string | null;
+  prescriptionCount: number;
+  clinicalOrderCount: number;
+  invoiceCount: number;
+  totalInvoiceAmount: number;
+  totalPaidAmount: number;
+  outstandingBalanceAmount: number;
+};
+
+export type HospitalPatientVisitHistoryResult = {
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  items: HospitalPatientVisitHistoryItem[];
 };
 
 export type HospitalPatientPortalPrescriptionItem = {
@@ -309,6 +356,16 @@ export type HospitalAppointmentWorklistQuery = {
 
 export type HospitalAppointmentCheckInPayload = {
   counterLabel?: string;
+};
+
+export type HospitalAppointmentCancelPayload = {
+  reason?: string;
+};
+
+export type HospitalAppointmentReschedulePayload = {
+  preferredDate: string;
+  preferredTime: string;
+  reason?: string;
 };
 
 export type HospitalEncounterStatus = "InProgress" | "Finalized";

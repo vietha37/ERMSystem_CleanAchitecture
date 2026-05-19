@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -67,6 +67,32 @@ function formatDateTime(value?: string | null): string {
   return date.toLocaleString("vi-VN");
 }
 
+function formatDateInput(value?: string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+function formatTimeInput(value?: string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toISOString().slice(11, 16);
+}
+
 export default function AppointmentsPage() {
   const { role } = useAuth();
   const [appointments, setAppointments] = useState<HospitalAppointmentWorklistItem[]>([]);
@@ -80,8 +106,14 @@ export default function AppointmentsPage() {
   const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<HospitalAppointmentWorklistItem | null>(null);
   const [counterLabel, setCounterLabel] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+  const [rescheduleReason, setRescheduleReason] = useState("");
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
   const [actionId, setActionId] = useState<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -149,6 +181,40 @@ export default function AppointmentsPage() {
     setIsCheckInModalOpen(true);
   };
 
+  const openCancelModal = (appointment: HospitalAppointmentWorklistItem) => {
+    setSelectedAppointment(appointment);
+    setCancelReason("");
+    setIsCancelModalOpen(true);
+  };
+
+  const openRescheduleModal = (appointment: HospitalAppointmentWorklistItem) => {
+    setSelectedAppointment(appointment);
+    setRescheduleReason("");
+    setRescheduleDate(formatDateInput(appointment.appointmentStartLocal));
+    setRescheduleTime(formatTimeInput(appointment.appointmentStartLocal));
+    setIsRescheduleModalOpen(true);
+  };
+
+  const resetCheckInModal = () => {
+    setIsCheckInModalOpen(false);
+    setSelectedAppointment(null);
+    setCounterLabel("");
+  };
+
+  const resetCancelModal = () => {
+    setIsCancelModalOpen(false);
+    setSelectedAppointment(null);
+    setCancelReason("");
+  };
+
+  const resetRescheduleModal = () => {
+    setIsRescheduleModalOpen(false);
+    setSelectedAppointment(null);
+    setRescheduleReason("");
+    setRescheduleDate("");
+    setRescheduleTime("");
+  };
+
   const handleCheckIn = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedAppointment) {
@@ -163,9 +229,7 @@ export default function AppointmentsPage() {
       });
 
       toast.success("Đã check-in bệnh nhân và cấp số thứ tự.");
-      setIsCheckInModalOpen(false);
-      setSelectedAppointment(null);
-      setCounterLabel("");
+      resetCheckInModal();
       await fetchAppointments(true);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Không thể check-in lịch hẹn."));
@@ -174,15 +238,12 @@ export default function AppointmentsPage() {
     }
   };
 
-  const handleStatusUpdate = async (
-    appointment: HospitalAppointmentWorklistItem,
-    status: HospitalAppointmentWorklistStatus
-  ) => {
+  const handleComplete = async (appointment: HospitalAppointmentWorklistItem) => {
     setActionId(appointment.appointmentId);
 
     try {
-      await hospitalAppointmentWorklistService.updateStatus(appointment.appointmentId, status);
-      toast.success(`Đã cập nhật trạng thái sang ${getStatusLabel(status)}.`);
+      await hospitalAppointmentWorklistService.updateStatus(appointment.appointmentId, "Completed");
+      toast.success("Đã cập nhật trạng thái sang Đã hoàn thành.");
       await fetchAppointments(true);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Không thể cập nhật trạng thái lịch hẹn."));
@@ -191,7 +252,54 @@ export default function AppointmentsPage() {
     }
   };
 
+  const handleCancel = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedAppointment) {
+      return;
+    }
+
+    setActionId(selectedAppointment.appointmentId);
+
+    try {
+      await hospitalAppointmentWorklistService.cancel(selectedAppointment.appointmentId, {
+        reason: cancelReason.trim() || undefined,
+      });
+      toast.success("Đã hủy lịch hẹn.");
+      resetCancelModal();
+      await fetchAppointments(true);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể hủy lịch hẹn."));
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleReschedule = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedAppointment || !rescheduleDate || !rescheduleTime) {
+      return;
+    }
+
+    setActionId(selectedAppointment.appointmentId);
+
+    try {
+      await hospitalAppointmentWorklistService.reschedule(selectedAppointment.appointmentId, {
+        preferredDate: rescheduleDate,
+        preferredTime: rescheduleTime,
+        reason: rescheduleReason.trim() || undefined,
+      });
+      toast.success("Đã đổi lịch hẹn.");
+      resetRescheduleModal();
+      await fetchAppointments(true);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể đổi lịch hẹn."));
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const canCheckIn = role === "Admin" || role === "Receptionist";
+  const canManageAppointment = role === "Admin" || role === "Receptionist";
   const startItem = totalCount === 0 ? 0 : (pageNumber - 1) * pageSize + 1;
   const endItem = totalCount === 0 ? 0 : Math.min(pageNumber * pageSize, totalCount);
 
@@ -207,8 +315,7 @@ export default function AppointmentsPage() {
               Điều phối lịch hẹn nội bộ
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-              Worklist này đọc trực tiếp từ hospital database mới để lễ tân và bác sĩ
-              theo dõi luồng tiếp nhận, check-in và xử lý lịch hẹn trong ngày.
+              Tách rõ nhánh check-in, hoàn thành, hủy lịch và đổi lịch để lễ tân thao tác đúng policy.
             </p>
           </div>
 
@@ -294,7 +401,7 @@ export default function AppointmentsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-[1320px] w-full border-collapse text-left">
+            <table className="min-w-[1380px] w-full border-collapse text-left">
               <thead>
                 <tr className="bg-slate-50">
                   <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Lịch hẹn</th>
@@ -376,10 +483,21 @@ export default function AppointmentsPage() {
                           </Button>
                         )}
 
+                        {canManageAppointment && appointment.status === "Scheduled" && (
+                          <Button
+                            variant="secondary"
+                            onClick={() => openRescheduleModal(appointment)}
+                            disabled={actionId === appointment.appointmentId}
+                            className="border-sky-200 text-sky-700 hover:bg-sky-50"
+                          >
+                            Đổi lịch
+                          </Button>
+                        )}
+
                         {appointment.status !== "Completed" && appointment.status !== "Cancelled" && (
                           <Button
                             variant="secondary"
-                            onClick={() => void handleStatusUpdate(appointment, "Completed")}
+                            onClick={() => void handleComplete(appointment)}
                             disabled={actionId === appointment.appointmentId}
                             className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                           >
@@ -387,10 +505,10 @@ export default function AppointmentsPage() {
                           </Button>
                         )}
 
-                        {appointment.status !== "Cancelled" && (
+                        {canManageAppointment && appointment.status === "Scheduled" && (
                           <Button
                             variant="secondary"
-                            onClick={() => void handleStatusUpdate(appointment, "Cancelled")}
+                            onClick={() => openCancelModal(appointment)}
                             disabled={actionId === appointment.appointmentId}
                             className="border-rose-200 text-rose-700 hover:bg-rose-50"
                           >
@@ -433,24 +551,9 @@ export default function AppointmentsPage() {
         </div>
       </Card>
 
-      <Modal
-        isOpen={isCheckInModalOpen}
-        onClose={() => {
-          setIsCheckInModalOpen(false);
-          setSelectedAppointment(null);
-          setCounterLabel("");
-        }}
-        title="Check-in bệnh nhân"
-      >
+      <Modal isOpen={isCheckInModalOpen} onClose={resetCheckInModal} title="Check-in bệnh nhân">
         <form onSubmit={handleCheckIn} className="space-y-5">
-          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-slate-900">
-              {selectedAppointment?.patientName}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              {selectedAppointment?.appointmentNumber} / {selectedAppointment?.doctorName}
-            </p>
-          </div>
+          <ModalAppointmentSummary appointment={selectedAppointment} />
 
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -466,15 +569,7 @@ export default function AppointmentsPage() {
           </div>
 
           <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                setIsCheckInModalOpen(false);
-                setSelectedAppointment(null);
-                setCounterLabel("");
-              }}
-            >
+            <Button type="button" variant="secondary" onClick={resetCheckInModal}>
               Đóng
             </Button>
             <Button type="submit" disabled={!selectedAppointment || actionId === selectedAppointment.appointmentId}>
@@ -483,6 +578,124 @@ export default function AppointmentsPage() {
           </div>
         </form>
       </Modal>
+
+      <Modal isOpen={isCancelModalOpen} onClose={resetCancelModal} title="Hủy lịch hẹn">
+        <form onSubmit={handleCancel} className="space-y-5">
+          <ModalAppointmentSummary appointment={selectedAppointment} />
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Lý do hủy
+            </label>
+            <textarea
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              rows={4}
+              placeholder="Ví dụ: bệnh nhân xin dời sang ngày khác"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            Policy hiện tại: chỉ hủy được lịch đang Scheduled. Lịch đã check-in sẽ phải xử lý tiếp ở quầy thay vì hủy trực tiếp.
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+            <Button type="button" variant="secondary" onClick={resetCancelModal}>
+              Đóng
+            </Button>
+            <Button type="submit" disabled={!selectedAppointment || actionId === selectedAppointment.appointmentId}>
+              {actionId === selectedAppointment?.appointmentId ? "Đang xử lý..." : "Xác nhận hủy lịch"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={isRescheduleModalOpen} onClose={resetRescheduleModal} title="Đổi lịch hẹn">
+        <form onSubmit={handleReschedule} className="space-y-5">
+          <ModalAppointmentSummary appointment={selectedAppointment} />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Ngày mới
+              </label>
+              <input
+                type="date"
+                value={rescheduleDate}
+                onChange={(event) => setRescheduleDate(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Giờ mới
+              </label>
+              <input
+                type="time"
+                value={rescheduleTime}
+                onChange={(event) => setRescheduleTime(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Lý do đổi lịch
+            </label>
+            <textarea
+              value={rescheduleReason}
+              onChange={(event) => setRescheduleReason(event.target.value)}
+              rows={4}
+              placeholder="Ví dụ: bệnh nhân xin đổi sang buổi chiều"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+            Policy hiện tại: chỉ đổi được lịch đang Scheduled, giữ nguyên bác sĩ, phải khớp lịch làm việc và không trùng slot hiện có.
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+            <Button type="button" variant="secondary" onClick={resetRescheduleModal}>
+              Đóng
+            </Button>
+            <Button
+              type="submit"
+              disabled={
+                !selectedAppointment ||
+                !rescheduleDate ||
+                !rescheduleTime ||
+                actionId === selectedAppointment.appointmentId
+              }
+            >
+              {actionId === selectedAppointment?.appointmentId ? "Đang xử lý..." : "Xác nhận đổi lịch"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}
+
+function ModalAppointmentSummary({
+  appointment,
+}: {
+  appointment: HospitalAppointmentWorklistItem | null;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+      <p className="text-sm font-semibold text-slate-900">
+        {appointment?.patientName}
+      </p>
+      <p className="mt-1 text-sm text-slate-500">
+        {appointment?.appointmentNumber} / {appointment?.doctorName}
+      </p>
+      <p className="mt-1 text-xs text-slate-400">
+        {formatDateTime(appointment?.appointmentStartLocal)}
+      </p>
     </div>
   );
 }

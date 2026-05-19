@@ -41,5 +41,28 @@ namespace ERMSystem.API.Controllers
 
             return Ok(overview);
         }
+
+        [HttpGet("me/visit-history")]
+        public async Task<IActionResult> GetMyVisitHistory(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            CancellationToken ct = default)
+        {
+            var userIdRaw = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (!Guid.TryParse(userIdRaw, out var userId))
+            {
+                return Unauthorized(new { message = "Ngu canh nguoi dung khong hop le." });
+            }
+
+            var history = await _service.GetVisitHistoryByUserIdAsync(userId, pageNumber, pageSize, ct);
+            if (history == null)
+            {
+                return NotFound(new { message = "Khong tim thay ho so cong thong tin benh nhan." });
+            }
+
+            return Ok(history);
+        }
     }
 }

@@ -15,23 +15,32 @@ namespace ERMSystem.Application.Services
         private readonly IMedicalRecordRepository _medicalRecordRepository;
         private readonly IPrescriptionRepository _prescriptionRepository;
         private readonly IHospitalBillingRepository _hospitalBillingRepository;
+        private readonly IDashboardQueryCache _dashboardQueryCache;
 
         public DashboardService(
             IPatientRepository patientRepository,
             IAppointmentRepository appointmentRepository,
             IMedicalRecordRepository medicalRecordRepository,
             IPrescriptionRepository prescriptionRepository,
-            IHospitalBillingRepository hospitalBillingRepository)
+            IHospitalBillingRepository hospitalBillingRepository,
+            IDashboardQueryCache dashboardQueryCache)
         {
             _patientRepository = patientRepository;
             _appointmentRepository = appointmentRepository;
             _medicalRecordRepository = medicalRecordRepository;
             _prescriptionRepository = prescriptionRepository;
             _hospitalBillingRepository = hospitalBillingRepository;
+            _dashboardQueryCache = dashboardQueryCache;
         }
 
         public async Task<DashboardStatsDto> GetDashboardStatsAsync(CancellationToken ct = default)
         {
+            var cached = await _dashboardQueryCache.GetStatsAsync(ct);
+            if (cached is not null)
+            {
+                return cached;
+            }
+
             var patientsCount = await _patientRepository.GetTotalCountAsync(ct);
             var todayAppointmentsCount = await _appointmentRepository.GetAppointmentsTodayCountAsync(ct);
             var pendingAppointmentsCount = await _appointmentRepository.GetPendingAppointmentsTodayCountAsync(ct);
@@ -56,7 +65,7 @@ namespace ERMSystem.Application.Services
                 ? 0m
                 : Math.Round(billingSnapshot.CollectedAmountInRange * 100m / billingSnapshot.IssuedAmountInRange, 2);
 
-            return new DashboardStatsDto
+            var result = new DashboardStatsDto
             {
                 TotalPatients = patientsCount,
                 AppointmentsToday = todayAppointmentsCount,
@@ -75,6 +84,10 @@ namespace ERMSystem.Application.Services
                 CollectionRatePercent = collectionRate,
                 TopDiagnoses = topDiagnoses
             };
+
+            await _dashboardQueryCache.SetStatsAsync(result, ct);
+
+            return result;
         }
 
         public async Task<DashboardTrendsDto> GetDashboardTrendsAsync(
@@ -116,6 +129,12 @@ namespace ERMSystem.Application.Services
                 dayCount = 366;
             }
 
+            var cached = await _dashboardQueryCache.GetTrendsAsync("daily", effectiveFrom, effectiveTo, ct);
+            if (cached is not null)
+            {
+                return cached;
+            }
+
             var previousFrom = effectiveFrom.AddDays(-dayCount);
             var previousTo = effectiveFrom.AddDays(-1);
 
@@ -147,7 +166,7 @@ namespace ERMSystem.Application.Services
             var previousAppointmentsTotal = SumByRange(appointmentMap, previousFrom, previousTo);
             var previousPrescriptionsTotal = SumByRange(prescriptionMap, previousFrom, previousTo);
 
-            return new DashboardTrendsDto
+            var result = new DashboardTrendsDto
             {
                 Period = "daily",
                 FromDate = effectiveFrom,
@@ -160,6 +179,10 @@ namespace ERMSystem.Application.Services
                 PreviousPrescriptionsTotal = previousPrescriptionsTotal,
                 Points = points
             };
+
+            await _dashboardQueryCache.SetTrendsAsync("daily", effectiveFrom, effectiveTo, result, ct);
+
+            return result;
         }
 
         private async Task<DashboardTrendsDto> BuildMonthlyTrendsAsync(
@@ -183,6 +206,12 @@ namespace ERMSystem.Application.Services
             {
                 effectiveFrom = effectiveTo.AddMonths(-23);
                 monthCount = 24;
+            }
+
+            var cached = await _dashboardQueryCache.GetTrendsAsync("monthly", effectiveFrom, effectiveTo, ct);
+            if (cached is not null)
+            {
+                return cached;
             }
 
             var previousFrom = effectiveFrom.AddMonths(-monthCount);
@@ -220,7 +249,7 @@ namespace ERMSystem.Application.Services
             var previousAppointmentsTotal = SumByMonthRange(appointmentMonthlyMap, previousFrom, previousTo);
             var previousPrescriptionsTotal = SumByMonthRange(prescriptionMonthlyMap, previousFrom, previousTo);
 
-            return new DashboardTrendsDto
+            var result = new DashboardTrendsDto
             {
                 Period = "monthly",
                 FromDate = effectiveFrom,
@@ -233,6 +262,10 @@ namespace ERMSystem.Application.Services
                 PreviousPrescriptionsTotal = previousPrescriptionsTotal,
                 Points = points
             };
+
+            await _dashboardQueryCache.SetTrendsAsync("monthly", effectiveFrom, effectiveTo, result, ct);
+
+            return result;
         }
 
         private static Dictionary<DateTime, int> GroupByMonth(Dictionary<DateTime, int> dailyMap)

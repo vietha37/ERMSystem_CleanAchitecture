@@ -8,5 +8,10 @@ namespace ERMSystem.Application.Interfaces
     public interface IHospitalPatientPortalRepository
     {
         Task<HospitalPatientPortalOverviewDto?> GetOverviewByUserIdAsync(Guid userId, CancellationToken ct = default);
+        Task<HospitalPatientVisitHistoryResultDto?> GetVisitHistoryByUserIdAsync(
+            Guid userId,
+            int pageNumber,
+            int pageSize,
+            CancellationToken ct = default);
     }
 }

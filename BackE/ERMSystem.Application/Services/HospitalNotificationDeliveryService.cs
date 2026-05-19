@@ -28,6 +28,9 @@ namespace ERMSystem.Application.Services
             CancellationToken ct = default)
             => _repository.GetDeliveriesAsync(status, channelCode, recipient, pageNumber, pageSize, ct);
 
+        public Task<NotificationDeliverySummaryDto> GetSummaryAsync(CancellationToken ct = default)
+            => _repository.GetSummaryAsync(ct);
+
         public async Task<NotificationDeliveryRetryResult> RetryDeliveryAsync(
             Guid deliveryId,
             Guid? actorUserId,

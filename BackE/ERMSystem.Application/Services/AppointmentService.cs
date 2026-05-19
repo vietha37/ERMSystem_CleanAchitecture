@@ -16,10 +16,14 @@ namespace ERMSystem.Application.Services
             new HashSet<string>(StringComparer.Ordinal) { "Pending", "Completed", "Cancelled" };
 
         private readonly IAppointmentRepository _appointmentRepository;
+        private readonly IDashboardQueryCache _dashboardQueryCache;
 
-        public AppointmentService(IAppointmentRepository appointmentRepository)
+        public AppointmentService(
+            IAppointmentRepository appointmentRepository,
+            IDashboardQueryCache dashboardQueryCache)
         {
             _appointmentRepository = appointmentRepository;
+            _dashboardQueryCache = dashboardQueryCache;
         }
 
         public async Task<PaginatedResult<AppointmentDto>> GetAllAppointmentsAsync(PaginationRequest request, CancellationToken ct = default)
@@ -58,6 +62,7 @@ namespace ERMSystem.Application.Services
             };
 
             await _appointmentRepository.AddAsync(appointment, ct);
+            await _dashboardQueryCache.InvalidateAsync(ct);
             return MapToDto(appointment);
         }
 
@@ -85,6 +90,7 @@ namespace ERMSystem.Application.Services
             appointment.Status = dto.Status;
 
             await _appointmentRepository.UpdateAsync(appointment, ct);
+            await _dashboardQueryCache.InvalidateAsync(ct);
         }
 
         public async Task DeleteAppointmentAsync(Guid id, CancellationToken ct = default)
@@ -94,6 +100,7 @@ namespace ERMSystem.Application.Services
                 throw new KeyNotFoundException($"Appointment with ID {id} not found.");
 
             await _appointmentRepository.DeleteAsync(appointment, ct);
+            await _dashboardQueryCache.InvalidateAsync(ct);
         }
 
         private static AppointmentDto MapToDto(Appointment a) => new AppointmentDto

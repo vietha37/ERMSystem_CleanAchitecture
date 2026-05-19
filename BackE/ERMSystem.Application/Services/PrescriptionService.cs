@@ -14,10 +14,14 @@ namespace ERMSystem.Application.Services
     public class PrescriptionService : IPrescriptionService
     {
         private readonly IPrescriptionRepository _prescriptionRepository;
+        private readonly IDashboardQueryCache _dashboardQueryCache;
 
-        public PrescriptionService(IPrescriptionRepository prescriptionRepository)
+        public PrescriptionService(
+            IPrescriptionRepository prescriptionRepository,
+            IDashboardQueryCache dashboardQueryCache)
         {
             _prescriptionRepository = prescriptionRepository;
+            _dashboardQueryCache = dashboardQueryCache;
         }
 
         public async Task<PaginatedResult<PrescriptionDto>> GetAllPrescriptionsAsync(PaginationRequest request, CancellationToken ct = default)
@@ -58,6 +62,7 @@ namespace ERMSystem.Application.Services
             };
 
             await _prescriptionRepository.AddAsync(prescription, ct);
+            await _dashboardQueryCache.InvalidateAsync(ct);
             return PrescriptionMapper.ToDto(prescription);
         }
 
@@ -68,6 +73,7 @@ namespace ERMSystem.Application.Services
                 throw new KeyNotFoundException($"Prescription with ID {id} not found.");
 
             await _prescriptionRepository.DeleteAsync(prescription, ct);
+            await _dashboardQueryCache.InvalidateAsync(ct);
         }
     }
 }

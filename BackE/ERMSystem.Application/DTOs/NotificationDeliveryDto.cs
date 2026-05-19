@@ -22,4 +22,17 @@ namespace ERMSystem.Application.DTOs
         public int TotalCount { get; set; }
         public IReadOnlyList<NotificationDeliveryDto> Items { get; set; } = Array.Empty<NotificationDeliveryDto>();
     }
+
+    public class NotificationDeliverySummaryDto
+    {
+        public int TotalCount { get; set; }
+        public int QueuedCount { get; set; }
+        public int DeliveredCount { get; set; }
+        public int FailedCount { get; set; }
+        public int SkippedCount { get; set; }
+        public int ActionRequiredCount { get; set; }
+        public int StaleQueuedCount { get; set; }
+        public DateTime? OldestQueuedAtUtc { get; set; }
+        public DateTime GeneratedAtUtc { get; set; }
+    }
 }

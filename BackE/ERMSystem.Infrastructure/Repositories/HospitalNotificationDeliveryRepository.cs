@@ -72,6 +72,45 @@ public class HospitalNotificationDeliveryRepository : IHospitalNotificationDeliv
         };
     }
 
+    public async Task<NotificationDeliverySummaryDto> GetSummaryAsync(CancellationToken ct = default)
+    {
+        var nowUtc = DateTime.UtcNow;
+        var staleQueuedCutoffUtc = nowUtc.AddMinutes(-15);
+        var deliveries = await _hospitalDbContext.NotificationDeliveries
+            .AsNoTracking()
+            .Select(x => new
+            {
+                x.DeliveryStatus,
+                x.LastAttemptAtUtc,
+                x.DeliveredAtUtc,
+                QueueReferenceAtUtc = x.LastAttemptAtUtc ?? x.OutboxMessage.PublishedAtUtc ?? x.OutboxMessage.AvailableAtUtc
+            })
+            .ToListAsync(ct);
+
+        var queuedItems = deliveries
+            .Where(x => string.Equals(x.DeliveryStatus, "Queued", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        return new NotificationDeliverySummaryDto
+        {
+            TotalCount = deliveries.Count,
+            QueuedCount = queuedItems.Length,
+            DeliveredCount = deliveries.Count(x => string.Equals(x.DeliveryStatus, "Delivered", StringComparison.OrdinalIgnoreCase)),
+            FailedCount = deliveries.Count(x => string.Equals(x.DeliveryStatus, "Failed", StringComparison.OrdinalIgnoreCase)),
+            SkippedCount = deliveries.Count(x => string.Equals(x.DeliveryStatus, "Skipped", StringComparison.OrdinalIgnoreCase)),
+            ActionRequiredCount = deliveries.Count(x =>
+                string.Equals(x.DeliveryStatus, "Failed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(x.DeliveryStatus, "Skipped", StringComparison.OrdinalIgnoreCase)),
+            StaleQueuedCount = queuedItems.Count(x =>
+                x.QueueReferenceAtUtc < staleQueuedCutoffUtc),
+            OldestQueuedAtUtc = queuedItems
+                .Select(x => x.QueueReferenceAtUtc)
+                .OrderBy(x => x)
+                .FirstOrDefault(),
+            GeneratedAtUtc = nowUtc
+        };
+    }
+
     public async Task<NotificationDeliveryRetryResult> RetryDeliveryAsync(Guid deliveryId, CancellationToken ct = default)
     {
         var delivery = await _hospitalDbContext.NotificationDeliveries.FirstOrDefaultAsync(x => x.Id == deliveryId, ct);

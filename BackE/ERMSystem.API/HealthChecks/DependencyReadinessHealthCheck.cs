@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using ERMSystem.Infrastructure.Services;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -8,13 +9,16 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
 {
     private readonly IConfiguration _configuration;
     private readonly ILogger<DependencyReadinessHealthCheck> _logger;
+    private readonly BackgroundWorkerHealthRegistry _workerHealthRegistry;
 
     public DependencyReadinessHealthCheck(
         IConfiguration configuration,
-        ILogger<DependencyReadinessHealthCheck> logger)
+        ILogger<DependencyReadinessHealthCheck> logger,
+        BackgroundWorkerHealthRegistry workerHealthRegistry)
     {
         _configuration = configuration;
         _logger = logger;
+        _workerHealthRegistry = workerHealthRegistry;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -40,6 +44,8 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
             data,
             failures,
             cancellationToken);
+
+        CheckWorkers(data, failures);
 
         return failures.Count == 0
             ? HealthCheckResult.Healthy("All dependencies are reachable.", data: data)
@@ -146,5 +152,57 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
         }
 
         return true;
+    }
+
+    private void CheckWorkers(
+        IDictionary<string, object> data,
+        ICollection<string> failures)
+    {
+        var workerSnapshots = _workerHealthRegistry.GetAll();
+        var nowUtc = DateTime.UtcNow;
+        var requiredWorkers = new[]
+        {
+            "hospital-outbox-publisher",
+            "hospital-notification-consumer",
+            "hospital-notification-dispatch",
+            "retention-cleanup",
+            "revisit-reminder-campaign"
+        };
+
+        var workerData = new Dictionary<string, object>();
+        foreach (var workerName in requiredWorkers)
+        {
+            var snapshot = workerSnapshots.FirstOrDefault(x => x.WorkerName == workerName);
+            if (snapshot == null)
+            {
+                workerData[workerName] = "missing";
+                failures.Add($"{workerName} missing");
+                continue;
+            }
+
+            var silence = nowUtc - snapshot.LastHeartbeatUtc;
+            workerData[workerName] = new
+            {
+                snapshot.Status,
+                snapshot.Detail,
+                snapshot.LastHeartbeatUtc,
+                snapshot.LastSuccessUtc,
+                snapshot.LastErrorUtc,
+                SilenceSeconds = Math.Round(silence.TotalSeconds, 2)
+            };
+
+            if (string.Equals(snapshot.Status, "Unhealthy", StringComparison.OrdinalIgnoreCase))
+            {
+                failures.Add($"{workerName} unhealthy");
+                continue;
+            }
+
+            if (silence > TimeSpan.FromMinutes(10))
+            {
+                failures.Add($"{workerName} stale");
+            }
+        }
+
+        data["workers"] = workerData;
     }
 }

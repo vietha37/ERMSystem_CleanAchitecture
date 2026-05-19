@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using ERMSystem.Infrastructure.HospitalData;
 using ERMSystem.Infrastructure.HospitalData.Entities;
+using ERMSystem.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -20,6 +21,7 @@ public class HospitalNotificationConsumerService : BackgroundService
     private readonly ILogger<HospitalNotificationConsumerService> _logger;
     private readonly RabbitMqOptions _rabbitMqOptions;
     private readonly NotificationConsumerOptions _consumerOptions;
+    private readonly BackgroundWorkerHealthRegistry _workerHealthRegistry;
 
     private IConnection? _connection;
     private IModel? _channel;
@@ -29,17 +31,20 @@ public class HospitalNotificationConsumerService : BackgroundService
         IServiceScopeFactory serviceScopeFactory,
         IOptions<RabbitMqOptions> rabbitMqOptions,
         IOptions<NotificationConsumerOptions> consumerOptions,
+        BackgroundWorkerHealthRegistry workerHealthRegistry,
         ILogger<HospitalNotificationConsumerService> logger)
     {
         _serviceScopeFactory = serviceScopeFactory;
         _rabbitMqOptions = rabbitMqOptions.Value;
         _consumerOptions = consumerOptions.Value;
+        _workerHealthRegistry = workerHealthRegistry;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Khoi dong worker consume notification tu RabbitMQ.");
+        _workerHealthRegistry.Report("hospital-notification-consumer", "Starting", "Worker started.");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -124,9 +129,11 @@ public class HospitalNotificationConsumerService : BackgroundService
                 consumer: consumer);
 
             _nextConnectAttemptUtc = DateTime.MinValue;
+            _workerHealthRegistry.Report("hospital-notification-consumer", "Healthy", "RabbitMQ consumer connected.", successAtUtc: nowUtc);
 
             _connection.ConnectionShutdown += (_, _) =>
             {
+                _workerHealthRegistry.Report("hospital-notification-consumer", "Degraded", "RabbitMQ connection shutdown detected.");
                 DisposeChannel();
             };
 
@@ -136,6 +143,7 @@ public class HospitalNotificationConsumerService : BackgroundService
         {
             _nextConnectAttemptUtc = nowUtc.AddSeconds(Math.Max(5, _consumerOptions.ReconnectDelaySeconds));
             _logger.LogWarning(ex, "Chua ket noi duoc RabbitMQ consumer. Se thu lai sau.");
+            _workerHealthRegistry.Report("hospital-notification-consumer", "Degraded", ex.Message, errorAtUtc: nowUtc);
             DisposeChannel();
             return false;
         }
@@ -157,6 +165,7 @@ public class HospitalNotificationConsumerService : BackgroundService
             if (envelope == null || envelope.MessageId == Guid.Empty)
             {
                 _logger.LogWarning("Nhan duoc message notification khong hop le, se ack bo qua.");
+                _workerHealthRegistry.Report("hospital-notification-consumer", "Degraded", "Received invalid message envelope.");
                 _channel.BasicAck(eventArgs.DeliveryTag, false);
                 return;
             }
@@ -204,6 +213,17 @@ public class HospitalNotificationConsumerService : BackgroundService
                                  x.IsActive,
                             stoppingToken);
 
+                    if (template == null && !string.Equals(templateCode, "GENERIC_NOTIFICATION", StringComparison.Ordinal))
+                    {
+                        template = await hospitalDbContext.NotificationTemplates
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(
+                                x => x.TemplateCode == "GENERIC_NOTIFICATION" &&
+                                     x.ChannelCode == target.ChannelCode &&
+                                     x.IsActive,
+                                stoppingToken);
+                    }
+
                     hospitalDbContext.NotificationDeliveries.Add(new HospitalNotificationDeliveryEntity
                     {
                         Id = Guid.NewGuid(),
@@ -223,10 +243,12 @@ public class HospitalNotificationConsumerService : BackgroundService
 
             await hospitalDbContext.SaveChangesAsync(stoppingToken);
             _channel.BasicAck(eventArgs.DeliveryTag, false);
+            _workerHealthRegistry.Report("hospital-notification-consumer", "Healthy", $"Processed event {envelope.EventType}.", successAtUtc: DateTime.UtcNow);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Consumer notification xu ly message that bai. Message se duoc requeue.");
+            _workerHealthRegistry.Report("hospital-notification-consumer", "Unhealthy", ex.Message, errorAtUtc: DateTime.UtcNow);
             _channel.BasicNack(eventArgs.DeliveryTag, false, true);
         }
     }
@@ -243,6 +265,7 @@ public class HospitalNotificationConsumerService : BackgroundService
             "InvoiceIssued.v1" => "INVOICE_ISSUED",
             "InvoicePaymentReceived.v1" => "INVOICE_PAYMENT_RECEIVED",
             "InvoiceRefunded.v1" => "INVOICE_REFUNDED",
+            "PatientRevisitReminder.v1" => "PATIENT_REVISIT_REMINDER",
             _ => "GENERIC_NOTIFICATION"
         };
 

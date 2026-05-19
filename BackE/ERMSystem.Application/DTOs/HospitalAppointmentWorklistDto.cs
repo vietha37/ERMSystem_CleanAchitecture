@@ -52,6 +52,24 @@ namespace ERMSystem.Application.DTOs
         public string Status { get; set; } = string.Empty;
     }
 
+    public class HospitalAppointmentCancelRequestDto
+    {
+        [MaxLength(500)]
+        public string? Reason { get; set; }
+    }
+
+    public class HospitalAppointmentRescheduleRequestDto
+    {
+        [Required]
+        public DateOnly PreferredDate { get; set; }
+
+        [Required]
+        public TimeOnly PreferredTime { get; set; }
+
+        [MaxLength(500)]
+        public string? Reason { get; set; }
+    }
+
     public class HospitalAppointmentCheckInRequestDto
     {
         [MaxLength(50)]

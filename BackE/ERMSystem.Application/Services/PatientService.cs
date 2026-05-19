@@ -14,13 +14,16 @@ namespace ERMSystem.Application.Services
     {
         private readonly IPatientRepository _patientRepository;
         private readonly IComplianceAuditRecorder _complianceAuditRecorder;
+        private readonly IDashboardQueryCache _dashboardQueryCache;
 
         public PatientService(
             IPatientRepository patientRepository,
-            IComplianceAuditRecorder complianceAuditRecorder)
+            IComplianceAuditRecorder complianceAuditRecorder,
+            IDashboardQueryCache dashboardQueryCache)
         {
             _patientRepository = patientRepository;
             _complianceAuditRecorder = complianceAuditRecorder;
+            _dashboardQueryCache = dashboardQueryCache;
         }
 
         public async Task<PaginatedResult<PatientDto>> GetAllPatientsAsync(PaginationRequest request, CancellationToken ct = default)
@@ -91,6 +94,7 @@ namespace ERMSystem.Application.Services
             };
 
             await _patientRepository.AddAsync(patient, ct);
+            await _dashboardQueryCache.InvalidateAsync(ct);
             return MapToDto(patient);
         }
 
@@ -110,6 +114,7 @@ namespace ERMSystem.Application.Services
             patient.EmergencyContactRelationship = dto.EmergencyContactRelationship;
 
             await _patientRepository.UpdateAsync(patient, ct);
+            await _dashboardQueryCache.InvalidateAsync(ct);
         }
 
         public async Task<MergePatientsResultDto> MergePatientsAsync(
@@ -167,6 +172,7 @@ namespace ERMSystem.Application.Services
                 ct);
 
             await _patientRepository.MergeAsync(sourcePatient, targetPatient, ct);
+            await _dashboardQueryCache.InvalidateAsync(ct);
 
             await _complianceAuditRecorder.RecordAsync(
                 actorUserId,
@@ -199,6 +205,7 @@ namespace ERMSystem.Application.Services
             }
 
             await _patientRepository.DeleteAsync(patient, ct);
+            await _dashboardQueryCache.InvalidateAsync(ct);
         }
 
         private static PatientDto MapToDto(Patient p) => new PatientDto

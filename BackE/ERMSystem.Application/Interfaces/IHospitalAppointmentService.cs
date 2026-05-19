@@ -24,5 +24,15 @@ namespace ERMSystem.Application.Interfaces
             Guid appointmentId,
             HospitalAppointmentStatusUpdateRequestDto request,
             CancellationToken ct = default);
+
+        Task<HospitalAppointmentWorklistItemDto?> CancelAsync(
+            Guid appointmentId,
+            HospitalAppointmentCancelRequestDto request,
+            CancellationToken ct = default);
+
+        Task<HospitalAppointmentWorklistItemDto?> RescheduleAsync(
+            Guid appointmentId,
+            HospitalAppointmentRescheduleRequestDto request,
+            CancellationToken ct = default);
     }
 }

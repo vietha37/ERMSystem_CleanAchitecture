@@ -1,0 +1,45 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: ermsystem-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  redis:
+    image: redis:7-alpine
+    container_name: ermsystem-redis
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      context: .
+      dockerfile: BackE/ERMSystem.API/Dockerfile
+    container_name: ermsystem-api
+    depends_on:
+      - rabbitmq
+      - redis
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: ${ERM_DB_CONNECTION_STRING:-Server=host.docker.internal;Database=ERMSystemDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True;Encrypt=False}
+      ConnectionStrings__HospitalConnection: ${ERM_HOSPITAL_DB_CONNECTION_STRING:-Server=host.docker.internal;Database=ERMSystemHospitalDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True;Encrypt=False}
+      Redis__ConnectionString: redis:6379
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__Port: 5672
+      RabbitMQ__Username: guest
+      RabbitMQ__Password: guest
+    ports:
+      - "5219:8080"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: FontE/Dockerfile
+    container_name: ermsystem-frontend
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:8080/api
+    ports:
+      - "3000:3000"
