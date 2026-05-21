@@ -514,6 +514,7 @@ export type HospitalPrescriptionItem = {
 export type HospitalPrescriptionDetail = HospitalPrescriptionSummary & {
   latestDispensingId?: Id | null;
   dispensingNotes?: string | null;
+  warnings: string[];
   items: HospitalPrescriptionItem[];
 };
 

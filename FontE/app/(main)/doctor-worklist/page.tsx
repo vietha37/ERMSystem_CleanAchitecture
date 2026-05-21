@@ -52,7 +52,7 @@ function getStatusClass(stage: string): string {
 
 export default function DoctorWorklistPage() {
   const { role } = useAuth();
-  const [workDate, setWorkDate] = useState(toDateInputValue(new Date()));
+  const [workDate, setWorkDate] = useState("");
   const [doctorFilter, setDoctorFilter] = useState("");
   const [doctors, setDoctors] = useState<
     Awaited<ReturnType<typeof hospitalDoctorService.getAll>>
@@ -63,8 +63,16 @@ export default function DoctorWorklistPage() {
 
   const canSelectDoctor = role === "Admin" || role === "Receptionist";
 
+  useEffect(() => {
+    setWorkDate(toDateInputValue(new Date()));
+  }, []);
+
   const fetchPageData = useCallback(
     async (showRefreshState = false) => {
+      if (!workDate) {
+        return;
+      }
+
       if (showRefreshState) {
         setIsRefreshing(true);
       } else {
@@ -93,8 +101,12 @@ export default function DoctorWorklistPage() {
   );
 
   useEffect(() => {
+    if (!workDate) {
+      return;
+    }
+
     void fetchPageData();
-  }, [fetchPageData]);
+  }, [fetchPageData, workDate]);
 
   const items = useMemo(() => worklist?.items ?? [], [worklist]);
 

@@ -283,11 +283,16 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [trends, setTrends] = useState<DashboardTrends | null>(null);
   const [period, setPeriod] = useState<TrendPeriod>("daily");
-  const initialRange = useMemo(() => getDefaultRange("daily"), []);
-  const [fromDate, setFromDate] = useState(initialRange.from);
-  const [toDate, setToDate] = useState(initialRange.to);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isTrendsLoading, setIsTrendsLoading] = useState(true);
+
+  useEffect(() => {
+    const range = getDefaultRange("daily");
+    setFromDate(range.from);
+    setToDate(range.to);
+  }, []);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -296,7 +301,7 @@ export default function DashboardPage() {
         const result = await dashboardService.getStats();
         setStats(result);
       } catch (error: unknown) {
-        toast.error(getApiErrorMessage(error, "Khong the tai thong ke tong quan."));
+        toast.error(getApiErrorMessage(error, "Không thể tải thống kê tổng quan."));
         setStats(null);
       } finally {
         setIsLoading(false);
@@ -307,6 +312,10 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    if (!fromDate || !toDate) {
+      return;
+    }
+
     const range = getDefaultRange(period);
     setFromDate(range.from);
     setToDate(range.to);
@@ -329,7 +338,7 @@ export default function DashboardPage() {
         });
         setTrends(result);
       } catch (error: unknown) {
-        toast.error(getApiErrorMessage(error, "Khong the tai du lieu bieu do."));
+        toast.error(getApiErrorMessage(error, "Không thể tải dữ liệu biểu đồ."));
         setTrends(null);
       } finally {
         setIsTrendsLoading(false);

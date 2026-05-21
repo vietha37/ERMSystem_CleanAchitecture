@@ -12,6 +12,29 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly string[] AllowedStatuses = ["Issued", "Dispensed", "Cancelled"];
+    private static readonly PrescriptionInteractionRule[] InteractionRules =
+    [
+        new(
+            ["warfarin"],
+            ["metronidazole", "clarithromycin", "erythromycin", "co-trimoxazole", "trimethoprim sulfamethoxazole"],
+            "Canh bao tuong tac nghiem trong: khang sinh co the lam tang tac dung chong dong cua warfarin, can theo doi INR sat."),
+        new(
+            ["ibuprofen", "diclofenac", "naproxen", "meloxicam"],
+            ["warfarin", "rivaroxaban", "apixaban", "dabigatran", "heparin", "enoxaparin"],
+            "Canh bao nguy co xuat huyet: NSAID dung cung thuoc chong dong can duoc danh gia lai."),
+        new(
+            ["enalapril", "lisinopril", "perindopril", "ramipril", "captopril", "losartan", "valsartan", "telmisartan"],
+            ["spironolactone", "potassium chloride", "kali clorid"],
+            "Canh bao tang kali mau: ACEi/ARB dung cung spironolactone hoac bo sung kali can theo doi dien giai va chuc nang than."),
+        new(
+            ["morphine", "fentanyl", "tramadol", "codeine", "oxycodone"],
+            ["diazepam", "lorazepam", "alprazolam", "clonazepam", "midazolam"],
+            "Canh bao uc che ho hap/an than: opioid dung cung benzodiazepine can can nhac muc do can thiet va theo doi sat."),
+        new(
+            ["nitroglycerin", "isosorbide mononitrate", "isosorbide dinitrate"],
+            ["sildenafil", "tadalafil", "vardenafil"],
+            "Canh bao ha huyet ap nghiem trong: nitrate khong nen dung cung thuoc uc che PDE5.")
+    ];
 
     private readonly IHospitalPrescriptionRepository _hospitalPrescriptionRepository;
     private readonly IHospitalIdentityBridgeService _hospitalIdentityBridgeService;
@@ -399,20 +422,106 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
     private static List<string> BuildPrescriptionWarnings(IReadOnlyCollection<HospitalPrescriptionItemSnapshot> items)
     {
         var warnings = new List<string>();
+        var normalizedItems = items
+            .Select(item => new NormalizedPrescriptionItemSnapshot(
+                item,
+                NormalizeMedicationDescriptor(item.MedicineName),
+                NormalizeMedicationDescriptor(item.GenericName)))
+            .ToArray();
 
-        var duplicateGenericGroups = items
-            .Where(x => !string.IsNullOrWhiteSpace(x.GenericName))
-            .GroupBy(x => x.GenericName!.Trim(), StringComparer.OrdinalIgnoreCase)
+        var duplicateGenericGroups = normalizedItems
+            .Where(x => !string.IsNullOrWhiteSpace(x.Source.GenericName))
+            .GroupBy(x => x.Source.GenericName!.Trim(), StringComparer.OrdinalIgnoreCase)
             .Where(x => x.Select(item => item.MedicineId).Distinct().Count() > 1)
             .ToArray();
 
         foreach (var group in duplicateGenericGroups)
         {
-            var medicineNames = string.Join(", ", group.Select(x => x.MedicineName).Distinct(StringComparer.OrdinalIgnoreCase));
+            var medicineNames = string.Join(", ", group.Select(x => x.Source.MedicineName).Distinct(StringComparer.OrdinalIgnoreCase));
             warnings.Add($"Canh bao trung hoat chat: {group.Key} xuat hien trong cac thuoc {medicineNames}.");
         }
 
+        foreach (var rule in InteractionRules)
+        {
+            if (!TryFindInteractionPair(normalizedItems, rule, out var primaryMatch, out var secondaryMatch))
+            {
+                continue;
+            }
+
+            warnings.Add($"{rule.WarningMessage} Cap thuoc lien quan: {primaryMatch.Source.MedicineName} + {secondaryMatch.Source.MedicineName}.");
+        }
+
+        var controlledItems = normalizedItems
+            .Where(x => x.Source.DurationDays.HasValue && x.Source.DurationDays.Value >= 14)
+            .Where(x => IsControlledSedative(x) || IsControlledAnalgesic(x))
+            .ToArray();
+        foreach (var item in controlledItems)
+        {
+            warnings.Add(
+                $"Canh bao theo doi keo dai: {item.Source.MedicineName} co lieu trinh {item.Source.DurationDays} ngay, can xac nhan chi dinh va ke hoach tai kham.");
+        }
+
         return warnings;
+    }
+
+    private static bool TryFindInteractionPair(
+        IReadOnlyCollection<NormalizedPrescriptionItemSnapshot> items,
+        PrescriptionInteractionRule rule,
+        out NormalizedPrescriptionItemSnapshot primaryMatch,
+        out NormalizedPrescriptionItemSnapshot secondaryMatch)
+    {
+        foreach (var primary in items)
+        {
+            if (!rule.PrimaryMatchers.Any(matcher => primary.ContainsToken(matcher)))
+            {
+                continue;
+            }
+
+            foreach (var secondary in items)
+            {
+                if (primary.MedicineId == secondary.MedicineId)
+                {
+                    continue;
+                }
+
+                if (!rule.SecondaryMatchers.Any(matcher => secondary.ContainsToken(matcher)))
+                {
+                    continue;
+                }
+
+                primaryMatch = primary;
+                secondaryMatch = secondary;
+                return true;
+            }
+        }
+
+        primaryMatch = default;
+        secondaryMatch = default;
+        return false;
+    }
+
+    private static bool IsControlledSedative(NormalizedPrescriptionItemSnapshot item)
+        => item.ContainsToken("diazepam")
+           || item.ContainsToken("lorazepam")
+           || item.ContainsToken("alprazolam")
+           || item.ContainsToken("clonazepam")
+           || item.ContainsToken("midazolam");
+
+    private static bool IsControlledAnalgesic(NormalizedPrescriptionItemSnapshot item)
+        => item.ContainsToken("morphine")
+           || item.ContainsToken("fentanyl")
+           || item.ContainsToken("tramadol")
+           || item.ContainsToken("codeine")
+           || item.ContainsToken("oxycodone");
+
+    private static string NormalizeMedicationDescriptor(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return Regex.Replace(value.Trim().ToLowerInvariant(), @"[^a-z0-9]+", " ").Trim();
     }
 
     private static bool TryExtractPositiveNumber(string input, out decimal value)
@@ -458,4 +567,29 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
 
     private static DateTime ConvertUtcToClinicLocal(DateTime utcDateTime)
         => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), ResolveClinicTimeZone());
+
+    private readonly record struct PrescriptionInteractionRule(
+        string[] PrimaryMatchers,
+        string[] SecondaryMatchers,
+        string WarningMessage);
+
+    private readonly record struct NormalizedPrescriptionItemSnapshot(
+        HospitalPrescriptionItemSnapshot Source,
+        string NormalizedMedicineName,
+        string NormalizedGenericName)
+    {
+        public Guid MedicineId => Source.MedicineId;
+
+        public bool ContainsToken(string token)
+        {
+            var normalizedToken = NormalizeMedicationDescriptor(token);
+            if (string.IsNullOrWhiteSpace(normalizedToken))
+            {
+                return false;
+            }
+
+            return NormalizedMedicineName.Contains(normalizedToken, StringComparison.Ordinal)
+                || NormalizedGenericName.Contains(normalizedToken, StringComparison.Ordinal);
+        }
+    }
 }
