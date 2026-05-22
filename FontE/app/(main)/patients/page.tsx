@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { formatDateValue } from '@/lib/dateFormatting';
 import { patientService } from '@/services/patientService';
 import { appointmentService } from '@/services/appointmentService';
 import { medicalRecordService } from '@/services/medicalRecordService';
@@ -319,7 +320,7 @@ export default function PatientsPage() {
                         </td>
                         <td className="p-4">
                            <div className="font-semibold text-gray-800">{patient.fullName}</div>
-                           <div className="text-xs text-gray-500 mt-0.5">{patient.dateOfBirth ? new Date(patient.dateOfBirth).toLocaleDateString() : 'No DOB'}</div>
+                           <div className="text-xs text-gray-500 mt-0.5">{patient.dateOfBirth ? formatDateValue(patient.dateOfBirth, 'No DOB') : 'No DOB'}</div>
                         </td>
                         <td className="p-4">
                            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
@@ -428,7 +429,7 @@ export default function PatientsPage() {
                         {selectedPatient.status || 'Active'}
                      </span>
                      <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold flex items-center gap-1">
-                        🗓️ {selectedPatient.dateOfBirth ? new Date(selectedPatient.dateOfBirth).toLocaleDateString() : 'N/A'}
+                        🗓️ {selectedPatient.dateOfBirth ? formatDateValue(selectedPatient.dateOfBirth, 'N/A') : 'N/A'}
                      </span>
                   </div>
                </div>
@@ -474,7 +475,7 @@ export default function PatientsPage() {
                        <div className="flex justify-between items-center bg-white/60 p-3 rounded-xl border border-white">
                           <span className="text-gray-600 font-medium text-sm">Last Visit</span>
                           <span className="font-bold text-gray-800 text-sm">
-                            {drawerData.appointments.length > 0 ? new Date(drawerData.appointments[0].appointmentDate).toLocaleDateString() : 'Never'}
+                            {drawerData.appointments.length > 0 ? formatDateValue(drawerData.appointments[0].appointmentDate, 'Never') : 'Never'}
                           </span>
                        </div>
                        <div className="flex justify-between items-center bg-white/60 p-3 rounded-xl border border-white">
@@ -507,7 +508,7 @@ export default function PatientsPage() {
                          ) : (
                             drawerData.appointments.map((a) => (
                               <tr key={a.id} className="hover:bg-blue-50/30 transition-colors">
-                                 <td className="px-4 py-3 text-gray-600 font-medium">{new Date(a.appointmentDate).toLocaleDateString()}</td>
+                                 <td className="px-4 py-3 text-gray-600 font-medium">{formatDateValue(a.appointmentDate)}</td>
                                  <td className="px-4 py-3 font-semibold text-gray-800">Assigned Doctor</td>
                                 <td className="px-4 py-3">
                                   <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${

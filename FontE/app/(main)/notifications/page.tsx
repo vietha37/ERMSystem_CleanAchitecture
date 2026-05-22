@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { formatDateTimeValue } from "@/lib/dateFormatting";
 import { getApiErrorMessage } from "@/services/error";
 import { hospitalNotificationDeliveryService } from "@/services/hospitalNotificationDeliveryService";
 import {
@@ -30,16 +31,7 @@ const STATUS_STYLES: Record<NotificationDeliveryStatus, string> = {
 };
 
 function formatDateTime(value?: string | null): string {
-  if (!value) {
-    return "--";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "--";
-  }
-
-  return date.toLocaleString("vi-VN");
+  return formatDateTimeValue(value);
 }
 
 function getStatusLabel(status: NotificationDeliveryStatus): string {

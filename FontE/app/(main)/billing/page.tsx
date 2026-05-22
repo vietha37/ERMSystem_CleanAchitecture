@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
+import { formatDateTimeValue } from "@/lib/dateFormatting";
 import { getApiErrorMessage } from "@/services/error";
 import { hospitalBillingService } from "@/services/hospitalBillingService";
 import {
@@ -27,9 +28,7 @@ function formatCurrency(value: number): string {
 }
 
 function formatDateTime(value?: string | null): string {
-  if (!value) return "--";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "--" : date.toLocaleString("vi-VN");
+  return formatDateTimeValue(value);
 }
 
 function getStatusClass(status: HospitalInvoiceStatus): string {
@@ -154,7 +153,7 @@ export default function BillingPage() {
   const handleCreateInvoice = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedEncounterId) {
-      toast.error("Cần chọn encounter để lập hóa đơn.");
+      toast.error("Cần chọn hồ sơ khám để lập hóa đơn.");
       return;
     }
 
@@ -212,10 +211,10 @@ export default function BillingPage() {
       <div className="rounded-[2rem] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 p-6 shadow-sm">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.26em] text-emerald-700">Billing</p>
+            <p className="text-xs font-bold uppercase tracking-[0.26em] text-emerald-700">Tài chính</p>
             <h1 className="mt-3 text-3xl font-bold text-slate-950">Hóa đơn và thanh toán</h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-              Lập hóa đơn từ encounter hospital mới, gom phí khám và các dịch vụ cận lâm sàng đã hoàn thành.
+              Lập hóa đơn từ hồ sơ khám mới, gom phí khám và các dịch vụ cận lâm sàng đã hoàn thành.
             </p>
           </div>
 
@@ -224,7 +223,7 @@ export default function BillingPage() {
               type="text"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Tìm theo mã hóa đơn, bệnh nhân, encounter..."
+              placeholder="Tìm theo mã hóa đơn, bệnh nhân, hồ sơ khám..."
               className="min-w-[260px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
             />
             <select
@@ -251,7 +250,7 @@ export default function BillingPage() {
         <MetricCard label="Đã phát hành" value={metrics.Issued} tone="cyan" />
         <MetricCard label="Thanh toán một phần" value={metrics.PartiallyPaid} tone="amber" />
         <MetricCard label="Đã thanh toán" value={metrics.Paid} tone="emerald" />
-        <MetricCard label="Encounter chờ lập" value={availableEncounters.length} tone="slate" />
+        <MetricCard label="Hồ sơ chờ lập" value={availableEncounters.length} tone="slate" />
       </div>
 
       <Card className="overflow-hidden border border-slate-100 p-0 shadow-sm">
@@ -338,7 +337,7 @@ export default function BillingPage() {
             onChange={(event) => setSelectedEncounterId(event.target.value)}
             className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
           >
-            <option value="">Chọn encounter</option>
+            <option value="">Chọn hồ sơ khám</option>
             {availableEncounters.map((item) => (
               <option key={item.encounterId} value={item.encounterId}>
                 {item.encounterNumber} - {item.patientName} - {item.completedLabOrders} xét nghiệm - {item.completedImagingOrders} CĐHA
@@ -408,7 +407,7 @@ export default function BillingPage() {
             <div className="grid gap-3 md:grid-cols-2">
               <InfoLine label="Hóa đơn" value={selectedInvoice.invoiceNumber} />
               <InfoLine label="Bệnh nhân" value={selectedInvoice.patientName} />
-              <InfoLine label="Encounter" value={selectedInvoice.encounterNumber || "--"} />
+              <InfoLine label="Hồ sơ khám" value={selectedInvoice.encounterNumber || "--"} />
               <InfoLine label="Bác sĩ" value={selectedInvoice.doctorName || "--"} />
               <InfoLine label="Trạng thái" value={getStatusLabel(selectedInvoice.invoiceStatus)} />
               <InfoLine label="Còn lại" value={formatCurrency(selectedInvoice.balanceAmount)} />

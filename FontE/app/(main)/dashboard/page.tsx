@@ -160,21 +160,21 @@ function MainTrendChart({ points }: { points: DashboardTrendPoint[] }) {
     <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-slate-800">Analysis</p>
-          <p className="text-xs text-slate-500">Patients, appointments, and prescriptions movement</p>
+          <p className="text-sm font-semibold text-slate-800">Phân tích xu hướng</p>
+          <p className="text-xs text-slate-500">Biến động bệnh nhân, lịch hẹn và đơn thuốc</p>
         </div>
         <div className="flex items-center gap-4 text-xs">
           <span className="flex items-center gap-2 text-slate-600">
             <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-            Patients
+            Bệnh nhân
           </span>
           <span className="flex items-center gap-2 text-slate-600">
             <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-            Appointments
+            Lịch hẹn
           </span>
           <span className="flex items-center gap-2 text-slate-600">
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            Prescriptions
+            Đơn thuốc
           </span>
         </div>
       </div>
@@ -239,7 +239,7 @@ function DailySnapshotDonut({
   const total = items.reduce((sum, item) => sum + item.value, 0);
 
   if (total <= 0) {
-    return <p className="text-sm text-slate-500">No snapshot data.</p>;
+    return <p className="text-sm text-slate-500">Chưa có dữ liệu tổng hợp.</p>;
   }
 
   const stops = items.reduce<{ next: number; parts: string[] }>(
@@ -259,7 +259,7 @@ function DailySnapshotDonut({
     <div className="space-y-4">
       <div className="mx-auto flex h-44 w-44 items-center justify-center rounded-full" style={{ background: gradient }}>
         <div className="flex h-28 w-28 flex-col items-center justify-center rounded-full bg-white shadow-inner">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Total</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Tổng</p>
           <p className="text-xl font-bold text-slate-900">{formatNumber(total)}</p>
         </div>
       </div>
@@ -417,31 +417,31 @@ export default function DashboardPage() {
 
     return [
       {
-        label: "Patients",
+        label: "Bệnh nhân",
         value: Math.max(stats?.totalPatients ?? 0, 0),
         color: palette[0].color,
         light: palette[0].light,
       },
       {
-        label: "Appointments",
+        label: "Lịch hẹn",
         value: Math.max(stats?.appointmentsToday ?? 0, 0),
         color: palette[1].color,
         light: palette[1].light,
       },
       {
-        label: "Completed",
+        label: "Hoàn thành",
         value: Math.max(stats?.completedAppointments ?? 0, 0),
         color: palette[2].color,
         light: palette[2].light,
       },
       {
-        label: "Pending",
+        label: "Đang chờ",
         value: Math.max(stats?.pendingAppointments ?? 0, 0),
         color: palette[3].color,
         light: palette[3].light,
       },
       {
-        label: "Cancelled",
+        label: "Đã hủy",
         value: Math.max(stats?.cancelledAppointments ?? 0, 0),
         color: palette[4].color,
         light: palette[4].light,
@@ -453,7 +453,7 @@ export default function DashboardPage() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
-        <p className="mt-4 font-medium tracking-wide text-slate-500">Loading dashboard...</p>
+        <p className="mt-4 font-medium tracking-wide text-slate-500">Đang tải bảng điều hành...</p>
       </div>
     );
   }
@@ -484,8 +484,8 @@ export default function DashboardPage() {
           <div className="space-y-4 xl:col-span-9">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-100 bg-white px-5 py-4 shadow-sm">
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-                <p className="text-xs text-slate-500">Hospital operation overview</p>
+                <h1 className="text-2xl font-bold text-slate-900">Bảng điều hành</h1>
+                <p className="text-xs text-slate-500">Tổng quan vận hành bệnh viện</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <input
@@ -508,7 +508,7 @@ export default function DashboardPage() {
                       period === "daily" ? "bg-white text-blue-700 shadow-sm" : "text-slate-600"
                     }`}
                   >
-                    Day
+                    Ngày
                   </button>
                   <button
                     onClick={() => setPeriod("monthly")}
@@ -516,7 +516,7 @@ export default function DashboardPage() {
                       period === "monthly" ? "bg-white text-blue-700 shadow-sm" : "text-slate-600"
                     }`}
                   >
-                    Month
+                    Tháng
                   </button>
                 </div>
               </div>
@@ -524,25 +524,25 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <KpiCard
-                title="Total Patients"
+                title="Tổng bệnh nhân"
                 value={patients}
                 percent={patientsPercent}
                 colorClass="text-blue-500"
-                note="Overall registered patients"
+                note="Tổng số bệnh nhân đã đăng ký"
               />
               <KpiCard
-                title="Appointments Today"
+                title="Lịch hẹn hôm nay"
                 value={appointmentsToday}
                 percent={todayPercent}
                 colorClass="text-sky-500"
-                note="New and follow-up visits"
+                note="Gồm lịch mới và tái khám"
               />
               <KpiCard
-                title="Completed Today"
+                title="Hoàn thành hôm nay"
                 value={completed}
                 percent={completedPercent}
                 colorClass="text-emerald-500"
-                note="Consultations completed"
+                note="Số lượt khám đã kết thúc"
               />
             </div>
 
@@ -550,28 +550,28 @@ export default function DashboardPage() {
               <Card className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-800">Today Status Mix</p>
-                    <p className="text-xs text-slate-500">Pending, completed, and cancelled appointments</p>
+                    <p className="text-sm font-semibold text-slate-800">Cơ cấu trạng thái hôm nay</p>
+                    <p className="text-xs text-slate-500">Lịch đang chờ, đã hoàn thành và đã hủy</p>
                   </div>
                   <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-                    Pending {formatNumber(pending)}
+                    Đang chờ {formatNumber(pending)}
                   </span>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <div className="rounded-2xl bg-emerald-50 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Completion rate</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Tỷ lệ hoàn thành</p>
                     <p className="mt-1 text-2xl font-bold text-emerald-900">{completedPercent.toFixed(0)}%</p>
-                    <p className="mt-1 text-xs text-emerald-700">{formatNumber(completed)} completed today</p>
+                    <p className="mt-1 text-xs text-emerald-700">{formatNumber(completed)} lượt đã hoàn thành hôm nay</p>
                   </div>
                   <div className="rounded-2xl bg-rose-50 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Cancellation rate</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Tỷ lệ hủy</p>
                     <p className="mt-1 text-2xl font-bold text-rose-900">{cancelledPercent.toFixed(0)}%</p>
-                    <p className="mt-1 text-xs text-rose-700">{formatNumber(cancelled)} cancelled today</p>
+                    <p className="mt-1 text-xs text-rose-700">{formatNumber(cancelled)} lịch đã hủy hôm nay</p>
                   </div>
                   <div className="col-span-2 rounded-2xl bg-violet-50 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Revisit rate</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Tỷ lệ tái khám</p>
                     <p className="mt-1 text-2xl font-bold text-violet-900">{revisitPercent.toFixed(0)}%</p>
-                    <p className="mt-1 text-xs text-violet-700">{formatNumber(revisitAppointmentsToday)} revisit appointments today</p>
+                    <p className="mt-1 text-xs text-violet-700">{formatNumber(revisitAppointmentsToday)} lịch tái khám hôm nay</p>
                   </div>
                 </div>
               </Card>
@@ -579,35 +579,35 @@ export default function DashboardPage() {
               <Card className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-800">Finance Snapshot</p>
-                    <p className="text-xs text-slate-500">Issued and collected this month</p>
+                    <p className="text-sm font-semibold text-slate-800">Ảnh chụp tài chính</p>
+                    <p className="text-xs text-slate-500">Số phát hành và số đã thu trong tháng</p>
                   </div>
                   <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-                    {collectionPercent.toFixed(0)}% collected
+                    {collectionPercent.toFixed(0)}% đã thu
                   </span>
                 </div>
                 <div className="mt-4 grid grid-cols-1 gap-3">
                   <div className="rounded-2xl bg-cyan-50 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">Issued this month</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">Phát hành trong tháng</p>
                     <p className="mt-1 text-xl font-bold text-cyan-900">{formatCurrency(issuedAmountThisMonth)}</p>
-                    <p className="mt-1 text-xs text-cyan-700">{formatNumber(totalInvoices)} invoices in system</p>
+                    <p className="mt-1 text-xs text-cyan-700">{formatNumber(totalInvoices)} hóa đơn trong hệ thống</p>
                   </div>
                   <div className="rounded-2xl bg-emerald-50 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Collected this month</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Đã thu trong tháng</p>
                     <p className="mt-1 text-xl font-bold text-emerald-900">{formatCurrency(collectedAmountThisMonth)}</p>
-                    <p className="mt-1 text-xs text-emerald-700">{formatNumber(paidInvoices)} invoices fully paid</p>
+                    <p className="mt-1 text-xs text-emerald-700">{formatNumber(paidInvoices)} hóa đơn đã thanh toán đủ</p>
                   </div>
                   <div className="rounded-2xl bg-rose-50 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Outstanding balance</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Công nợ còn lại</p>
                     <p className="mt-1 text-xl font-bold text-rose-900">{formatCurrency(outstandingBalanceAmount)}</p>
-                    <p className="mt-1 text-xs text-rose-700">Current unpaid balance across invoices</p>
+                    <p className="mt-1 text-xs text-rose-700">Tổng số dư chưa thanh toán hiện tại</p>
                   </div>
                 </div>
               </Card>
             </div>
 
             <Card className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-              <p className="text-sm font-semibold text-slate-800">Daily Snapshot</p>
+              <p className="text-sm font-semibold text-slate-800">Ảnh chụp trong ngày</p>
               <div className="mt-4">
                 <DailySnapshotDonut items={snapshotPieData} />
               </div>
@@ -615,19 +615,19 @@ export default function DashboardPage() {
 
             {isTrendsLoading ? (
               <Card className="flex h-[390px] items-center justify-center rounded-3xl border border-slate-100 bg-white text-slate-500">
-                Loading chart...
+                Đang tải biểu đồ...
               </Card>
             ) : trendPoints.length > 0 ? (
               <MainTrendChart points={trendPoints} />
             ) : (
               <Card className="flex h-[390px] items-center justify-center rounded-3xl border border-slate-100 bg-white text-slate-500">
-                No trend data.
+                Chưa có dữ liệu xu hướng.
               </Card>
             )}
 
             <div className="grid grid-cols-1 gap-4">
               <Card className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-                <p className="text-sm font-semibold text-slate-800">Top 5 Diagnoses</p>
+                <p className="text-sm font-semibold text-slate-800">Top 5 chẩn đoán</p>
                 <div className="mt-4 space-y-3">
                   {topDiagnoses.length ? (
                     topDiagnoses.map((item, index) => (
@@ -641,7 +641,7 @@ export default function DashboardPage() {
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-slate-500">No diagnosis data.</p>
+                    <p className="text-sm text-slate-500">Chưa có dữ liệu chẩn đoán.</p>
                   )}
                 </div>
               </Card>
@@ -651,28 +651,28 @@ export default function DashboardPage() {
 
           <div className="space-y-4 xl:col-span-3">
             <Card className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-              <p className="text-sm font-semibold text-slate-800">Activity</p>
+              <p className="text-sm font-semibold text-slate-800">Tổng hợp hoạt động</p>
               <div className="mt-4 space-y-3">
                 <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-sky-500 px-4 py-3 text-white">
-                  <p className="text-xs opacity-90">Patients in selected period</p>
+                  <p className="text-xs opacity-90">Bệnh nhân trong kỳ đã chọn</p>
                   <p className="mt-1 text-2xl font-bold">{formatNumber(trendSummary.totalPatients)}</p>
                 </div>
                 <div className="rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 text-white">
-                  <p className="text-xs opacity-90">Appointments in selected period</p>
+                  <p className="text-xs opacity-90">Lịch hẹn trong kỳ đã chọn</p>
                   <p className="mt-1 text-2xl font-bold">{formatNumber(trendSummary.totalAppointments)}</p>
                 </div>
                 <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-3 text-white">
-                  <p className="text-xs opacity-90">Prescriptions in selected period</p>
+                  <p className="text-xs opacity-90">Đơn thuốc trong kỳ đã chọn</p>
                   <p className="mt-1 text-2xl font-bold">{formatNumber(trendSummary.totalPrescriptions)}</p>
                 </div>
               </div>
             </Card>
 
             <Card className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-              <p className="text-sm font-semibold text-slate-800">Compare with previous period</p>
+              <p className="text-sm font-semibold text-slate-800">So với kỳ trước</p>
               <div className="mt-4 space-y-3">
                 <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-                  <span className="text-sm text-slate-600">Patients</span>
+                  <span className="text-sm text-slate-600">Bệnh nhân</span>
                   <span
                     className={`text-sm font-semibold ${
                       compareDelta.patients >= 0 ? "text-emerald-600" : "text-rose-600"
@@ -683,7 +683,7 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-                  <span className="text-sm text-slate-600">Appointments</span>
+                  <span className="text-sm text-slate-600">Lịch hẹn</span>
                   <span
                     className={`text-sm font-semibold ${
                       compareDelta.appointments >= 0 ? "text-emerald-600" : "text-rose-600"
@@ -694,7 +694,7 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-                  <span className="text-sm text-slate-600">Prescriptions</span>
+                  <span className="text-sm text-slate-600">Đơn thuốc</span>
                   <span
                     className={`text-sm font-semibold ${
                       compareDelta.prescriptions >= 0 ? "text-emerald-600" : "text-rose-600"

@@ -9,7 +9,7 @@ export type NavigationItem = {
 export const menuItemsByRole: Record<UserRole, NavigationItem[]> = {
   Admin: [
     { name: "Tổng quan", path: "/dashboard", shortLabel: "HQ" },
-    { name: "Worklist bác sĩ", path: "/doctor-worklist", shortLabel: "WL" },
+    { name: "Công việc bác sĩ", path: "/doctor-worklist", shortLabel: "BS" },
     { name: "Nhân sự", path: "/staff", shortLabel: "NS" },
     { name: "Bệnh nhân", path: "/patients", shortLabel: "BN" },
     { name: "Lịch hẹn", path: "/appointments", shortLabel: "LH" },
@@ -21,7 +21,7 @@ export const menuItemsByRole: Record<UserRole, NavigationItem[]> = {
   ],
   Doctor: [
     { name: "Tổng quan", path: "/dashboard", shortLabel: "HQ" },
-    { name: "Worklist bác sĩ", path: "/doctor-worklist", shortLabel: "WL" },
+    { name: "Công việc bác sĩ", path: "/doctor-worklist", shortLabel: "BS" },
     { name: "Bệnh nhân", path: "/patients", shortLabel: "BN" },
     { name: "Lịch hẹn", path: "/appointments", shortLabel: "LH" },
     { name: "Hồ sơ bệnh án", path: "/medical-records", shortLabel: "BA" },
@@ -30,7 +30,7 @@ export const menuItemsByRole: Record<UserRole, NavigationItem[]> = {
   ],
   Receptionist: [
     { name: "Tổng quan", path: "/dashboard", shortLabel: "HQ" },
-    { name: "Worklist bác sĩ", path: "/doctor-worklist", shortLabel: "WL" },
+    { name: "Công việc bác sĩ", path: "/doctor-worklist", shortLabel: "BS" },
     { name: "Bệnh nhân", path: "/patients", shortLabel: "BN" },
     { name: "Lịch hẹn", path: "/appointments", shortLabel: "LH" },
     { name: "Cận lâm sàng", path: "/clinical-orders", shortLabel: "CLS" },
@@ -49,13 +49,13 @@ export function resolvePageTitle(pathname: string): { title: string; subtitle: s
     },
     {
       match: "/doctor-worklist",
-      title: "Worklist bác sĩ",
-      subtitle: "Theo dõi lịch khám, check-in và encounter cần xử lý.",
+      title: "Công việc bác sĩ",
+      subtitle: "Theo dõi lịch khám, check-in và hồ sơ khám cần xử lý.",
     },
     {
       match: "/appointments",
       title: "Điều phối lịch hẹn",
-      subtitle: "Xử lý check-in, đổi lịch và hủy lịch theo policy.",
+      subtitle: "Xử lý check-in, đổi lịch và hủy lịch theo chính sách.",
     },
     {
       match: "/patients",
@@ -65,12 +65,12 @@ export function resolvePageTitle(pathname: string): { title: string; subtitle: s
     {
       match: "/medical-records",
       title: "Hồ sơ lâm sàng",
-      subtitle: "Mở encounter, cập nhật diễn biến và chốt hồ sơ.",
+      subtitle: "Mở hồ sơ khám, cập nhật diễn biến và chốt hồ sơ.",
     },
     {
       match: "/prescriptions",
       title: "Bàn kê thuốc",
-      subtitle: "Phát hành và theo dõi đơn thuốc theo encounter.",
+      subtitle: "Phát hành và theo dõi đơn thuốc theo hồ sơ khám.",
     },
     {
       match: "/clinical-orders",
@@ -95,7 +95,7 @@ export function resolvePageTitle(pathname: string): { title: string; subtitle: s
     {
       match: "/portal",
       title: "Cổng bệnh nhân",
-      subtitle: "Theo dõi lịch sử khám và đơn thuốc dành cho bệnh nhân.",
+      subtitle: "Theo dõi lịch sử khám, đơn thuốc và hóa đơn dành cho bệnh nhân.",
     },
   ];
 

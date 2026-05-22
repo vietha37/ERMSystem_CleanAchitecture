@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useAuth } from "@/hooks/useAuth";
+import { formatDateTimeValue } from "@/lib/dateFormatting";
 import { getApiErrorMessage } from "@/services/error";
 import { hospitalDoctorService } from "@/services/hospitalDoctorService";
 import { hospitalDoctorWorklistService } from "@/services/hospitalDoctorWorklistService";
@@ -19,16 +20,7 @@ function toDateInputValue(date: Date): string {
 }
 
 function formatDateTime(value?: string | null): string {
-  if (!value) {
-    return "--";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "--";
-  }
-
-  return date.toLocaleString("vi-VN");
+  return formatDateTimeValue(value);
 }
 
 function getStatusClass(stage: string): string {

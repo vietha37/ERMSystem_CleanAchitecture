@@ -2,17 +2,12 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { formatTimeValue } from "@/lib/dateFormatting";
 import { notificationService } from "@/services/notificationService";
 import { AppointmentNotification } from "@/services/types";
 
 function formatTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "--:--";
-  return date.toLocaleTimeString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  return formatTimeValue(value);
 }
 
 function computeUnreadCount(

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
+import { formatDateTimeValue } from "@/lib/dateFormatting";
 import { getApiErrorMessage } from "@/services/error";
 import { hospitalEncounterService } from "@/services/hospitalEncounterService";
 import {
@@ -68,16 +69,7 @@ const EMPTY_FORM: EncounterFormState = {
 };
 
 function formatDateTime(value?: string | null): string {
-  if (!value) {
-    return "--";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "--";
-  }
-
-  return date.toLocaleString("vi-VN");
+  return formatDateTimeValue(value);
 }
 
 function getEncounterStatusLabel(status: HospitalEncounterStatus): string {

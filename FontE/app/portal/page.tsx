@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import ProtectedLayout from "@/components/layout/ProtectedLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { authService } from "@/services/authService";
+import { formatDateTimeValue, formatDateValue } from "@/lib/dateFormatting";
 import { getApiErrorMessage } from "@/services/error";
 import { hospitalPatientPortalService } from "@/services/hospitalPatientPortalService";
 import {
@@ -18,29 +19,11 @@ import {
 } from "@/services/types";
 
 function formatDate(value?: string | null): string {
-  if (!value) {
-    return "--";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "--";
-  }
-
-  return date.toLocaleDateString("vi-VN");
+  return formatDateValue(value);
 }
 
 function formatDateTime(value?: string | null): string {
-  if (!value) {
-    return "--";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "--";
-  }
-
-  return date.toLocaleString("vi-VN");
+  return formatDateTimeValue(value);
 }
 
 function formatCurrency(value?: number | null): string {
@@ -251,7 +234,7 @@ export default function PatientPortalPage() {
                   Trạng thái tài khoản
                 </p>
                 <div className="mt-5 rounded-[1.5rem] border border-white/10 bg-white/5 p-5">
-                  <p className="text-sm text-slate-300">Trạng thái portal</p>
+                  <p className="text-sm text-slate-300">Trạng thái tài khoản</p>
                   <p className="mt-2 text-2xl font-bold text-white">
                     {profile?.portalStatus ?? "Đang đồng bộ"}
                   </p>
@@ -316,7 +299,7 @@ export default function PatientPortalPage() {
                 </div>
               ) : (
                 <div className="mt-6 rounded-[1.5rem] border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
-                  Không tìm thấy hồ sơ hospital portal của tài khoản này.
+                  Không tìm thấy hồ sơ cổng bệnh nhân của tài khoản này.
                 </div>
               )}
             </section>
@@ -333,7 +316,7 @@ export default function PatientPortalPage() {
                 title="Lịch sử gần đây"
                 description="Tổng hợp những lần khám gần nhất của bạn."
                 appointments={recentAppointments}
-                emptyMessage="Chưa có lịch sử khám nào trong portal."
+                emptyMessage="Chưa có lịch sử khám nào trong cổng bệnh nhân."
               />
             </section>
           </div>
@@ -482,7 +465,7 @@ function VisitHistoryPanel({
             Tổng hợp theo từng lần đến khám
           </h2>
           <p className="mt-2 text-sm leading-7 text-slate-500">
-            Mỗi dòng gom lịch hẹn, encounter, chẩn đoán, đơn thuốc, cận lâm sàng và thanh toán.
+            Mỗi dòng gom lịch hẹn, hồ sơ khám, chẩn đoán, đơn thuốc, cận lâm sàng và thanh toán.
           </p>
         </div>
 
@@ -547,7 +530,7 @@ function VisitHistoryPanel({
                     {getAppointmentStatusLabel(item.appointmentStatus)}
                   </span>
                   <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700">
-                    {item.encounterStatus || "Chưa tạo encounter"}
+                    {item.encounterStatus || "Chưa tạo hồ sơ khám"}
                   </span>
                 </div>
               </div>
@@ -555,7 +538,7 @@ function VisitHistoryPanel({
               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <MiniInfo label="Hẹn khám" value={formatDateTime(item.appointmentStartLocal)} />
                 <MiniInfo label="Check-in" value={formatDateTime(item.checkInTimeLocal)} />
-                <MiniInfo label="Encounter" value={item.encounterNumber || "--"} />
+                <MiniInfo label="Hồ sơ khám" value={item.encounterNumber || "--"} />
                 <MiniInfo label="Kết thúc" value={formatDateTime(item.encounterEndedLocal)} />
               </div>
 
@@ -603,11 +586,11 @@ function PrescriptionsPanel({
         Đơn thuốc của tôi
       </p>
       <p className="mt-2 text-sm leading-7 text-slate-500">
-        Theo dõi các đơn thuốc mới nhất gắn với encounter gần đây.
+        Theo dõi các đơn thuốc mới nhất gắn với hồ sơ khám gần đây.
       </p>
 
       {prescriptions.length === 0 ? (
-        <EmptyPanel message="Chưa có đơn thuốc nào trong portal." />
+        <EmptyPanel message="Chưa có đơn thuốc nào trong cổng bệnh nhân." />
       ) : (
         <div className="mt-5 space-y-4">
           {prescriptions.map((prescription) => (
@@ -640,7 +623,7 @@ function PrescriptionsPanel({
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <MiniInfo label="Ngày tạo" value={formatDateTime(prescription.createdAtLocal)} />
                 <MiniInfo label="Ngày cấp thuốc" value={formatDateTime(prescription.dispensedAtLocal)} />
-                <MiniInfo label="Encounter" value={prescription.encounterNumber} />
+                <MiniInfo label="Hồ sơ khám" value={prescription.encounterNumber} />
                 <MiniInfo label="Số thuốc" value={`${prescription.totalItems} mục`} />
               </div>
 
@@ -697,7 +680,7 @@ function ClinicalOrdersPanel({
       </p>
 
       {orders.length === 0 ? (
-        <EmptyPanel message="Chưa có kết quả cận lâm sàng nào trong portal." />
+        <EmptyPanel message="Chưa có kết quả cận lâm sàng nào trong cổng bệnh nhân." />
       ) : (
         <div className="mt-5 space-y-4">
           {orders.map((order) => (
@@ -727,7 +710,7 @@ function ClinicalOrdersPanel({
                 <MiniInfo label="Ngày chỉ định" value={formatDateTime(order.requestedAtLocal)} />
                 <MiniInfo label="Hoàn thành" value={formatDateTime(order.completedAtLocal)} />
                 <MiniInfo label="Mã dịch vụ" value={order.serviceCode} />
-                <MiniInfo label="Encounter" value={order.encounterNumber} />
+                <MiniInfo label="Hồ sơ khám" value={order.encounterNumber} />
               </div>
 
               {order.category === "Lab" && order.resultItems.length > 0 && (
@@ -754,8 +737,8 @@ function ClinicalOrdersPanel({
 
               {order.category === "Imaging" && (
                 <div className="mt-4 space-y-3">
-                  <RichInfoBlock label="Findings" value={order.findings || order.summaryText} />
-                  <RichInfoBlock label="Impression" value={order.impression} />
+                  <RichInfoBlock label="Mô tả" value={order.findings || order.summaryText} />
+                  <RichInfoBlock label="Kết luận" value={order.impression} />
                   {order.reportUri && (
                     <div className="rounded-[1.2rem] border border-white bg-white px-4 py-3 text-sm shadow-sm">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
@@ -785,7 +768,7 @@ function InvoicesPanel({ invoices }: { invoices: HospitalPatientPortalInvoice[] 
       </p>
 
       {invoices.length === 0 ? (
-        <EmptyPanel message="Chưa có hóa đơn nào trong portal." />
+        <EmptyPanel message="Chưa có hóa đơn nào trong cổng bệnh nhân." />
       ) : (
         <div className="mt-5 space-y-4">
           {invoices.map((invoice) => (
@@ -802,7 +785,7 @@ function InvoicesPanel({ invoices }: { invoices: HospitalPatientPortalInvoice[] 
                     {formatCurrency(invoice.totalAmount)}
                   </h3>
                   <p className="mt-1 text-sm text-slate-600">
-                    {invoice.encounterNumber || "Không gắn encounter"}
+                    {invoice.encounterNumber || "Không gắn hồ sơ khám"}
                   </p>
                 </div>
 

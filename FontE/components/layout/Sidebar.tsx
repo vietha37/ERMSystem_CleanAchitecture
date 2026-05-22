@@ -10,7 +10,7 @@ export function Sidebar() {
   const menuItemsByRole: Record<UserRole, Array<{ name: string; path: string }>> = {
     Admin: [
       { name: "Tổng quan", path: "/dashboard" },
-      { name: "Worklist bác sĩ", path: "/doctor-worklist" },
+      { name: "Công việc bác sĩ", path: "/doctor-worklist" },
       { name: "Nhân sự", path: "/staff" },
       { name: "Bệnh nhân", path: "/patients" },
       { name: "Lịch hẹn", path: "/appointments" },
@@ -22,7 +22,7 @@ export function Sidebar() {
     ],
     Doctor: [
       { name: "Tổng quan", path: "/dashboard" },
-      { name: "Worklist bác sĩ", path: "/doctor-worklist" },
+      { name: "Công việc bác sĩ", path: "/doctor-worklist" },
       { name: "Bệnh nhân", path: "/patients" },
       { name: "Lịch hẹn", path: "/appointments" },
       { name: "Hồ sơ bệnh án", path: "/medical-records" },
@@ -31,7 +31,7 @@ export function Sidebar() {
     ],
     Receptionist: [
       { name: "Tổng quan", path: "/dashboard" },
-      { name: "Worklist bác sĩ", path: "/doctor-worklist" },
+      { name: "Công việc bác sĩ", path: "/doctor-worklist" },
       { name: "Bệnh nhân", path: "/patients" },
       { name: "Lịch hẹn", path: "/appointments" },
       { name: "Chỉ định cận lâm sàng", path: "/clinical-orders" },

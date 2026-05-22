@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/hooks/useAuth";
+import { formatDateTimeValue } from "@/lib/dateFormatting";
 import { getApiErrorMessage } from "@/services/error";
 import { hospitalPrescriptionService } from "@/services/hospitalPrescriptionService";
 import {
@@ -46,16 +47,7 @@ const EMPTY_ITEM: PrescriptionItemForm = {
 };
 
 function formatDateTime(value?: string | null): string {
-  if (!value) {
-    return "--";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "--";
-  }
-
-  return date.toLocaleString("vi-VN");
+  return formatDateTimeValue(value);
 }
 
 function getStatusLabel(status: HospitalPrescriptionStatus): string {
