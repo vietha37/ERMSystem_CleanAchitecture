@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 const navItems = [
   { label: "Trang chủ", href: "/" },
@@ -33,9 +33,9 @@ export function SiteHeader() {
             EH
           </div>
           <div>
-            <p className="font-serif text-3xl leading-none tracking-tight text-white">ERM Private Hospital</p>
+            <p className="font-serif text-3xl leading-none tracking-tight text-white">Bệnh viện tư ERM</p>
             <p className="mt-1 text-sm uppercase tracking-[0.24em] text-cyan-200">
-              Preventive care, diagnostics and family medicine
+              Chăm sóc dự phòng, chẩn đoán và y học gia đình
             </p>
           </div>
         </Link>

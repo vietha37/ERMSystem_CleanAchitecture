@@ -90,7 +90,7 @@ export default function PatientsPage() {
       setTotalPages(Math.ceil((data?.totalCount || 0) / pageSize) || 1);
       setTotalItems(data?.totalCount || 0);
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, "Failed to load patients."));
+      toast.error(getApiErrorMessage(error, "Không thể tải danh sách bệnh nhân."));
       setPatients([]);
       setTotalPages(1);
       setTotalItems(0);
@@ -128,7 +128,7 @@ export default function PatientsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim() || !formData.dateOfBirth) {
-      toast.error("Full Name and Date of Birth are mandatory.");
+      toast.error("Họ tên và ngày sinh là bắt buộc.");
       return;
     }
     
@@ -141,13 +141,13 @@ export default function PatientsPage() {
     try {
       if (modalMode === 'create') {
         await patientService.create(payload);
-        toast.success("Patient created successfully.");
+        toast.success("Đã tạo bệnh nhân.");
         setIsModalOpen(false);
         fetchPatients();
       } else {
         if (!selectedPatientId) return;
         await patientService.update(selectedPatientId, payload);
-        toast.success("Patient updated successfully.");
+        toast.success("Đã cập nhật bệnh nhân.");
         setIsModalOpen(false);
         fetchPatients();
         if (selectedPatient?.id === selectedPatientId) {
@@ -155,7 +155,7 @@ export default function PatientsPage() {
         }
       }
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, "Failed to process request."));
+      toast.error(getApiErrorMessage(error, "Không thể xử lý yêu cầu."));
     } finally {
       setIsSubmitting(false);
     }
@@ -164,20 +164,20 @@ export default function PatientsPage() {
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (role === "Doctor") {
-      toast.error("Doctor khong co quyen xoa benh nhan.");
+      toast.error("Bác sĩ không có quyền xóa bệnh nhân.");
       return;
     }
-    if (!window.confirm("Are you sure you want to delete this patient? This action cannot be undone.")) return;
+    if (!window.confirm("Bạn có chắc muốn xóa bệnh nhân này không? Thao tác này không thể hoàn tác.")) return;
     
     try {
       await patientService.delete(id);
-      toast.success("Patient deleted.");
+      toast.success("Đã xóa bệnh nhân.");
       if (patients.length === 1 && currentPage > 1) setCurrentPage(currentPage - 1);
       else fetchPatients();
       
       if (selectedPatient?.id === id) setIsDrawerOpen(false);
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, "Failed to delete patient."));
+      toast.error(getApiErrorMessage(error, "Không thể xóa bệnh nhân."));
     }
   };
 
@@ -241,11 +241,11 @@ export default function PatientsPage() {
       {/* Page Header */}
       <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Patients</h1>
-          <p className="text-gray-500 text-sm mt-1">Manage external patient records and unified medical history.</p>
+          <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Bệnh nhân</h1>
+          <p className="text-gray-500 text-sm mt-1">Quản lý hồ sơ bệnh nhân và theo dõi lịch sử chăm sóc tập trung.</p>
         </div>
         <Button onClick={openCreateModal} className="shadow-md hover:shadow-lg transform transition-all hover:-translate-y-0.5">
-           + Add Patient
+           + Thêm bệnh nhân
         </Button>
       </div>
 
@@ -256,7 +256,7 @@ export default function PatientsPage() {
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">🔍</span>
             <input
               type="text"
-              placeholder="Search by patient name..."
+              placeholder="Tìm theo tên bệnh nhân..."
               className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm shadow-sm"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -264,7 +264,7 @@ export default function PatientsPage() {
           </div>
           
           <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
-            <span className="text-sm font-medium text-gray-500">View</span>
+            <span className="text-sm font-medium text-gray-500">Hiển thị</span>
             <select 
               className="bg-transparent text-sm font-bold text-gray-700 outline-none cursor-pointer"
               value={pageSize}
@@ -273,9 +273,9 @@ export default function PatientsPage() {
                  setCurrentPage(1);
               }}
             >
-              <option value={5}>5 per page</option>
-              <option value={10}>10 per page</option>
-              <option value={20}>20 per page</option>
+              <option value={5}>5 / trang</option>
+              <option value={10}>10 / trang</option>
+              <option value={20}>20 / trang</option>
             </select>
           </div>
         </div>
@@ -286,13 +286,13 @@ export default function PatientsPage() {
               <table className="w-full text-left border-collapse min-w-max relative">
                 <thead className="sticky top-0 bg-white/95 backdrop-blur-md z-10 border-b border-gray-200 shadow-sm">
                   <tr>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Patient</th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-1/4">Full Name</th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Gender</th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Phone</th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-1/4">Address</th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Mã nhận diện</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-1/4">Họ và tên</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Giới tính</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Điện thoại</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-1/4">Địa chỉ</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -302,7 +302,7 @@ export default function PatientsPage() {
                     <tr>
                       <td colSpan={7} className="p-16 text-center text-gray-500 bg-gray-50/50">
                         <div className="text-4xl mb-3">📭</div>
-                        <p className="font-medium">{debouncedSearch ? 'No patients match your search.' : 'No patient records available.'}</p>
+                        <p className="font-medium">{debouncedSearch ? 'Không có bệnh nhân nào khớp từ khóa tìm kiếm.' : 'Chưa có hồ sơ bệnh nhân nào.'}</p>
                       </td>
                     </tr>
                   ) : (
@@ -320,7 +320,7 @@ export default function PatientsPage() {
                         </td>
                         <td className="p-4">
                            <div className="font-semibold text-gray-800">{patient.fullName}</div>
-                           <div className="text-xs text-gray-500 mt-0.5">{patient.dateOfBirth ? formatDateValue(patient.dateOfBirth, 'No DOB') : 'No DOB'}</div>
+                           <div className="text-xs text-gray-500 mt-0.5">{patient.dateOfBirth ? formatDateValue(patient.dateOfBirth, 'Chưa có ngày sinh') : 'Chưa có ngày sinh'}</div>
                         </td>
                         <td className="p-4">
                            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
@@ -328,32 +328,32 @@ export default function PatientsPage() {
                              patient.gender === 'Female' ? 'bg-pink-50 text-pink-700 border border-pink-100' : 
                              'bg-gray-100 text-gray-700 border border-gray-200'
                            }`}>
-                             {patient.gender || 'Unknown'}
+                             {patient.gender === 'Male' ? 'Nam' : patient.gender === 'Female' ? 'Nữ' : patient.gender === 'Other' ? 'Khác' : 'Chưa rõ'}
                            </span>
                         </td>
-                        <td className="p-4 text-sm font-medium text-gray-600">{patient.phone || 'N/A'}</td>
-                        <td className="p-4 text-sm text-gray-500 truncate max-w-[200px]">{patient.address || 'N/A'}</td>
+                        <td className="p-4 text-sm font-medium text-gray-600">{patient.phone || 'Chưa có'}</td>
+                        <td className="p-4 text-sm text-gray-500 truncate max-w-[200px]">{patient.address || 'Chưa có'}</td>
                         <td className="p-4">
                             <span className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 text-green-700 border border-green-100 rounded-full text-xs font-bold w-max">
                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                               {patient.status || 'Active'}
+                               {patient.status === 'Active' || !patient.status ? 'Đang hoạt động' : patient.status}
                             </span>
                         </td>
                         <td className="p-4 flex justify-end gap-2">
                           <button
                             onClick={(e) => openEditModal(patient, e)}
                             className="bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors text-sm font-semibold shadow-sm"
-                            title="Edit Patient"
+                            title="Sửa bệnh nhân"
                           >
-                            Edit
+                            Sửa
                           </button>
                           {role !== "Doctor" && (
                             <button
                               onClick={(e) => handleDelete(patient.id, e)}
                               className="bg-white border border-red-100 text-red-500 hover:bg-red-500 hover:text-white hover:border-red-600 px-3 py-1.5 rounded-lg transition-colors text-sm font-semibold shadow-sm"
-                              title="Delete Patient"
+                              title="Xóa bệnh nhân"
                             >
-                              Delete
+                              Xóa
                             </button>
                           )}
                         </td>
@@ -369,7 +369,7 @@ export default function PatientsPage() {
         {!isLoading && totalPages > 0 && (
           <div className="mt-5 flex justify-between items-center text-sm">
             <div className="text-gray-500 font-medium">
-               Showing <span className="text-gray-900 font-bold">{(currentPage - 1) * pageSize + 1}</span> to <span className="text-gray-900 font-bold">{Math.min(currentPage * pageSize, totalItems || patients.length)}</span> of <span className="text-blue-600 font-bold">{totalItems || patients.length}</span> patients
+               Hiển thị <span className="text-gray-900 font-bold">{(currentPage - 1) * pageSize + 1}</span> đến <span className="text-gray-900 font-bold">{Math.min(currentPage * pageSize, totalItems || patients.length)}</span> trong tổng số <span className="text-blue-600 font-bold">{totalItems || patients.length}</span> bệnh nhân
             </div>
             <div className="flex gap-1 items-center bg-gray-50 border border-gray-200 shadow-sm p-1 rounded-xl">
               <button 
@@ -381,7 +381,7 @@ export default function PatientsPage() {
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(p => p - 1)}
                 className="px-3 py-1.5 rounded-lg font-bold disabled:opacity-40 hover:bg-white hover:shadow-sm text-gray-600 transition-all"
-              >‹ Prev</button>
+              >Trước</button>
               <span className="px-4 py-1.5 font-bold text-blue-700 bg-blue-100/50 rounded-lg shadow-inner">
                  {currentPage} / {totalPages}
               </span>
@@ -389,7 +389,7 @@ export default function PatientsPage() {
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(p => p + 1)}
                 className="px-3 py-1.5 rounded-lg font-bold disabled:opacity-40 hover:bg-white hover:shadow-sm text-gray-600 transition-all"
-              >Next ›</button>
+              >Tiếp</button>
             </div>
           </div>
         )}
@@ -429,7 +429,7 @@ export default function PatientsPage() {
                         {selectedPatient.status || 'Active'}
                      </span>
                      <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold flex items-center gap-1">
-                        🗓️ {selectedPatient.dateOfBirth ? formatDateValue(selectedPatient.dateOfBirth, 'N/A') : 'N/A'}
+                        Ngày sinh: {selectedPatient.dateOfBirth ? formatDateValue(selectedPatient.dateOfBirth, 'Chưa có') : 'Chưa có'}
                      </span>
                   </div>
                </div>
@@ -439,15 +439,15 @@ export default function PatientsPage() {
                   <div className="flex items-start gap-3">
                      <div className="mt-0.5 text-blue-500">📞</div>
                      <div>
-                        <div className="text-xs font-bold text-gray-400 uppercase">Phone Number</div>
-                        <div className="font-semibold text-gray-800">{selectedPatient.phone || 'No phone recorded'}</div>
+                        <div className="text-xs font-bold text-gray-400 uppercase">Số điện thoại</div>
+                        <div className="font-semibold text-gray-800">{selectedPatient.phone || 'Chưa có số điện thoại'}</div>
                      </div>
                   </div>
                   <div className="flex items-start gap-3">
                      <div className="mt-0.5 text-blue-500">🏠</div>
                      <div>
-                        <div className="text-xs font-bold text-gray-400 uppercase">Home Address</div>
-                        <div className="font-semibold text-gray-800">{selectedPatient.address || 'No address recorded'}</div>
+                        <div className="text-xs font-bold text-gray-400 uppercase">Địa chỉ</div>
+                        <div className="font-semibold text-gray-800">{selectedPatient.address || 'Chưa có địa chỉ'}</div>
                      </div>
                   </div>
                </div>
@@ -457,7 +457,7 @@ export default function PatientsPage() {
                   <div className="absolute -right-4 -top-4 text-7xl opacity-5">📋</div>
                   <h4 className="text-sm font-bold text-blue-800 uppercase tracking-wide mb-4 flex items-center gap-2">
                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                     Medical Summary
+                     Tóm tắt hồ sơ
                   </h4>
                   
                   {drawerData.isLoading ? (
@@ -469,19 +469,19 @@ export default function PatientsPage() {
                   ) : (
                     <div className="space-y-4">
                        <div className="flex justify-between items-center bg-white/60 p-3 rounded-xl border border-white">
-                          <span className="text-gray-600 font-medium text-sm">Total Appointments</span>
+                          <span className="text-gray-600 font-medium text-sm">Tổng lịch hẹn</span>
                           <span className="text-lg font-bold text-blue-700">{drawerData.appointments.length}</span>
                        </div>
                        <div className="flex justify-between items-center bg-white/60 p-3 rounded-xl border border-white">
-                          <span className="text-gray-600 font-medium text-sm">Last Visit</span>
+                          <span className="text-gray-600 font-medium text-sm">Lần khám gần nhất</span>
                           <span className="font-bold text-gray-800 text-sm">
-                            {drawerData.appointments.length > 0 ? formatDateValue(drawerData.appointments[0].appointmentDate, 'Never') : 'Never'}
+                            {drawerData.appointments.length > 0 ? formatDateValue(drawerData.appointments[0].appointmentDate, 'Chưa từng') : 'Chưa từng'}
                           </span>
                        </div>
                        <div className="flex justify-between items-center bg-white/60 p-3 rounded-xl border border-white">
-                          <span className="text-gray-600 font-medium text-sm">Latest Diagnosis</span>
+                          <span className="text-gray-600 font-medium text-sm">Chẩn đoán gần nhất</span>
                           <span className="font-bold text-blue-600 text-sm">
-                            {drawerData.medicalRecords.length > 0 ? drawerData.medicalRecords[0].diagnosis : 'None'}
+                            {drawerData.medicalRecords.length > 0 ? drawerData.medicalRecords[0].diagnosis : 'Chưa có'}
                           </span>
                        </div>
                     </div>
@@ -490,26 +490,26 @@ export default function PatientsPage() {
 
                {/* Appointment History Preview Table */}
                <div>
-                  <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-3 px-1">Recent Appointments</h4>
+                  <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide mb-3 px-1">Lịch hẹn gần đây</h4>
                   <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm bg-white">
                     <table className="w-full text-left text-sm">
                       <thead className="bg-gray-50 border-b border-gray-100">
                          <tr>
-                            <th className="px-4 py-3 font-semibold text-gray-500">Date</th>
-                            <th className="px-4 py-3 font-semibold text-gray-500">Doctor</th>
-                            <th className="px-4 py-3 font-semibold text-gray-500 whitespace-nowrap">Status</th>
+                            <th className="px-4 py-3 font-semibold text-gray-500">Ngày</th>
+                            <th className="px-4 py-3 font-semibold text-gray-500">Bác sĩ</th>
+                            <th className="px-4 py-3 font-semibold text-gray-500 whitespace-nowrap">Trạng thái</th>
                          </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                          {drawerData.isLoading ? (
-                           <tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">Loading history...</td></tr>
+                           <tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">Đang tải lịch sử...</td></tr>
                          ) : drawerData.appointments.length === 0 ? (
-                           <tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">No appointments found.</td></tr>
+                           <tr><td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-400">Chưa có lịch hẹn nào.</td></tr>
                          ) : (
                             drawerData.appointments.map((a) => (
                               <tr key={a.id} className="hover:bg-blue-50/30 transition-colors">
                                  <td className="px-4 py-3 text-gray-600 font-medium">{formatDateValue(a.appointmentDate)}</td>
-                                 <td className="px-4 py-3 font-semibold text-gray-800">Assigned Doctor</td>
+                                 <td className="px-4 py-3 font-semibold text-gray-800">Bác sĩ phụ trách</td>
                                 <td className="px-4 py-3">
                                   <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
                                     a.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
@@ -530,16 +530,16 @@ export default function PatientsPage() {
             {/* Quick Actions Base */}
             <div className="p-6 border-t border-gray-100 bg-gray-50 flex flex-col gap-3 shrink-0">
                <button 
-                 onClick={() => { toast("Redirecting to Appointment Creation..."); setIsDrawerOpen(false); }}
+                 onClick={() => { toast("Chuyển sang màn tạo lịch hẹn..."); setIsDrawerOpen(false); }}
                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-md hover:shadow-lg transition-all"
                >
-                 + Schedule Appointment
+                 + Tạo lịch hẹn
                </button>
                <button 
-                 onClick={() => { toast("Redirecting to Medical Records..."); setIsDrawerOpen(false); }}
+                 onClick={() => { toast("Chuyển sang màn hồ sơ khám..."); setIsDrawerOpen(false); }}
                  className="w-full bg-white hover:bg-gray-50 text-blue-700 border border-blue-200 font-bold py-3.5 rounded-xl shadow-sm transition-all"
                >
-                 View Full Medical Records
+                 Xem toàn bộ hồ sơ khám
                </button>
             </div>
           </>
@@ -547,11 +547,11 @@ export default function PatientsPage() {
       </div>
 
       {/* CREATE/EDIT MODAL FORM */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={modalMode === 'create' ? 'Add New Patient' : 'Edit Patient Profile'}>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={modalMode === 'create' ? 'Thêm bệnh nhân mới' : 'Cập nhật hồ sơ bệnh nhân'}>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2 px-1 pb-2">
           
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">Full Name <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-bold text-gray-700 mb-1.5">Họ và tên <span className="text-red-500">*</span></label>
             <input 
               ref={firstInputRef}
               type="text" 
@@ -565,7 +565,7 @@ export default function PatientsPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1.5">Date Of Birth <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-bold text-gray-700 mb-1.5">Ngày sinh <span className="text-red-500">*</span></label>
               <input 
                 type="date" 
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium text-gray-800 shadow-sm"
@@ -590,7 +590,7 @@ export default function PatientsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">Phone Number</label>
+            <label className="block text-sm font-bold text-gray-700 mb-1.5">Số điện thoại</label>
             <input 
               type="tel" 
               className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400 font-medium text-gray-800 shadow-sm"
@@ -601,7 +601,7 @@ export default function PatientsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">Residential Address</label>
+            <label className="block text-sm font-bold text-gray-700 mb-1.5">Địa chỉ thường trú</label>
             <textarea 
               rows={3}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-y placeholder:text-gray-400 font-medium text-gray-800 shadow-sm"
@@ -617,7 +617,7 @@ export default function PatientsPage() {
                onClick={() => setIsModalOpen(false)}
                className="px-5 py-2.5 rounded-xl font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
             >
-               Cancel
+               Hủy
             </button>
             <button 
                type="submit" 
@@ -627,10 +627,10 @@ export default function PatientsPage() {
               {isSubmitting ? (
                  <>
                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                   {modalMode === 'create' ? 'Creating...' : 'Updating...'}
+                   {modalMode === 'create' ? 'Đang tạo...' : 'Đang cập nhật...'}
                  </>
               ) : (
-                 modalMode === 'create' ? 'Save Patient Record' : 'Apply Changes'
+                 modalMode === 'create' ? 'Lưu bệnh nhân' : 'Cập nhật thay đổi'
               )}
             </button>
           </div>

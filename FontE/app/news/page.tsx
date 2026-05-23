@@ -1,4 +1,4 @@
-import { PublicPageShell } from "@/components/public/PublicPageShell";
+﻿import { PublicPageShell } from "@/components/public/PublicPageShell";
 import { SectionHeading } from "@/components/public/SectionHeading";
 import { newsArticles } from "@/content/hospitalContent";
 
@@ -10,7 +10,7 @@ export default function NewsPage() {
       <section className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-22">
         <SectionHeading
           eyebrow="Kiến thức sức khỏe"
-          title="Website bệnh viện tư cần vận hành như một newsroom chuyên môn."
+          title="Website bệnh viện tư cần vận hành như một phòng tin chuyên môn."
           description="Không chỉ có trang giới thiệu dịch vụ, lớp nội dung cần đủ mạnh để giữ nhịp tương tác với khách hàng trước và sau khi sử dụng dịch vụ y tế."
         />
 

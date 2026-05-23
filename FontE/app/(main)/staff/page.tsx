@@ -52,12 +52,7 @@ export default function StaffPage() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await staffUserService.getAll(
-        pageNumber,
-        pageSize,
-        roleFilter,
-        debouncedSearch
-      );
+      const data = await staffUserService.getAll(pageNumber, pageSize, roleFilter, debouncedSearch);
       setItems(data.items);
       setTotalCount(data.totalCount);
       setTotalPages(data.totalPages || 1);
@@ -65,7 +60,7 @@ export default function StaffPage() {
       setItems([]);
       setTotalCount(0);
       setTotalPages(1);
-      toast.error(getApiErrorMessage(error, "Failed to load staff list."));
+      toast.error(getApiErrorMessage(error, "Không thể tải danh sách tài khoản."));
     } finally {
       setIsLoading(false);
     }
@@ -105,7 +100,7 @@ export default function StaffPage() {
           password: form.password,
           role: form.role,
         });
-        toast.success("Staff account created.");
+        toast.success("Đã tạo tài khoản nhân sự.");
       } else if (selected) {
         const payload: UpdateStaffUserPayload = {
           username: form.username.trim(),
@@ -115,139 +110,142 @@ export default function StaffPage() {
           payload.password = form.password.trim();
         }
         await staffUserService.update(selected.id, payload);
-        toast.success("Staff account updated.");
+        toast.success("Đã cập nhật tài khoản nhân sự.");
       }
 
       setIsModalOpen(false);
       fetchData();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to save staff account."));
+      toast.error(getApiErrorMessage(error, "Không thể lưu tài khoản nhân sự."));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (user: StaffUser) => {
-    const ok = window.confirm(`Delete ${user.username} (${user.role})?`);
+    const ok = window.confirm(`Xóa tài khoản ${user.username} (${user.role})?`);
     if (!ok) {
       return;
     }
+
     try {
       await staffUserService.delete(user.id);
-      toast.success("Staff account deleted.");
+      toast.success("Đã xóa tài khoản nhân sự.");
       if (items.length === 1 && pageNumber > 1) {
-        setPageNumber((p) => p - 1);
+        setPageNumber((current) => current - 1);
       } else {
         fetchData();
       }
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to delete staff account."));
+      toast.error(getApiErrorMessage(error, "Không thể xóa tài khoản nhân sự."));
     }
   };
 
   const titleByMode = useMemo(
-    () => (mode === "create" ? "Create Staff Account" : "Edit Staff Account"),
+    () => (mode === "create" ? "Tạo tài khoản nhân sự" : "Cập nhật tài khoản nhân sự"),
     [mode]
   );
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Staff Management</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Admin can manage Doctor and Receptionist accounts.
+          <h1 className="text-3xl font-bold tracking-tight text-gray-800">Nhân sự</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Quản trị viên có thể quản lý tài khoản bác sĩ và lễ tân.
           </p>
         </div>
-        <Button onClick={openCreateModal}>+ Add Staff</Button>
+        <Button onClick={openCreateModal}>+ Thêm nhân sự</Button>
       </div>
 
-      <Card className="p-6 border-none shadow-sm rounded-2xl bg-white">
-        <div className="mb-6 flex flex-col md:flex-row gap-3 justify-between">
+      <Card className="rounded-2xl border-none bg-white p-6 shadow-sm">
+        <div className="mb-6 flex flex-col justify-between gap-3 md:flex-row">
           <input
             type="text"
-            placeholder="Search username..."
-            className="w-full md:w-[360px] px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-sm shadow-sm"
+            placeholder="Tìm theo tên đăng nhập..."
+            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 md:w-[360px]"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
           />
 
           <div className="flex items-center gap-3">
             <select
-              className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white"
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
               value={roleFilter}
-              onChange={(e) => {
-                setRoleFilter(e.target.value as "" | "Doctor" | "Receptionist");
+              onChange={(event) => {
+                setRoleFilter(event.target.value as "" | "Doctor" | "Receptionist");
                 setPageNumber(1);
               }}
             >
-              <option value="">All Roles</option>
-              <option value="Doctor">Doctor</option>
-              <option value="Receptionist">Receptionist</option>
+              <option value="">Tất cả vai trò</option>
+              <option value="Doctor">Bác sĩ</option>
+              <option value="Receptionist">Lễ tân</option>
             </select>
 
             <select
-              className="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-white"
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
               value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
+              onChange={(event) => {
+                setPageSize(Number(event.target.value));
                 setPageNumber(1);
               }}
             >
-              <option value={5}>5 / page</option>
-              <option value={10}>10 / page</option>
-              <option value={20}>20 / page</option>
+              <option value={5}>5 / trang</option>
+              <option value={10}>10 / trang</option>
+              <option value={20}>20 / trang</option>
             </select>
           </div>
         </div>
 
-        <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50 border-b border-gray-200">
+        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <table className="w-full border-collapse text-left">
+            <thead className="border-b border-gray-200 bg-gray-50">
               <tr>
-                <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Username</th>
-                <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-gray-500">Tên đăng nhập</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-gray-500">Vai trò</th>
+                <th className="p-4 text-right text-xs font-bold uppercase tracking-wider text-gray-500">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {isLoading ? (
                 <tr>
-                  <td colSpan={3} className="p-8 text-center text-gray-500">Loading...</td>
+                  <td colSpan={3} className="p-8 text-center text-gray-500">
+                    Đang tải...
+                  </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="p-8 text-center text-gray-500">
-                    No staff found.
+                    Không tìm thấy tài khoản nào.
                   </td>
                 </tr>
               ) : (
                 items.map((user) => (
-                  <tr key={user.id} className="hover:bg-blue-50/30 transition-colors">
+                  <tr key={user.id} className="transition-colors hover:bg-blue-50/30">
                     <td className="p-4 font-semibold text-gray-800">{user.username}</td>
                     <td className="p-4">
                       <span
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                        className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
                           user.role === "Doctor"
-                            ? "bg-cyan-50 text-cyan-700 border border-cyan-100"
-                            : "bg-amber-50 text-amber-700 border border-amber-100"
+                            ? "border border-cyan-100 bg-cyan-50 text-cyan-700"
+                            : "border border-amber-100 bg-amber-50 text-amber-700"
                         }`}
                       >
-                        {user.role}
+                        {user.role === "Doctor" ? "Bác sĩ" : "Lễ tân"}
                       </span>
                     </td>
-                    <td className="p-4 text-right space-x-2">
+                    <td className="space-x-2 p-4 text-right">
                       <button
                         onClick={() => openEditModal(user)}
-                        className="bg-white border border-gray-200 text-gray-600 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors text-sm font-semibold shadow-sm"
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-600 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
                       >
-                        Edit
+                        Sửa
                       </button>
                       <button
                         onClick={() => handleDelete(user)}
-                        className="bg-white border border-red-100 text-red-500 hover:bg-red-500 hover:text-white hover:border-red-600 px-3 py-1.5 rounded-lg transition-colors text-sm font-semibold shadow-sm"
+                        className="rounded-lg border border-red-100 bg-white px-3 py-1.5 text-sm font-semibold text-red-500 shadow-sm transition-colors hover:border-red-600 hover:bg-red-500 hover:text-white"
                       >
-                        Delete
+                        Xóa
                       </button>
                     </td>
                   </tr>
@@ -258,42 +256,40 @@ export default function StaffPage() {
         </div>
 
         {!isLoading && totalPages > 0 && (
-          <div className="mt-5 flex justify-between items-center text-sm">
-            <div className="text-gray-500 font-medium">
-              Showing{" "}
-              <span className="text-gray-900 font-bold">
+          <div className="mt-5 flex items-center justify-between text-sm">
+            <div className="font-medium text-gray-500">
+              Hiển thị{" "}
+              <span className="font-bold text-gray-900">
                 {totalCount === 0 ? 0 : (pageNumber - 1) * pageSize + 1}
               </span>{" "}
-              to{" "}
-              <span className="text-gray-900 font-bold">
-                {Math.min(pageNumber * pageSize, totalCount)}
-              </span>{" "}
-              of <span className="text-blue-600 font-bold">{totalCount}</span> accounts
+              đến{" "}
+              <span className="font-bold text-gray-900">{Math.min(pageNumber * pageSize, totalCount)}</span>{" "}
+              trong tổng số <span className="font-bold text-blue-600">{totalCount}</span> tài khoản
             </div>
-            <div className="flex gap-1 items-center bg-gray-50 border border-gray-200 p-1 rounded-xl">
+            <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
               <button
                 disabled={pageNumber === 1}
                 onClick={() => setPageNumber(1)}
-                className="px-3 py-1.5 rounded-lg font-bold disabled:opacity-40 hover:bg-white text-gray-600"
+                className="rounded-lg px-3 py-1.5 font-bold text-gray-600 disabled:opacity-40 hover:bg-white"
               >
                 «
               </button>
               <button
                 disabled={pageNumber === 1}
-                onClick={() => setPageNumber((p) => p - 1)}
-                className="px-3 py-1.5 rounded-lg font-bold disabled:opacity-40 hover:bg-white text-gray-600"
+                onClick={() => setPageNumber((current) => current - 1)}
+                className="rounded-lg px-3 py-1.5 font-bold text-gray-600 disabled:opacity-40 hover:bg-white"
               >
-                ‹ Prev
+                Trước
               </button>
-              <span className="px-4 py-1.5 font-bold text-blue-700 bg-blue-100/50 rounded-lg">
+              <span className="rounded-lg bg-blue-100/50 px-4 py-1.5 font-bold text-blue-700">
                 {pageNumber} / {totalPages}
               </span>
               <button
                 disabled={pageNumber === totalPages}
-                onClick={() => setPageNumber((p) => p + 1)}
-                className="px-3 py-1.5 rounded-lg font-bold disabled:opacity-40 hover:bg-white text-gray-600"
+                onClick={() => setPageNumber((current) => current + 1)}
+                className="rounded-lg px-3 py-1.5 font-bold text-gray-600 disabled:opacity-40 hover:bg-white"
               >
-                Next ›
+                Tiếp
               </button>
             </div>
           </div>
@@ -301,85 +297,85 @@ export default function StaffPage() {
       </Card>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={titleByMode}>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2 px-1 pb-2">
+        <form onSubmit={handleSubmit} className="mt-2 space-y-4 px-1 pb-2">
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">
-              Username <span className="text-red-500">*</span>
+            <label className="mb-1.5 block text-sm font-bold text-gray-700">
+              Tên đăng nhập <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl outline-none text-gray-800"
+              className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-gray-800 outline-none"
               value={form.username}
-              onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
+              onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">
-              Role <span className="text-red-500">*</span>
+            <label className="mb-1.5 block text-sm font-bold text-gray-700">
+              Vai trò <span className="text-red-500">*</span>
             </label>
             <select
-              className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-xl outline-none text-gray-800"
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-800 outline-none"
               value={form.role}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  role: e.target.value as "Doctor" | "Receptionist",
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  role: event.target.value as "Doctor" | "Receptionist",
                 }))
               }
               required
             >
-              <option value="Doctor">Doctor</option>
-              <option value="Receptionist">Receptionist</option>
+              <option value="Doctor">Bác sĩ</option>
+              <option value="Receptionist">Lễ tân</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1.5">
+            <label className="mb-1.5 block text-sm font-bold text-gray-700">
               {mode === "create" ? (
                 <>
-                  Password <span className="text-red-500">*</span>
+                  Mật khẩu <span className="text-red-500">*</span>
                 </>
               ) : (
-                "New Password (optional)"
+                "Mật khẩu mới (không bắt buộc)"
               )}
             </label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
-                className="w-full px-4 py-2.5 pr-16 border border-gray-300 rounded-xl outline-none text-gray-800"
+                className="w-full rounded-xl border border-gray-300 px-4 py-2.5 pr-16 text-gray-800 outline-none"
                 value={form.password}
-                onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
                 required={mode === "create"}
                 minLength={6}
               />
               <button
                 type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute inset-y-0 right-0 px-3 text-xs font-semibold text-gray-500 hover:text-blue-600 transition-colors"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                title={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((value) => !value)}
+                className="absolute inset-y-0 right-0 px-3 text-xs font-semibold text-gray-500 transition-colors hover:text-blue-600"
+                aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
               >
-                {showPassword ? "Hide" : "Show"}
+                {showPassword ? "Ẩn" : "Hiện"}
               </button>
             </div>
           </div>
 
-          <div className="pt-6 border-t border-gray-100 flex justify-end gap-3">
+          <div className="flex justify-end gap-3 border-t border-gray-100 pt-6">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-5 py-2.5 rounded-xl font-bold bg-gray-100 text-gray-600 hover:bg-gray-200"
+              className="rounded-xl bg-gray-100 px-5 py-2.5 font-bold text-gray-600 hover:bg-gray-200"
             >
-              Cancel
+              Hủy
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-2.5 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-xl bg-blue-600 px-6 py-2.5 font-bold text-white disabled:opacity-50 hover:bg-blue-700"
             >
-              {isSubmitting ? "Saving..." : mode === "create" ? "Create" : "Save Changes"}
+              {isSubmitting ? "Đang lưu..." : mode === "create" ? "Tạo tài khoản" : "Lưu thay đổi"}
             </button>
           </div>
         </form>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -267,7 +267,7 @@ export default function ClinicalOrdersPage() {
     event.preventDefault();
 
     if (!selectedEncounterId) {
-      toast.error("Cần chọn encounter để tạo chỉ định.");
+      toast.error("Cần chọn hồ sơ khám để tạo chỉ định.");
       return;
     }
 
@@ -377,7 +377,7 @@ export default function ClinicalOrdersPage() {
     }
 
     if (!findings.trim() && !impression.trim()) {
-      toast.error("Cần có findings hoặc impression để lưu báo cáo.");
+      toast.error("Cần có mô tả hoặc kết luận để lưu báo cáo.");
       return;
     }
 
@@ -414,14 +414,14 @@ export default function ClinicalOrdersPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.26em] text-violet-700">
-              Clinical orders
+              Cận lâm sàng
             </p>
             <h1 className="mt-3 text-3xl font-bold text-slate-950">
               Chỉ định cận lâm sàng
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-              Quản lý worklist xét nghiệm và chẩn đoán hình ảnh theo hospital database
-              mới, bám theo encounter và order header.
+              Quản lý danh sách xét nghiệm và chẩn đoán hình ảnh theo hospital database
+              mới, bám theo hồ sơ khám và phiếu chỉ định.
             </p>
           </div>
 
@@ -510,7 +510,7 @@ export default function ClinicalOrdersPage() {
         {isLoading ? (
           <div className="flex flex-col items-center justify-center p-16">
             <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-violet-100 border-t-violet-600" />
-            <p className="text-sm font-medium text-slate-500">Đang tải worklist chỉ định...</p>
+            <p className="text-sm font-medium text-slate-500">Đang tải danh sách chỉ định...</p>
           </div>
         ) : orders.length === 0 ? (
           <div className="p-16 text-center text-sm text-slate-500">
@@ -672,13 +672,13 @@ export default function ClinicalOrdersPage() {
       >
         <form className="space-y-4" onSubmit={handleCreateOrder}>
           <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">Encounter</label>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">Hồ sơ khám</label>
             <select
               value={selectedEncounterId}
               onChange={(event) => setSelectedEncounterId(event.target.value)}
               className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
             >
-              <option value="">Chọn encounter</option>
+              <option value="">Chọn hồ sơ khám</option>
               {availableEncounters.map((encounter) => (
                 <option key={encounter.encounterId} value={encounter.encounterId}>
                   {encounter.encounterNumber} - {encounter.patientName} -{" "}
@@ -772,7 +772,7 @@ export default function ClinicalOrdersPage() {
               <InfoTile label="Loại" value={getCategoryLabel(selectedDetail.category)} />
               <InfoTile label="Bệnh nhân" value={selectedDetail.patientName} />
               <InfoTile label="Mã bệnh án" value={selectedDetail.medicalRecordNumber} />
-              <InfoTile label="Encounter" value={selectedDetail.encounterNumber} />
+              <InfoTile label="Hồ sơ khám" value={selectedDetail.encounterNumber} />
               <InfoTile label="Dịch vụ" value={selectedDetail.serviceName} />
               <InfoTile label="Trạng thái" value={getStatusLabel(selectedDetail.status)} />
               <InfoTile
@@ -827,13 +827,13 @@ export default function ClinicalOrdersPage() {
             ) : (
               <div className="space-y-3">
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <div className="text-sm font-semibold text-slate-800">Findings</div>
+                  <div className="text-sm font-semibold text-slate-800">Mô tả</div>
                   <div className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
                     {selectedDetail.findings || "--"}
                   </div>
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                  <div className="text-sm font-semibold text-slate-800">Impression</div>
+                  <div className="text-sm font-semibold text-slate-800">Kết luận</div>
                   <div className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
                     {selectedDetail.impression || "--"}
                   </div>
@@ -1001,7 +1001,7 @@ export default function ClinicalOrdersPage() {
           )}
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">Findings</label>
+            <label className="mb-2 block text-sm font-semibold text-slate-700">Mô tả</label>
             <textarea
               value={findings}
               onChange={(event) => setFindings(event.target.value)}
@@ -1013,7 +1013,7 @@ export default function ClinicalOrdersPage() {
 
           <div>
             <label className="mb-2 block text-sm font-semibold text-slate-700">
-              Impression
+              Kết luận
             </label>
             <textarea
               value={impression}

@@ -66,13 +66,13 @@ export default function LoginPage() {
           </h1>
           <p className="mt-6 max-w-xl text-base leading-8 text-slate-300">
             Bệnh viện tư thực tế không thể chỉ có một form đăng nhập chung cho nhân sự. Hệ thống cần phân luồng rõ:
-            khối nội bộ cho staff, còn bệnh nhân có portal riêng để theo dõi hồ sơ, lịch hẹn và dịch vụ chăm sóc.
+            khối nội bộ cho nhân sự, còn bệnh nhân có cổng riêng để theo dõi hồ sơ, lịch hẹn và dịch vụ chăm sóc.
           </p>
 
           <div className="mt-10 grid gap-4">
             {[
               "Nhân sự nội bộ tiếp tục đi vào dashboard vận hành.",
-              "Bệnh nhân có thể tự tạo tài khoản và đi vào portal riêng.",
+              "Bệnh nhân có thể tự tạo tài khoản và đi vào cổng riêng.",
               "JWT role-based routing tách biệt giữa nội bộ và bệnh nhân.",
             ].map((item) => (
               <div key={item} className="rounded-[1.5rem] border border-white/10 bg-white/6 px-5 py-4 text-sm leading-7 text-slate-200">
@@ -113,7 +113,7 @@ export default function LoginPage() {
                 description="Dành cho Admin, Doctor và Receptionist vận hành hệ thống bệnh viện."
               />
 
-              <Field label="Username" value={username} onChange={setUsername} placeholder="staff.username" />
+              <Field label="Tên đăng nhập" value={username} onChange={setUsername} placeholder="staff.username" />
               <PasswordField
                 value={password}
                 onChange={setPassword}
@@ -140,7 +140,7 @@ export default function LoginPage() {
             <div className="mt-8 animate-fade-in">
               <HeaderBlock
                 title="Cổng bệnh nhân"
-                description="Bệnh nhân có thể đăng nhập portal hoặc tự tạo tài khoản mới để theo dõi hồ sơ chăm sóc."
+                description="Bệnh nhân có thể đăng nhập cổng riêng hoặc tự tạo tài khoản mới để theo dõi hồ sơ chăm sóc."
               />
 
               <div className="mt-6 rounded-full bg-cyan-50 p-1">
@@ -180,7 +180,7 @@ export default function LoginPage() {
                     showPassword={showPassword}
                     setShowPassword={setShowPassword}
                   />
-                  <SubmitButton submitting={isSubmitting} idleText="Vào patient portal" loadingText="Đang đăng nhập..." />
+                  <SubmitButton submitting={isSubmitting} idleText="Vào cổng bệnh nhân" loadingText="Đang đăng nhập..." />
                 </form>
               ) : (
                 <form onSubmit={handlePatientRegister} className="mt-6 grid gap-4 md:grid-cols-2">

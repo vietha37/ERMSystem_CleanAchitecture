@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -220,7 +220,7 @@ export default function PrescriptionsPage() {
     event.preventDefault();
 
     if (!selectedEncounterId) {
-      toast.error("Cần chọn encounter để phát hành đơn thuốc.");
+      toast.error("Cần chọn hồ sơ khám để phát hành đơn thuốc.");
       return;
     }
 
@@ -286,11 +286,11 @@ export default function PrescriptionsPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.26em] text-cyan-700">
-              Pharmacy service
+              Dược lâm sàng
             </p>
             <h1 className="mt-3 text-3xl font-bold text-slate-950">Đơn thuốc hospital</h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-              Module đơn thuốc đã chuyển sang hospital database mới, bám theo encounter
+              Module đơn thuốc đã chuyển sang hospital database mới, bám theo hồ sơ khám
               và danh mục thuốc `pharmacy.Medicines`.
             </p>
           </div>
@@ -300,7 +300,7 @@ export default function PrescriptionsPage() {
               type="text"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Tìm theo mã đơn, encounter, bệnh nhân..."
+              placeholder="Tìm theo mã đơn, hồ sơ khám, bệnh nhân..."
               className="min-w-[260px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
             />
 
@@ -336,7 +336,7 @@ export default function PrescriptionsPage() {
         <MetricCard label="Đã cấp thuốc" value={metrics.Dispensed} tone="emerald" />
         <MetricCard label="Đã hủy" value={metrics.Cancelled} tone="rose" />
         <MetricCard
-          label="Encounter chờ kê đơn"
+          label="Hồ sơ chờ kê đơn"
           value={availableEncounters.length}
           tone="amber"
         />
@@ -525,7 +525,7 @@ export default function PrescriptionsPage() {
         <form onSubmit={handleCreatePrescription} className="space-y-5">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700">
-              Chọn encounter
+              Chọn hồ sơ khám
             </label>
             <select
               value={selectedEncounterId}
@@ -533,7 +533,7 @@ export default function PrescriptionsPage() {
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
               required
             >
-              <option value="">-- Chọn encounter --</option>
+              <option value="">-- Chọn hồ sơ khám --</option>
               {availableEncounters.map((encounter) => (
                 <option key={encounter.encounterId} value={encounter.encounterId}>
                   {encounter.encounterNumber} - {encounter.patientName} -{" "}
@@ -669,7 +669,7 @@ export default function PrescriptionsPage() {
           <div className="space-y-5">
             <div className="grid gap-3 rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4 text-sm md:grid-cols-2">
               <InfoLine label="Đơn thuốc" value={selectedPrescription.prescriptionNumber} />
-              <InfoLine label="Encounter" value={selectedPrescription.encounterNumber} />
+              <InfoLine label="Hồ sơ khám" value={selectedPrescription.encounterNumber} />
               <InfoLine label="Bệnh nhân" value={selectedPrescription.patientName} />
               <InfoLine label="Bác sĩ" value={selectedPrescription.doctorName} />
               <InfoLine

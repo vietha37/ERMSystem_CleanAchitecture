@@ -6,7 +6,7 @@ export function SiteFooter() {
     <footer className="mt-24 bg-slate-950 text-slate-200">
       <div className="mx-auto grid max-w-7xl gap-12 px-4 py-16 md:grid-cols-[1.2fr_repeat(3,0.8fr)] md:px-6">
         <div className="max-w-md">
-          <p className="font-serif text-3xl text-white">ERM Private Hospital</p>
+          <p className="font-serif text-3xl text-white">Bệnh viện tư ERM</p>
           <p className="mt-4 text-sm leading-7 text-slate-400">
             Mô hình bệnh viện tư định hướng gia đình, kết nối đa chuyên khoa, cận lâm sàng và chăm sóc sau khám
             trên cùng một hành trình số hóa.
@@ -25,7 +25,7 @@ export function SiteFooter() {
 
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-5 text-sm text-slate-400 md:flex-row md:items-center md:justify-between md:px-6">
-          <p>© 2026 ERM Private Hospital. Thiết kế cho vận hành bệnh viện tư hiện đại.</p>
+          <p>© 2026 Bệnh viện tư ERM. Thiết kế cho vận hành bệnh viện tư hiện đại.</p>
           <div className="flex flex-wrap gap-4">
             <Link href="/booking" className="transition hover:text-cyan-200">
               Đặt lịch trực tuyến

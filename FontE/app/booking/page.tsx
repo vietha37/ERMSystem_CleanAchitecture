@@ -45,7 +45,7 @@ export default async function BookingPage() {
           <div>
             <SectionHeading
               eyebrow="Đặt lịch thông minh"
-              title="Trang booking đã bắt đầu đi vào luồng đặt lịch thật trên database đích."
+              title="Trang đặt lịch đã bắt đầu đi vào luồng đặt lịch thật trên cơ sở dữ liệu đích."
               description="Người bệnh chọn chuyên khoa, bác sĩ, ngày giờ và gửi yêu cầu. Hệ thống kiểm tra lịch làm việc và tạo lịch hẹn nếu hợp lệ."
             />
 
@@ -53,7 +53,7 @@ export default async function BookingPage() {
               {[
                 "Kiểm tra khung giờ dựa trên lịch làm việc của bác sĩ.",
                 "Tự động tạo hồ sơ bệnh nhân mới nếu chưa tồn tại trong hệ thống đích.",
-                "Đẩy sự kiện AppointmentCreated.v1 vào notification outbox để xử lý nhắc lịch ở phase sau.",
+                "Đẩy sự kiện AppointmentCreated.v1 vào notification outbox để xử lý nhắc lịch ở giai đoạn sau.",
               ].map((item) => (
                 <div key={item} className="rounded-[1.6rem] border border-slate-200 bg-white p-5 text-sm leading-7 text-slate-700 shadow-[0_20px_55px_rgba(15,23,42,0.05)]">
                   {item}

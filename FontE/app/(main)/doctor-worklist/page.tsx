@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -83,7 +83,7 @@ export default function DoctorWorklistPage() {
         setDoctors(doctorData);
         setWorklist(worklistData);
       } catch (error: unknown) {
-        toast.error(getApiErrorMessage(error, "Không thể tải danh sách worklist bác sĩ."));
+        toast.error(getApiErrorMessage(error, "Không thể tải danh sách công việc bác sĩ."));
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
@@ -115,13 +115,13 @@ export default function DoctorWorklistPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.26em] text-blue-700">
-              Clinical operations
+              Vận hành lâm sàng
             </p>
             <h1 className="mt-3 text-3xl font-bold text-slate-950">
-              Worklist bác sĩ trong ngày
+              Công việc bác sĩ trong ngày
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-              Theo dõi luồng khám theo từng bác sĩ: lịch hẹn, encounter và đơn thuốc.
+              Theo dõi luồng khám theo từng bác sĩ: lịch hẹn, hồ sơ khám và đơn thuốc.
             </p>
           </div>
 
@@ -190,8 +190,8 @@ export default function DoctorWorklistPage() {
           <div>
             <h2 className="text-lg font-bold text-slate-900">
               {worklist?.doctorName
-                ? `Worklist của ${worklist.doctorName}`
-                : "Worklist theo ngày"}
+                ? `Công việc của ${worklist.doctorName}`
+                : "Công việc theo ngày"}
             </h2>
             <p className="text-sm text-slate-500">
               {worklist?.specialtyName || "Tất cả chuyên khoa"} / {workDate}
@@ -215,7 +215,7 @@ export default function DoctorWorklistPage() {
           <div className="flex flex-col items-center justify-center p-16">
             <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
             <p className="text-sm font-medium text-slate-500">
-              Đang tải worklist bác sĩ...
+              Đang tải công việc bác sĩ...
             </p>
           </div>
         ) : items.length === 0 ? (
@@ -237,13 +237,13 @@ export default function DoctorWorklistPage() {
                     Bác sĩ / phòng
                   </th>
                   <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                    Encounter
+                    Hồ sơ khám
                   </th>
                   <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                     Đơn thuốc
                   </th>
                   <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                    Workflow
+                    Trạng thái luồng
                   </th>
                 </tr>
               </thead>

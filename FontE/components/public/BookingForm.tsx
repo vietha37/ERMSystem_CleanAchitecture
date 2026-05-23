@@ -169,7 +169,7 @@ export function BookingForm({
 
       <div className="md:col-span-2 flex flex-col gap-4 pt-2 md:flex-row md:items-center md:justify-between">
         <p className="max-w-2xl text-sm leading-6 text-slate-500">
-          Sau khi gửi, hệ thống sẽ tạo lịch hẹn và đưa sự kiện vào outbox để Notification Service có thể nhắc lịch ở các bước sau.
+          Sau khi gửi, hệ thống sẽ tạo lịch hẹn và đưa sự kiện vào outbox để dịch vụ thông báo có thể nhắc lịch ở các bước sau.
         </p>
         <button
           type="submit"

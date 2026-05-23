@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -229,7 +229,7 @@ export default function MedicalRecordsPage() {
         setTotalCount(worklist.totalCount);
         setEligibleAppointments(appointments);
       } catch (error: unknown) {
-        toast.error(getApiErrorMessage(error, "Không thể tải dữ liệu EMR."));
+        toast.error(getApiErrorMessage(error, "Không thể tải dữ liệu hồ sơ khám."));
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
@@ -277,7 +277,7 @@ export default function MedicalRecordsPage() {
       setForm(mapDetailToForm(detail));
       setIsModalOpen(true);
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, "Không thể tải chi tiết encounter."));
+      toast.error(getApiErrorMessage(error, "Không thể tải chi tiết hồ sơ khám."));
     }
   };
 
@@ -285,7 +285,7 @@ export default function MedicalRecordsPage() {
     event.preventDefault();
 
     if (!editingEncounterId && !form.appointmentId) {
-      toast.error("Cần chọn lịch hẹn để mở encounter.");
+      toast.error("Cần chọn lịch hẹn để mở hồ sơ khám.");
       return;
     }
 
@@ -299,10 +299,10 @@ export default function MedicalRecordsPage() {
     try {
       if (editingEncounterId) {
         await hospitalEncounterService.update(editingEncounterId, buildUpdatePayload(form));
-        toast.success("Đã cập nhật encounter.");
+        toast.success("Đã cập nhật hồ sơ khám.");
       } else {
         await hospitalEncounterService.create(buildPayload(form));
-        toast.success("Đã tạo encounter mới.");
+        toast.success("Đã tạo hồ sơ khám mới.");
       }
 
       setIsModalOpen(false);
@@ -310,7 +310,7 @@ export default function MedicalRecordsPage() {
       setForm(EMPTY_FORM);
       await fetchData(true);
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, "Không thể lưu hồ sơ EMR."));
+      toast.error(getApiErrorMessage(error, "Không thể lưu hồ sơ khám."));
     } finally {
       setIsSubmitting(false);
     }
@@ -322,14 +322,14 @@ export default function MedicalRecordsPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.26em] text-emerald-700">
-              EMR service
+              Hồ sơ lâm sàng
             </p>
             <h1 className="mt-3 text-3xl font-bold text-slate-950">
               Hồ sơ khám bệnh hospital
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
               Module này đã chuyển sang hospital database mới. Mỗi hồ sơ được lưu
-              theo mô hình encounter, gồm chẩn đoán, ghi chú lâm sàng và dấu hiệu sinh tồn.
+              theo mô hình hồ sơ khám, gồm chẩn đoán, ghi chú lâm sàng và dấu hiệu sinh tồn.
             </p>
           </div>
 
@@ -338,7 +338,7 @@ export default function MedicalRecordsPage() {
               type="text"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Tìm theo mã encounter, mã lịch, bệnh nhân..."
+              placeholder="Tìm theo mã hồ sơ, mã lịch, bệnh nhân..."
               className="min-w-[260px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
             />
 
@@ -374,7 +374,7 @@ export default function MedicalRecordsPage() {
             >
               {isRefreshing ? "Đang làm mới..." : "Làm mới"}
             </Button>
-            <Button onClick={openCreateModal}>Mở encounter</Button>
+            <Button onClick={openCreateModal}>Mở hồ sơ khám</Button>
           </div>
         </div>
       </div>
@@ -383,7 +383,7 @@ export default function MedicalRecordsPage() {
         <MetricCard label="Đang khám" value={metrics.InProgress} tone="amber" />
         <MetricCard label="Đã chốt hồ sơ" value={metrics.Finalized} tone="emerald" />
         <MetricCard
-          label="Lịch chờ mở encounter"
+          label="Lịch chờ mở hồ sơ"
           value={availableAppointments.length}
           tone="cyan"
         />
@@ -392,7 +392,7 @@ export default function MedicalRecordsPage() {
       <Card className="overflow-hidden border border-slate-100 p-0 shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-5 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Danh sách encounter</h2>
+            <h2 className="text-lg font-bold text-slate-900">Danh sách hồ sơ khám</h2>
             <p className="mt-1 text-sm text-slate-500">
               Hiển thị {startItem}-{endItem} / {totalCount} hồ sơ.
             </p>
@@ -415,11 +415,11 @@ export default function MedicalRecordsPage() {
         {isLoading ? (
           <div className="flex flex-col items-center justify-center p-16">
             <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-600" />
-            <p className="text-sm font-medium text-slate-500">Đang tải hồ sơ EMR...</p>
+            <p className="text-sm font-medium text-slate-500">Đang tải hồ sơ khám...</p>
           </div>
         ) : encounters.length === 0 ? (
           <div className="p-16 text-center text-sm text-slate-500">
-            Chưa có encounter nào khớp bộ lọc hiện tại.
+            Chưa có hồ sơ khám nào khớp bộ lọc hiện tại.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -427,7 +427,7 @@ export default function MedicalRecordsPage() {
               <thead>
                 <tr className="bg-slate-50">
                   <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                    Encounter
+                    Hồ sơ khám
                   </th>
                   <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                     Bệnh nhân
@@ -557,7 +557,7 @@ export default function MedicalRecordsPage() {
           setEditingEncounterId(null);
           setForm(EMPTY_FORM);
         }}
-        title={editingEncounterId ? "Cập nhật encounter" : "Mở encounter mới"}
+        title={editingEncounterId ? "Cập nhật hồ sơ khám" : "Mở hồ sơ khám mới"}
       >
         <form onSubmit={handleSubmit} className="space-y-5">
           {!editingEncounterId && (
@@ -635,7 +635,7 @@ export default function MedicalRecordsPage() {
 
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">
-                Trạng thái encounter
+                Trạng thái hồ sơ khám
               </label>
               <select
                 value={form.encounterStatus}
