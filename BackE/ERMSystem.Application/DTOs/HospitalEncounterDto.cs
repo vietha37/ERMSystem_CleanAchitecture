@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
 
 namespace ERMSystem.Application.DTOs;
 
@@ -50,6 +51,11 @@ public class HospitalEncounterDetailDto : HospitalEncounterSummaryDto
     public DateTime? ClinicalNoteAuthoredAtLocal { get; set; }
     public DateTime? ClinicalNoteSignedAtLocal { get; set; }
     public bool IsClinicalNoteSigned { get; set; }
+    public string? ClinicalNoteSignedByUsername { get; set; }
+    public DateTime? ApprovalSignedAtLocal { get; set; }
+    public string? ApprovedByUsername { get; set; }
+    public string? ApprovalComment { get; set; }
+    public bool IsApproved { get; set; }
     public string? Subjective { get; set; }
     public string? Objective { get; set; }
     public string? Assessment { get; set; }
@@ -62,7 +68,17 @@ public class HospitalEncounterDetailDto : HospitalEncounterSummaryDto
     public int? SystolicBp { get; set; }
     public int? DiastolicBp { get; set; }
     public decimal? OxygenSaturation { get; set; }
+    public List<HospitalEncounterWorkflowEventDto> WorkflowEvents { get; set; } = new();
     public List<HospitalEncounterAttachmentDto> Attachments { get; set; } = new();
+}
+
+public class HospitalEncounterWorkflowEventDto
+{
+    public string EventType { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public string? Comment { get; set; }
+    public string? PerformedByUsername { get; set; }
+    public DateTime OccurredAtLocal { get; set; }
 }
 
 public class HospitalEncounterAttachmentDto
@@ -71,10 +87,27 @@ public class HospitalEncounterAttachmentDto
     public string DocumentType { get; set; } = string.Empty;
     public string FileName { get; set; } = string.Empty;
     public string ContentType { get; set; } = string.Empty;
+    public string StorageProvider { get; set; } = "local";
     public string DocumentUri { get; set; } = string.Empty;
     public DateTime UploadedAtLocal { get; set; }
     public Guid? UploadedByUserId { get; set; }
     public string? UploadedByUsername { get; set; }
+}
+
+public class HospitalEncounterAttachmentDownloadTicketDto
+{
+    public string StorageProvider { get; set; } = "local";
+    public string AccessToken { get; set; } = string.Empty;
+    public string DownloadUrl { get; set; } = string.Empty;
+    public DateTime ExpiresAtUtc { get; set; }
+}
+
+public class HospitalStoredAttachmentContentDto
+{
+    public string FileName { get; set; } = string.Empty;
+    public string ContentType { get; set; } = "application/octet-stream";
+    public Stream Content { get; set; } = Stream.Null;
+    public long? ContentLength { get; set; }
 }
 
 public class HospitalEncounterEligibleAppointmentDto
@@ -173,4 +206,16 @@ public class AddHospitalEncounterAttachmentDto
     [Required]
     [MaxLength(1000)]
     public string DocumentUri { get; set; } = string.Empty;
+}
+
+public class SignHospitalEncounterDto
+{
+    [MaxLength(1000)]
+    public string? AttestationText { get; set; }
+}
+
+public class ApproveHospitalEncounterDto
+{
+    [MaxLength(1000)]
+    public string? ApprovalComment { get; set; }
 }

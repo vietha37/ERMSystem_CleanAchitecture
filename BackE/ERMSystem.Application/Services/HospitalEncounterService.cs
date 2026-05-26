@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using ERMSystem.Application.DTOs;
@@ -10,20 +11,23 @@ namespace ERMSystem.Application.Services;
 public class HospitalEncounterService : IHospitalEncounterService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly string[] AllowedStatuses = ["InProgress", "Finalized"];
+    private static readonly string[] AllowedStatuses = ["InProgress", "Finalized", "Approved"];
 
     private readonly IHospitalEncounterRepository _hospitalEncounterRepository;
     private readonly IHospitalIdentityBridgeService _hospitalIdentityBridgeService;
     private readonly IBusinessMetricsRecorder _businessMetricsRecorder;
+    private readonly IHospitalDocumentStorageService _hospitalDocumentStorageService;
 
     public HospitalEncounterService(
         IHospitalEncounterRepository hospitalEncounterRepository,
         IHospitalIdentityBridgeService hospitalIdentityBridgeService,
-        IBusinessMetricsRecorder businessMetricsRecorder)
+        IBusinessMetricsRecorder businessMetricsRecorder,
+        IHospitalDocumentStorageService hospitalDocumentStorageService)
     {
         _hospitalEncounterRepository = hospitalEncounterRepository;
         _hospitalIdentityBridgeService = hospitalIdentityBridgeService;
         _businessMetricsRecorder = businessMetricsRecorder;
+        _hospitalDocumentStorageService = hospitalDocumentStorageService;
     }
 
     public Task<PaginatedResult<HospitalEncounterSummaryDto>> GetWorklistAsync(
@@ -47,7 +51,7 @@ public class HospitalEncounterService : IHospitalEncounterService
         CancellationToken ct = default)
     {
         actorUserId = await ResolveHospitalActorUserIdAsync(actorUserId, actorUsername, ct);
-        var normalizedStatus = NormalizeStatus(request.EncounterStatus);
+        var normalizedStatus = NormalizeEditableStatus(request.EncounterStatus);
         var appointment = await _hospitalEncounterRepository.GetAppointmentForEncounterAsync(request.AppointmentId, ct);
         if (appointment == null)
         {
@@ -162,7 +166,12 @@ public class HospitalEncounterService : IHospitalEncounterService
             return null;
         }
 
-        var normalizedStatus = NormalizeStatus(request.EncounterStatus);
+        if (existing.EncounterStatus == "Approved")
+        {
+            throw new InvalidOperationException("Ho so da duyet khong duoc cap nhat bang luong sua thong thuong.");
+        }
+
+        var normalizedStatus = NormalizeEditableStatus(request.EncounterStatus);
         var nowUtc = DateTime.UtcNow;
         var finalizedNow = existing.EncounterStatus != "Finalized" && normalizedStatus == "Finalized";
 
@@ -245,6 +254,7 @@ public class HospitalEncounterService : IHospitalEncounterService
             await _hospitalEncounterRepository.UpdateClinicalNoteAsync(new HospitalEncounterClinicalNoteUpdateCommand
             {
                 ClinicalNoteId = existing.ClinicalNoteId.Value,
+                NoteType = "Consultation",
                 Subjective = NormalizeText(request.Subjective),
                 Objective = NormalizeText(request.Objective),
                 Assessment = NormalizeText(request.Assessment),
@@ -289,6 +299,158 @@ public class HospitalEncounterService : IHospitalEncounterService
         return updated == null ? null : MapDetail(updated);
     }
 
+    public async Task<HospitalEncounterDetailDto?> ApproveAsync(
+        Guid encounterId,
+        ApproveHospitalEncounterDto request,
+        Guid? actorUserId,
+        string? actorUsername,
+        CancellationToken ct = default)
+    {
+        actorUserId = await ResolveHospitalActorUserIdAsync(actorUserId, actorUsername, ct);
+        var existing = await _hospitalEncounterRepository.GetEncounterAggregateAsync(encounterId, ct);
+        if (existing == null)
+        {
+            return null;
+        }
+
+        if (existing.EncounterStatus == "InProgress")
+        {
+            throw new InvalidOperationException("Chi duoc duyet ho so da chot.");
+        }
+
+        if (!existing.ClinicalNoteSignedAtUtc.HasValue)
+        {
+            throw new InvalidOperationException("Ho so can duoc ky xac nhan truoc khi duyet.");
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        var approvalComment = NormalizeText(request.ApprovalComment) ?? "Clinical record approval completed.";
+        await _hospitalEncounterRepository.UpdateEncounterAsync(new HospitalEncounterUpdateCommand
+        {
+            EncounterId = encounterId,
+            EncounterStatus = "Approved",
+            EndedAtUtc = existing.EndedAtUtc ?? nowUtc,
+            Summary = existing.Summary,
+            UpdatedAtUtc = nowUtc
+        }, ct);
+
+        if (existing.ApprovalNoteId.HasValue)
+        {
+            await _hospitalEncounterRepository.UpdateClinicalNoteAsync(new HospitalEncounterClinicalNoteUpdateCommand
+            {
+                ClinicalNoteId = existing.ApprovalNoteId.Value,
+                NoteType = "Approval",
+                Subjective = null,
+                Objective = null,
+                Assessment = "Approved",
+                CarePlan = approvalComment,
+                AuthoredByUserId = actorUserId,
+                AuthoredAtUtc = nowUtc,
+                SignedAtUtc = nowUtc
+            }, ct);
+        }
+        else
+        {
+            await _hospitalEncounterRepository.AddClinicalNoteAsync(new HospitalEncounterClinicalNoteCreateCommand
+            {
+                ClinicalNoteId = Guid.NewGuid(),
+                EncounterId = encounterId,
+                NoteType = "Approval",
+                Subjective = null,
+                Objective = null,
+                Assessment = "Approved",
+                CarePlan = approvalComment,
+                AuthoredByUserId = actorUserId,
+                AuthoredAtUtc = nowUtc,
+                SignedAtUtc = nowUtc
+            }, ct);
+        }
+
+        await _hospitalEncounterRepository.AddOutboxMessageAsync(new HospitalEncounterOutboxCreateCommand
+        {
+            OutboxMessageId = Guid.NewGuid(),
+            AggregateType = "Encounter",
+            AggregateId = encounterId,
+            EventType = "MedicalRecordApproved.v1",
+            PayloadJson = JsonSerializer.Serialize(new
+            {
+                encounterId,
+                approvedAtUtc = nowUtc,
+                approvedByUserId = actorUserId,
+                approvalComment
+            }, JsonOptions),
+            Status = "Pending",
+            AvailableAtUtc = nowUtc
+        }, ct);
+
+        await _hospitalEncounterRepository.SaveChangesAsync(ct);
+
+        _businessMetricsRecorder.IncrementEvent("hospital_encounter", "approved");
+
+        var updated = await _hospitalEncounterRepository.GetEncounterAggregateAsync(encounterId, ct);
+        return updated == null ? null : MapDetail(updated);
+    }
+
+    public async Task<HospitalEncounterDetailDto?> SignAsync(
+        Guid encounterId,
+        SignHospitalEncounterDto request,
+        Guid? actorUserId,
+        string? actorUsername,
+        CancellationToken ct = default)
+    {
+        actorUserId = await ResolveHospitalActorUserIdAsync(actorUserId, actorUsername, ct);
+        var existing = await _hospitalEncounterRepository.GetEncounterAggregateAsync(encounterId, ct);
+        if (existing == null)
+        {
+            return null;
+        }
+
+        if (existing.EncounterStatus == "InProgress")
+        {
+            throw new InvalidOperationException("Chi duoc ky xac nhan ho so da chot.");
+        }
+
+        if (!existing.ClinicalNoteId.HasValue)
+        {
+            throw new InvalidOperationException("Ho so chua co ghi chu lam sang de ky.");
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        await _hospitalEncounterRepository.UpdateClinicalNoteAsync(new HospitalEncounterClinicalNoteUpdateCommand
+        {
+            ClinicalNoteId = existing.ClinicalNoteId.Value,
+            NoteType = "Consultation",
+            Subjective = existing.Subjective,
+            Objective = existing.Objective,
+            Assessment = existing.Assessment,
+            CarePlan = existing.CarePlan,
+            AuthoredByUserId = actorUserId,
+            AuthoredAtUtc = existing.ClinicalNoteAuthoredAtUtc ?? nowUtc,
+            SignedAtUtc = nowUtc
+        }, ct);
+
+        await _hospitalEncounterRepository.AddClinicalNoteAsync(new HospitalEncounterClinicalNoteCreateCommand
+        {
+            ClinicalNoteId = Guid.NewGuid(),
+            EncounterId = encounterId,
+            NoteType = "Signature",
+            Subjective = null,
+            Objective = null,
+            Assessment = "Signed",
+            CarePlan = NormalizeText(request.AttestationText) ?? "Clinical note signed and attested.",
+            AuthoredByUserId = actorUserId,
+            AuthoredAtUtc = nowUtc,
+            SignedAtUtc = nowUtc
+        }, ct);
+
+        await _hospitalEncounterRepository.SaveChangesAsync(ct);
+
+        _businessMetricsRecorder.IncrementEvent("hospital_encounter", "signed");
+
+        var updated = await _hospitalEncounterRepository.GetEncounterAggregateAsync(encounterId, ct);
+        return updated == null ? null : MapDetail(updated);
+    }
+
     public async Task<HospitalEncounterDetailDto?> AddAttachmentAsync(
         Guid encounterId,
         AddHospitalEncounterAttachmentDto request,
@@ -325,6 +487,129 @@ public class HospitalEncounterService : IHospitalEncounterService
 
         var updated = await _hospitalEncounterRepository.GetEncounterAggregateAsync(encounterId, ct);
         return updated == null ? null : MapDetail(updated);
+    }
+
+    public async Task<HospitalEncounterDetailDto?> UploadAttachmentAsync(
+        Guid encounterId,
+        string documentType,
+        string fileName,
+        string? contentType,
+        long contentLength,
+        Stream content,
+        Guid? actorUserId,
+        string? actorUsername,
+        CancellationToken ct = default)
+    {
+        actorUserId = await ResolveHospitalActorUserIdAsync(actorUserId, actorUsername, ct);
+        var encounter = await _hospitalEncounterRepository.GetEncounterAggregateAsync(encounterId, ct);
+        if (encounter == null)
+        {
+            return null;
+        }
+
+        var storedDocument = await _hospitalDocumentStorageService.StoreEncounterAttachmentAsync(
+            encounterId,
+            fileName,
+            contentType,
+            contentLength,
+            content,
+            ct);
+
+        var nowUtc = DateTime.UtcNow;
+        await _hospitalEncounterRepository.AddAttachmentAsync(new HospitalEncounterAttachmentCreateCommand
+        {
+            AttachmentId = Guid.NewGuid(),
+            EncounterId = encounterId,
+            DocumentType = NormalizeDocumentType(documentType),
+            FileName = storedDocument.FileName,
+            ContentType = NormalizeContentType(storedDocument.ContentType),
+            DocumentUri = storedDocument.StorageUri,
+            UploadedAtUtc = nowUtc,
+            UploadedByUserId = actorUserId
+        }, ct);
+
+        await _hospitalEncounterRepository.SaveChangesAsync(ct);
+
+        _businessMetricsRecorder.IncrementEvent("hospital_encounter", "attachment_uploaded", new Dictionary<string, string?>
+        {
+            ["document_type"] = NormalizeDocumentType(documentType)
+        });
+
+        var updated = await _hospitalEncounterRepository.GetEncounterAggregateAsync(encounterId, ct);
+        return updated == null ? null : MapDetail(updated);
+    }
+
+    public async Task<HospitalStoredAttachmentContentDto?> GetAttachmentContentAsync(
+        Guid encounterId,
+        Guid attachmentId,
+        CancellationToken ct = default)
+    {
+        var attachment = await _hospitalEncounterRepository.GetAttachmentAsync(encounterId, attachmentId, ct);
+        if (attachment == null)
+        {
+            return null;
+        }
+
+        var storedDocument = await _hospitalDocumentStorageService.OpenReadAsync(attachment.DocumentUri, ct);
+        if (storedDocument == null)
+        {
+            return null;
+        }
+
+        return new HospitalStoredAttachmentContentDto
+        {
+            FileName = attachment.FileName,
+            ContentType = string.IsNullOrWhiteSpace(attachment.ContentType)
+                ? storedDocument.ContentType
+                : attachment.ContentType,
+            Content = storedDocument.Content,
+            ContentLength = storedDocument.ContentLength
+        };
+    }
+
+    public async Task<HospitalEncounterAttachmentDownloadTicketDto?> CreateAttachmentDownloadTicketAsync(
+        Guid encounterId,
+        Guid attachmentId,
+        CancellationToken ct = default)
+    {
+        var attachment = await _hospitalEncounterRepository.GetAttachmentAsync(encounterId, attachmentId, ct);
+        if (attachment == null)
+        {
+            return null;
+        }
+
+        var ticket = await _hospitalDocumentStorageService.CreateReadTicketAsync(
+            attachment.DocumentUri,
+            attachment.FileName,
+            attachment.ContentType,
+            ct);
+
+        return new HospitalEncounterAttachmentDownloadTicketDto
+        {
+            StorageProvider = ticket.Provider,
+            AccessToken = ticket.AccessToken,
+            ExpiresAtUtc = ticket.ExpiresAtUtc,
+            DownloadUrl = string.Empty
+        };
+    }
+
+    public async Task<HospitalStoredAttachmentContentDto?> GetAttachmentContentByTicketAsync(
+        string accessToken,
+        CancellationToken ct = default)
+    {
+        var storedDocument = await _hospitalDocumentStorageService.OpenReadByTicketAsync(accessToken, ct);
+        if (storedDocument == null)
+        {
+            return null;
+        }
+
+        return new HospitalStoredAttachmentContentDto
+        {
+            FileName = storedDocument.FileName,
+            ContentType = storedDocument.ContentType,
+            Content = storedDocument.Content,
+            ContentLength = storedDocument.ContentLength
+        };
     }
 
     private async Task QueueFinalizedEventAsync(
@@ -376,6 +661,17 @@ public class HospitalEncounterService : IHospitalEncounterService
         return AllowedStatuses.First(x => string.Equals(x, normalized, StringComparison.OrdinalIgnoreCase));
     }
 
+    private static string NormalizeEditableStatus(string? status)
+    {
+        var normalized = NormalizeStatus(status);
+        if (normalized == "Approved")
+        {
+            throw new InvalidOperationException("Khong the tao/cap nhat truc tiep ho so o trang thai Approved. Hay dung luong duyet rieng.");
+        }
+
+        return normalized;
+    }
+
     private static string NormalizeDiagnosisType(string? diagnosisType)
     {
         return string.IsNullOrWhiteSpace(diagnosisType) ? "Working" : diagnosisType.Trim();
@@ -413,7 +709,7 @@ public class HospitalEncounterService : IHospitalEncounterService
     private static string GenerateEncounterNumber(DateTime nowUtc)
         => $"ENC-{nowUtc:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
 
-    private static HospitalEncounterDetailDto MapDetail(HospitalEncounterAggregateSnapshot encounter)
+    private HospitalEncounterDetailDto MapDetail(HospitalEncounterAggregateSnapshot encounter)
     {
         return new HospitalEncounterDetailDto
         {
@@ -447,6 +743,13 @@ public class HospitalEncounterService : IHospitalEncounterService
                 ? ConvertUtcToClinicLocal(encounter.ClinicalNoteSignedAtUtc.Value)
                 : null,
             IsClinicalNoteSigned = encounter.ClinicalNoteSignedAtUtc.HasValue,
+            ClinicalNoteSignedByUsername = encounter.ClinicalNoteSignedByUsername,
+            ApprovalSignedAtLocal = encounter.ApprovalSignedAtUtc.HasValue
+                ? ConvertUtcToClinicLocal(encounter.ApprovalSignedAtUtc.Value)
+                : null,
+            ApprovedByUsername = encounter.ApprovedByUsername,
+            ApprovalComment = encounter.ApprovalComment,
+            IsApproved = encounter.EncounterStatus == "Approved",
             Subjective = encounter.Subjective,
             Objective = encounter.Objective,
             Assessment = encounter.Assessment,
@@ -458,8 +761,17 @@ public class HospitalEncounterService : IHospitalEncounterService
             RespiratoryRate = encounter.RespiratoryRate,
             SystolicBp = encounter.SystolicBp,
             DiastolicBp = encounter.DiastolicBp,
-            OxygenSaturation = encounter.OxygenSaturation
-            ,
+            OxygenSaturation = encounter.OxygenSaturation,
+            WorkflowEvents = encounter.WorkflowEvents
+                .Select(workflowEvent => new HospitalEncounterWorkflowEventDto
+                {
+                    EventType = workflowEvent.EventType,
+                    Label = GetWorkflowEventLabel(workflowEvent.EventType),
+                    Comment = workflowEvent.Comment,
+                    PerformedByUsername = workflowEvent.PerformedByUsername,
+                    OccurredAtLocal = ConvertUtcToClinicLocal(workflowEvent.OccurredAtUtc)
+                })
+                .ToList(),
             Attachments = encounter.Attachments
                 .Select(attachment => new HospitalEncounterAttachmentDto
                 {
@@ -467,12 +779,24 @@ public class HospitalEncounterService : IHospitalEncounterService
                     DocumentType = attachment.DocumentType,
                     FileName = attachment.FileName,
                     ContentType = attachment.ContentType,
+                    StorageProvider = _hospitalDocumentStorageService.Provider,
                     DocumentUri = attachment.DocumentUri,
                     UploadedAtLocal = ConvertUtcToClinicLocal(attachment.UploadedAtUtc),
                     UploadedByUserId = attachment.UploadedByUserId,
                     UploadedByUsername = attachment.UploadedByUsername
                 })
                 .ToList()
+        };
+    }
+
+    private static string GetWorkflowEventLabel(string eventType)
+    {
+        return eventType.Trim().ToLowerInvariant() switch
+        {
+            "consultation" => "Chốt hồ sơ lâm sàng",
+            "signature" => "Ký xác nhận hồ sơ",
+            "approval" => "Duyệt hồ sơ",
+            _ => eventType
         };
     }
 

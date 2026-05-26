@@ -32,6 +32,15 @@ namespace ERMSystem.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("MfaEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("MfaEnabledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MfaSecretProtected")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime?>("RefreshTokenExpiresAt")
                         .HasColumnType("datetime2");
 

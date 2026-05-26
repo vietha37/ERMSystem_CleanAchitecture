@@ -13,6 +13,8 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using System.Text;
@@ -22,6 +24,9 @@ using System.Threading.RateLimiting;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<RequestObservabilityOptions>(builder.Configuration.GetSection("Observability"));
+builder.Services.Configure<OpenTelemetryTracingOptions>(builder.Configuration.GetSection("OpenTelemetry"));
+builder.Services.Configure<OperationalAlertOptions>(builder.Configuration.GetSection("OperationalAlerts"));
+builder.Services.Configure<TwoFactorAuthOptions>(builder.Configuration.GetSection("Security:TwoFactor"));
 builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection("RabbitMQ"));
 builder.Services.Configure<OutboxPublisherOptions>(builder.Configuration.GetSection("OutboxPublisher"));
 builder.Services.Configure<NotificationConsumerOptions>(builder.Configuration.GetSection("NotificationConsumer"));
@@ -29,11 +34,67 @@ builder.Services.Configure<NotificationDispatchOptions>(builder.Configuration.Ge
 builder.Services.Configure<RetentionCleanupOptions>(builder.Configuration.GetSection("RetentionCleanup"));
 builder.Services.Configure<DashboardCacheOptions>(builder.Configuration.GetSection("DashboardCache"));
 builder.Services.Configure<RevisitReminderOptions>(builder.Configuration.GetSection("RevisitReminder"));
+builder.Services.Configure<SatisfactionSurveyOptions>(builder.Configuration.GetSection("SatisfactionSurvey"));
+builder.Services.Configure<CustomerCareFollowUpOptions>(builder.Configuration.GetSection("CustomerCareFollowUp"));
+builder.Services.Configure<DistributedCacheRuntimeOptions>(builder.Configuration.GetSection("Redis"));
+builder.Services.Configure<LocalDocumentStorageOptions>(builder.Configuration.GetSection("LocalDocumentStorage"));
 builder.Services.AddSingleton<ApiMetricsCollector>();
 builder.Services.AddSingleton<IBusinessMetricsRecorder, BusinessMetricsRecorder>();
 builder.Services.AddSingleton<BackgroundWorkerHealthRegistry>();
 builder.Services.AddSingleton<DashboardCacheMetricsRegistry>();
 builder.Services.AddSingleton<NotificationPipelineMetricsReader>();
+builder.Services.AddSingleton<OperationalAlertEvaluator>();
+builder.Services.AddSingleton<OperationalAlertWebhookNotifier>();
+builder.Services.AddHttpClient("operational-alert-webhook", (serviceProvider, client) =>
+{
+    var options = serviceProvider
+        .GetRequiredService<Microsoft.Extensions.Options.IOptions<OperationalAlertOptions>>()
+        .Value;
+
+    client.Timeout = TimeSpan.FromSeconds(Math.Max(1, options.Webhook.TimeoutSeconds));
+});
+
+var openTelemetryTracingOptions =
+    builder.Configuration.GetSection("OpenTelemetry").Get<OpenTelemetryTracingOptions>()
+    ?? new OpenTelemetryTracingOptions();
+
+if (openTelemetryTracingOptions.Enabled)
+{
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resource => resource.AddService(
+            serviceName: string.IsNullOrWhiteSpace(openTelemetryTracingOptions.ServiceName)
+                ? "ERMSystem.API"
+                : openTelemetryTracingOptions.ServiceName.Trim(),
+            serviceVersion: string.IsNullOrWhiteSpace(openTelemetryTracingOptions.ServiceVersion)
+                ? "1.0.0"
+                : openTelemetryTracingOptions.ServiceVersion.Trim()))
+        .WithTracing(tracing =>
+        {
+            tracing
+                .AddSource(ErmTelemetry.ActivitySourceName)
+                .AddAspNetCoreInstrumentation(options =>
+                {
+                    options.RecordException = true;
+                    options.Filter = httpContext =>
+                        !httpContext.Request.Path.StartsWithSegments("/metrics", StringComparison.OrdinalIgnoreCase);
+                })
+                .AddHttpClientInstrumentation()
+                .AddEntityFrameworkCoreInstrumentation();
+
+            if (openTelemetryTracingOptions.UseConsoleExporter)
+            {
+                tracing.AddConsoleExporter();
+            }
+
+            if (!string.IsNullOrWhiteSpace(openTelemetryTracingOptions.OtlpEndpoint))
+            {
+                tracing.AddOtlpExporter(options =>
+                {
+                    options.Endpoint = new Uri(openTelemetryTracingOptions.OtlpEndpoint.Trim());
+                });
+            }
+        });
+}
 
 // ── Database ──────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<ERMSystem.Infrastructure.Data.ApplicationDbContext>(options =>
@@ -114,8 +175,55 @@ builder.Services.AddAuthorization(options =>
             policy.RequireClaim(AppPermissions.ClaimType, permission));
     }
 });
-builder.Services.AddDistributedMemoryCache();
+
+var distributedCacheRuntimeOptions =
+    builder.Configuration.GetSection("Redis").Get<DistributedCacheRuntimeOptions>()
+    ?? new DistributedCacheRuntimeOptions();
+
+if (distributedCacheRuntimeOptions.Enabled)
+{
+    if (string.IsNullOrWhiteSpace(distributedCacheRuntimeOptions.ConnectionString))
+    {
+        if (!distributedCacheRuntimeOptions.AllowInMemoryFallback)
+        {
+            throw new InvalidOperationException(
+                "Redis cache is enabled but Redis:ConnectionString is missing and fallback is disabled.");
+        }
+
+        builder.Services.AddDistributedMemoryCache();
+        builder.Services.AddSingleton(
+            new DistributedCacheRuntimeInfo(
+                provider: "memory",
+                isFallback: true,
+                reason: "Redis is enabled in config but ConnectionString is missing. Falling back to in-memory distributed cache."));
+    }
+    else
+    {
+        builder.Services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration = distributedCacheRuntimeOptions.ConnectionString;
+            options.InstanceName = distributedCacheRuntimeOptions.InstanceName;
+        });
+
+        builder.Services.AddSingleton(
+            new DistributedCacheRuntimeInfo(
+                provider: "redis",
+                isFallback: false,
+                reason: "Redis distributed cache is active."));
+    }
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+    builder.Services.AddSingleton(
+        new DistributedCacheRuntimeInfo(
+            provider: "memory",
+            isFallback: false,
+            reason: "Redis is disabled in configuration. Using in-memory distributed cache."));
+}
+
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddDataProtection();
 builder.Services.AddHealthChecks()
     .AddCheck<DependencyReadinessHealthCheck>("dependency-readiness", tags: ["ready"]);
 
@@ -203,6 +311,7 @@ builder.Services.AddScoped<IHospitalAppointmentRepository, HospitalAppointmentRe
 builder.Services.AddScoped<IHospitalAppointmentService, HospitalAppointmentService>();
 builder.Services.AddScoped<IHospitalEncounterRepository, HospitalEncounterRepository>();
 builder.Services.AddScoped<IHospitalEncounterService, HospitalEncounterService>();
+builder.Services.AddSingleton<IHospitalDocumentStorageService, LocalHospitalDocumentStorageService>();
 builder.Services.AddScoped<IHospitalPrescriptionRepository, HospitalPrescriptionRepository>();
 builder.Services.AddScoped<IHospitalPrescriptionService, HospitalPrescriptionService>();
 builder.Services.AddScoped<IHospitalClinicalOrderRepository, HospitalClinicalOrderRepository>();
@@ -220,6 +329,10 @@ builder.Services.AddHostedService<HospitalNotificationConsumerService>();
 builder.Services.AddHostedService<HospitalNotificationDispatchService>();
 builder.Services.AddHostedService<RetentionCleanupService>();
 builder.Services.AddHostedService<RevisitReminderCampaignService>();
+builder.Services.AddHostedService<SatisfactionSurveyCampaignService>();
+builder.Services.AddHostedService<CustomerCareFollowUpCampaignService>();
+builder.Services.AddHostedService<OperationalAlertDispatchService>();
+builder.Services.AddHostedService<DocumentStorageCleanupService>();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                    ?? new[] { "http://localhost:3000", "http://localhost:3001" };
@@ -336,6 +449,12 @@ app.MapGet("/health/live", () => Results.Ok(new
     service = "ERMSystem.API",
     utcNow = DateTime.UtcNow
 })).AllowAnonymous();
+
+app.MapGet("/health/alerts", async (OperationalAlertEvaluator evaluator, CancellationToken ct) =>
+{
+    var snapshot = await evaluator.EvaluateAsync(ct);
+    return Results.Ok(snapshot);
+}).AllowAnonymous();
 
 app.MapGet("/metrics", async (
     ApiMetricsCollector collector,

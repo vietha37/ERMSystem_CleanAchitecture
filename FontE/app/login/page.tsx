@@ -17,7 +17,7 @@ const patientInitialState = {
 };
 
 export default function LoginPage() {
-  const { login, registerPatient } = useAuth();
+  const { login, registerPatient, verifyMfaLogin } = useAuth();
   const [loginMode, setLoginMode] = useState<LoginMode>("staff");
   const [patientMode, setPatientMode] = useState<PatientMode>("login");
   const [username, setUsername] = useState("");
@@ -26,11 +26,38 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [patientForm, setPatientForm] = useState(patientInitialState);
+  const [mfaCode, setMfaCode] = useState("");
+  const [staffMfaChallenge, setStaffMfaChallenge] = useState<{
+    token: string;
+    expiresAtUtc: string | null;
+  } | null>(null);
 
   const handleStaffLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
-    await login(username, password, remember);
+    const result = await login(username, password, remember);
+    if (result.success && result.requiresTwoFactor && result.challengeToken) {
+      setStaffMfaChallenge({
+        token: result.challengeToken,
+        expiresAtUtc: result.challengeExpiresAtUtc ?? null,
+      });
+      setMfaCode("");
+    }
+    setIsSubmitting(false);
+  };
+
+  const handleStaffMfaLogin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!staffMfaChallenge) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    const result = await verifyMfaLogin(staffMfaChallenge.token, mfaCode, remember);
+    if (result.success) {
+      setStaffMfaChallenge(null);
+      setMfaCode("");
+    }
     setIsSubmitting(false);
   };
 
@@ -107,35 +134,73 @@ export default function LoginPage() {
           </div>
 
           {loginMode === "staff" ? (
-            <form onSubmit={handleStaffLogin} className="mt-8 space-y-5 animate-fade-in">
-              <HeaderBlock
-                title="Đăng nhập nội bộ"
-                description="Dành cho Admin, Doctor và Receptionist vận hành hệ thống bệnh viện."
-              />
+            staffMfaChallenge ? (
+              <form onSubmit={handleStaffMfaLogin} className="mt-8 space-y-5 animate-fade-in">
+                <HeaderBlock
+                  title="Xác thực hai bước"
+                  description="Nhập mã 6 số từ ứng dụng xác thực để hoàn tất đăng nhập nội bộ."
+                />
 
-              <Field label="Tên đăng nhập" value={username} onChange={setUsername} placeholder="staff.username" />
-              <PasswordField
-                value={password}
-                onChange={setPassword}
-                showPassword={showPassword}
-                setShowPassword={setShowPassword}
-              />
+                <Field
+                  label="Mã xác thực"
+                  value={mfaCode}
+                  onChange={setMfaCode}
+                  placeholder="123456"
+                />
 
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-sm text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={remember}
-                    onChange={(event) => setRemember(event.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-cyan-700"
-                  />
-                  Ghi nhớ đăng nhập
-                </label>
-                <span className="text-sm font-medium text-slate-400">Hỗ trợ bởi bộ phận IT nội bộ</span>
-              </div>
+                <div className="rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">
+                  {staffMfaChallenge.expiresAtUtc
+                    ? `Phiên xác thực này sẽ hết hạn lúc ${new Date(staffMfaChallenge.expiresAtUtc).toLocaleTimeString("vi-VN")}.`
+                    : "Phiên xác thực này sẽ hết hạn sau ít phút."}
+                </div>
 
-              <SubmitButton submitting={isSubmitting} idleText="Đăng nhập dashboard nội bộ" loadingText="Đang xác thực..." />
-            </form>
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStaffMfaChallenge(null);
+                      setMfaCode("");
+                    }}
+                    className="inline-flex h-12 items-center justify-center rounded-full border border-slate-200 px-6 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    Quay lại
+                  </button>
+                  <div className="flex-1">
+                    <SubmitButton submitting={isSubmitting} idleText="Xác nhận mã MFA" loadingText="Đang xác thực..." />
+                  </div>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleStaffLogin} className="mt-8 space-y-5 animate-fade-in">
+                <HeaderBlock
+                  title="Đăng nhập nội bộ"
+                  description="Dành cho Admin, Doctor và Receptionist vận hành hệ thống bệnh viện."
+                />
+
+                <Field label="Tên đăng nhập" value={username} onChange={setUsername} placeholder="staff.username" />
+                <PasswordField
+                  value={password}
+                  onChange={setPassword}
+                  showPassword={showPassword}
+                  setShowPassword={setShowPassword}
+                />
+
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={remember}
+                      onChange={(event) => setRemember(event.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-cyan-700"
+                    />
+                    Ghi nhớ đăng nhập
+                  </label>
+                  <span className="text-sm font-medium text-slate-400">Hỗ trợ bởi bộ phận IT nội bộ</span>
+                </div>
+
+                <SubmitButton submitting={isSubmitting} idleText="Đăng nhập dashboard nội bộ" loadingText="Đang xác thực..." />
+              </form>
+            )
           ) : (
             <div className="mt-8 animate-fade-in">
               <HeaderBlock

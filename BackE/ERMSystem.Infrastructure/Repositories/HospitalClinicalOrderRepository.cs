@@ -132,7 +132,7 @@ public class HospitalClinicalOrderRepository : IHospitalClinicalOrderRepository
             .Include(x => x.DoctorProfile).ThenInclude(x => x.Specialty)
             .Include(x => x.Clinic)
             .Include(x => x.Diagnoses)
-            .Where(x => x.EncounterStatus == "InProgress" || x.EncounterStatus == "Finalized")
+            .Where(x => x.EncounterStatus == "InProgress" || x.EncounterStatus == "Finalized" || x.EncounterStatus == "Approved")
             .OrderByDescending(x => x.UpdatedAtUtc)
             .Take(100)
             .ToListAsync(ct);

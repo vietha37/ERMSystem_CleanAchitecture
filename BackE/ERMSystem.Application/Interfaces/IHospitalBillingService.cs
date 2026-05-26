@@ -12,6 +12,9 @@ public interface IHospitalBillingService
     Task<HospitalInvoiceDetailDto?> GetByIdAsync(Guid invoiceId, CancellationToken ct = default);
     Task<HospitalBillingEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default);
     Task<HospitalInvoiceDetailDto> CreateInvoiceAsync(CreateHospitalInvoiceDto request, CancellationToken ct = default);
+    Task<HospitalPaymentIntentDto?> CreatePaymentIntentAsync(Guid invoiceId, CreateHospitalPaymentIntentDto request, Guid? actorUserId, string? actorUsername, CancellationToken ct = default);
     Task<HospitalInvoiceDetailDto?> ReceivePaymentAsync(Guid invoiceId, ReceiveHospitalPaymentDto request, Guid? actorUserId, string? actorUsername, CancellationToken ct = default);
+    Task<HospitalInvoiceDetailDto?> ConfirmPaymentCallbackAsync(ConfirmHospitalPaymentCallbackDto request, CancellationToken ct = default);
     Task<HospitalInvoiceDetailDto?> RefundPaymentAsync(Guid invoiceId, RefundHospitalPaymentDto request, Guid? actorUserId, string? actorUsername, CancellationToken ct = default);
+    Task<HospitalPaymentReconciliationSummaryDto> GetReconciliationSummaryAsync(CancellationToken ct = default);
 }

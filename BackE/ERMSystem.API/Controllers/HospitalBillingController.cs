@@ -72,6 +72,36 @@ public class HospitalBillingController : ControllerBase
         }
     }
 
+    [HttpPost("{invoiceId:guid}/payment-intents")]
+    [Authorize(Policy = AppPermissions.HospitalBilling.CollectPayment)]
+    public async Task<IActionResult> CreatePaymentIntent(Guid invoiceId, [FromBody] CreateHospitalPaymentIntentDto request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        try
+        {
+            var result = await _hospitalBillingService.CreatePaymentIntentAsync(
+                invoiceId,
+                request,
+                ResolveActorUserId(),
+                ResolveActorUsername(),
+                ct);
+            if (result == null)
+            {
+                return NotFound(new { message = "Khong tim thay hoa don." });
+            }
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPost("{invoiceId:guid}/payments")]
     [Authorize(Policy = AppPermissions.HospitalBilling.CollectPayment)]
     public async Task<IActionResult> ReceivePayment(Guid invoiceId, [FromBody] ReceiveHospitalPaymentDto request, CancellationToken ct)
@@ -130,6 +160,39 @@ public class HospitalBillingController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
+    }
+
+    [HttpPost("payment-callbacks")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ConfirmPaymentCallback([FromBody] ConfirmHospitalPaymentCallbackDto request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        try
+        {
+            var result = await _hospitalBillingService.ConfirmPaymentCallbackAsync(request, ct);
+            if (result == null)
+            {
+                return NotFound(new { message = "Khong tim thay hoa don cho callback thanh toan." });
+            }
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("reconciliation/summary")]
+    [Authorize(Policy = AppPermissions.HospitalBilling.Read)]
+    public async Task<IActionResult> GetReconciliationSummary(CancellationToken ct)
+    {
+        var result = await _hospitalBillingService.GetReconciliationSummaryAsync(ct);
+        return Ok(result);
     }
 
     private Guid? ResolveActorUserId()

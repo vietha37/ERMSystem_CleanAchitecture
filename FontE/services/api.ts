@@ -29,6 +29,7 @@ let refreshPromise: Promise<string | null> | null = null;
 function isAuthEndpoint(url?: string) {
   return !!url && (
     url.includes("/auth/login") ||
+    url.includes("/auth/verify-mfa-login") ||
     url.includes("/auth/refresh") ||
     url.includes("/auth/logout") ||
     url.includes("/auth/patient-register")

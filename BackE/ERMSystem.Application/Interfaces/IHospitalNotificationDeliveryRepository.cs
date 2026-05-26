@@ -16,6 +16,7 @@ namespace ERMSystem.Application.Interfaces
             int pageSize,
             CancellationToken ct = default);
         Task<NotificationDeliverySummaryDto> GetSummaryAsync(CancellationToken ct = default);
+        Task<HospitalCrmEngagementSummaryDto> GetEngagementSummaryAsync(CancellationToken ct = default);
         Task<NotificationDeliveryRetryResult> RetryDeliveryAsync(Guid deliveryId, CancellationToken ct = default);
     }
 }

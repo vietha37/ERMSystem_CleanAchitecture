@@ -118,6 +118,7 @@ public class HospitalEncounterRepository : IHospitalEncounterRepository
             .Include(x => x.VitalSigns)
             .Include(x => x.Diagnoses)
             .Include(x => x.ClinicalNotes)
+                .ThenInclude(x => x.AuthoredByUser)
             .Include(x => x.Attachments)
                 .ThenInclude(x => x.UploadedByUser)
             .FirstOrDefaultAsync(x => x.Id == encounterId, ct);
@@ -132,7 +133,19 @@ public class HospitalEncounterRepository : IHospitalEncounterRepository
             .OrderByDescending(x => x.IsPrimary)
             .ThenByDescending(x => x.NotedAtUtc)
             .FirstOrDefault();
-        var latestNote = entity.ClinicalNotes.OrderByDescending(x => x.AuthoredAtUtc).FirstOrDefault();
+        var latestNote = entity.ClinicalNotes
+            .Where(x => !string.Equals(x.NoteType, "Approval", StringComparison.OrdinalIgnoreCase))
+            .Where(x => !string.Equals(x.NoteType, "Signature", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(x => x.AuthoredAtUtc)
+            .FirstOrDefault();
+        var latestSignatureNote = entity.ClinicalNotes
+            .Where(x => string.Equals(x.NoteType, "Signature", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(x => x.AuthoredAtUtc)
+            .FirstOrDefault();
+        var latestApprovalNote = entity.ClinicalNotes
+            .Where(x => string.Equals(x.NoteType, "Approval", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(x => x.AuthoredAtUtc)
+            .FirstOrDefault();
 
         return new HospitalEncounterAggregateSnapshot
         {
@@ -171,10 +184,31 @@ public class HospitalEncounterRepository : IHospitalEncounterRepository
             ClinicalNoteId = latestNote?.Id,
             ClinicalNoteAuthoredAtUtc = latestNote?.AuthoredAtUtc,
             ClinicalNoteSignedAtUtc = latestNote?.SignedAtUtc,
+            ClinicalNoteSignedByUsername = latestSignatureNote?.AuthoredByUser?.Username
+                ?? latestNote?.AuthoredByUser?.Username,
+            ApprovalNoteId = latestApprovalNote?.Id,
+            ApprovalSignedAtUtc = latestApprovalNote?.SignedAtUtc,
+            ApprovedByUsername = latestApprovalNote?.AuthoredByUser?.Username,
+            ApprovalComment = latestApprovalNote?.CarePlan,
             Subjective = latestNote?.Subjective,
             Objective = latestNote?.Objective,
             Assessment = latestNote?.Assessment,
             CarePlan = latestNote?.CarePlan,
+            WorkflowEvents = entity.ClinicalNotes
+                .Where(x =>
+                    (x.SignedAtUtc.HasValue && string.Equals(x.NoteType, "Consultation", StringComparison.OrdinalIgnoreCase)) ||
+                    string.Equals(x.NoteType, "Signature", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(x.NoteType, "Approval", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(x => x.SignedAtUtc ?? x.AuthoredAtUtc)
+                .ThenByDescending(x => x.Id)
+                .Select(x => new HospitalEncounterWorkflowEventSnapshot
+                {
+                    EventType = x.NoteType,
+                    Comment = x.CarePlan,
+                    PerformedByUsername = x.AuthoredByUser != null ? x.AuthoredByUser.Username : null,
+                    OccurredAtUtc = x.SignedAtUtc ?? x.AuthoredAtUtc
+                })
+                .ToArray(),
             Attachments = entity.Attachments
                 .OrderByDescending(x => x.UploadedAtUtc)
                 .ThenByDescending(x => x.Id)
@@ -191,6 +225,38 @@ public class HospitalEncounterRepository : IHospitalEncounterRepository
                 })
                 .ToArray()
         };
+    }
+
+    public async Task<HospitalEncounterAttachmentSnapshot?> GetAttachmentAsync(
+        Guid encounterId,
+        Guid attachmentId,
+        CancellationToken ct = default)
+    {
+        return await _hospitalDbContext.EncounterAttachments
+            .AsNoTracking()
+            .Where(x => x.EncounterId == encounterId && x.Id == attachmentId)
+            .Select(x => new HospitalEncounterAttachmentSnapshot
+            {
+                AttachmentId = x.Id,
+                DocumentType = x.DocumentType,
+                FileName = x.FileName,
+                ContentType = x.MimeType ?? "application/octet-stream",
+                DocumentUri = x.StorageUri,
+                UploadedAtUtc = x.UploadedAtUtc,
+                UploadedByUserId = x.UploadedByUserId,
+                UploadedByUsername = null
+            })
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public Task<string[]> GetReferencedAttachmentUrisAsync(CancellationToken ct = default)
+    {
+        return _hospitalDbContext.EncounterAttachments
+            .AsNoTracking()
+            .Where(x => x.StorageUri != null && x.StorageUri != "")
+            .Select(x => x.StorageUri)
+            .Distinct()
+            .ToArrayAsync(ct);
     }
 
     public async Task<HospitalEncounterAppointmentSnapshot?> GetAppointmentForEncounterAsync(
@@ -426,6 +492,7 @@ public class HospitalEncounterRepository : IHospitalEncounterRepository
         entity.Objective = command.Objective;
         entity.Assessment = command.Assessment;
         entity.CarePlan = command.CarePlan;
+        entity.NoteType = string.IsNullOrWhiteSpace(command.NoteType) ? entity.NoteType : command.NoteType.Trim();
         entity.AuthoredByUserId = command.AuthoredByUserId;
         entity.AuthoredAtUtc = command.AuthoredAtUtc;
         entity.SignedAtUtc = command.SignedAtUtc;

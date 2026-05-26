@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using ERMSystem.Application.DTOs;
@@ -29,10 +30,49 @@ public interface IHospitalEncounterService
         string? actorUsername,
         CancellationToken ct = default);
 
+    Task<HospitalEncounterDetailDto?> ApproveAsync(
+        Guid encounterId,
+        ApproveHospitalEncounterDto request,
+        Guid? actorUserId,
+        string? actorUsername,
+        CancellationToken ct = default);
+
+    Task<HospitalEncounterDetailDto?> SignAsync(
+        Guid encounterId,
+        SignHospitalEncounterDto request,
+        Guid? actorUserId,
+        string? actorUsername,
+        CancellationToken ct = default);
+
     Task<HospitalEncounterDetailDto?> AddAttachmentAsync(
         Guid encounterId,
         AddHospitalEncounterAttachmentDto request,
         Guid? actorUserId,
         string? actorUsername,
+        CancellationToken ct = default);
+
+    Task<HospitalEncounterDetailDto?> UploadAttachmentAsync(
+        Guid encounterId,
+        string documentType,
+        string fileName,
+        string? contentType,
+        long contentLength,
+        Stream content,
+        Guid? actorUserId,
+        string? actorUsername,
+        CancellationToken ct = default);
+
+    Task<HospitalStoredAttachmentContentDto?> GetAttachmentContentAsync(
+        Guid encounterId,
+        Guid attachmentId,
+        CancellationToken ct = default);
+
+    Task<HospitalEncounterAttachmentDownloadTicketDto?> CreateAttachmentDownloadTicketAsync(
+        Guid encounterId,
+        Guid attachmentId,
+        CancellationToken ct = default);
+
+    Task<HospitalStoredAttachmentContentDto?> GetAttachmentContentByTicketAsync(
+        string accessToken,
         CancellationToken ct = default);
 }

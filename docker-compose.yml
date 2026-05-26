@@ -24,6 +24,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: ${ERM_DB_CONNECTION_STRING:-Server=host.docker.internal;Database=ERMSystemDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True;Encrypt=False}
       ConnectionStrings__HospitalConnection: ${ERM_HOSPITAL_DB_CONNECTION_STRING:-Server=host.docker.internal;Database=ERMSystemHospitalDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True;Encrypt=False}
+      Redis__Enabled: "true"
       Redis__ConnectionString: redis:6379
       RabbitMQ__Host: rabbitmq
       RabbitMQ__Port: 5672

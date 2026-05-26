@@ -15,6 +15,11 @@ public interface IHospitalEncounterRepository
     Task<HospitalEncounterAggregateSnapshot?> GetEncounterAggregateAsync(
         Guid encounterId,
         CancellationToken ct = default);
+    Task<HospitalEncounterAttachmentSnapshot?> GetAttachmentAsync(
+        Guid encounterId,
+        Guid attachmentId,
+        CancellationToken ct = default);
+    Task<string[]> GetReferencedAttachmentUrisAsync(CancellationToken ct = default);
 
     Task<HospitalEncounterAppointmentSnapshot?> GetAppointmentForEncounterAsync(
         Guid appointmentId,
@@ -73,11 +78,25 @@ public class HospitalEncounterAggregateSnapshot
     public Guid? ClinicalNoteId { get; set; }
     public DateTime? ClinicalNoteAuthoredAtUtc { get; set; }
     public DateTime? ClinicalNoteSignedAtUtc { get; set; }
+    public string? ClinicalNoteSignedByUsername { get; set; }
+    public Guid? ApprovalNoteId { get; set; }
+    public DateTime? ApprovalSignedAtUtc { get; set; }
+    public string? ApprovedByUsername { get; set; }
+    public string? ApprovalComment { get; set; }
     public string? Subjective { get; set; }
     public string? Objective { get; set; }
     public string? Assessment { get; set; }
     public string? CarePlan { get; set; }
+    public HospitalEncounterWorkflowEventSnapshot[] WorkflowEvents { get; set; } = Array.Empty<HospitalEncounterWorkflowEventSnapshot>();
     public HospitalEncounterAttachmentSnapshot[] Attachments { get; set; } = Array.Empty<HospitalEncounterAttachmentSnapshot>();
+}
+
+public class HospitalEncounterWorkflowEventSnapshot
+{
+    public string EventType { get; set; } = string.Empty;
+    public string? Comment { get; set; }
+    public string? PerformedByUsername { get; set; }
+    public DateTime OccurredAtUtc { get; set; }
 }
 
 public class HospitalEncounterAttachmentSnapshot
@@ -206,6 +225,7 @@ public class HospitalEncounterDiagnosisUpdateCommand
 public class HospitalEncounterClinicalNoteUpdateCommand
 {
     public Guid ClinicalNoteId { get; set; }
+    public string? NoteType { get; set; }
     public string? Subjective { get; set; }
     public string? Objective { get; set; }
     public string? Assessment { get; set; }

@@ -16,6 +16,7 @@ using ERMSystem.Infrastructure.HospitalData.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace ERMSystem.Infrastructure.Services
 {
@@ -29,6 +30,8 @@ namespace ERMSystem.Infrastructure.Services
         private readonly IDistributedCache _distributedCache;
         private readonly IConfiguration _configuration;
         private readonly ILogger<AuthService> _logger;
+        private readonly IDataProtector _mfaSecretProtector;
+        private readonly TwoFactorAuthOptions _twoFactorOptions;
 
         public AuthService(
             IUserRepository userRepository,
@@ -38,6 +41,7 @@ namespace ERMSystem.Infrastructure.Services
             HospitalDbContext hospitalDbContext,
             IDistributedCache distributedCache,
             ILogger<AuthService> logger,
+            IDataProtectionProvider dataProtectionProvider,
             IConfiguration configuration)
         {
             _userRepository = userRepository;
@@ -48,6 +52,16 @@ namespace ERMSystem.Infrastructure.Services
             _distributedCache = distributedCache;
             _logger = logger;
             _configuration = configuration;
+            _mfaSecretProtector = dataProtectionProvider.CreateProtector("ERMSystem.Auth.MfaSecret.v1");
+            _twoFactorOptions = new TwoFactorAuthOptions
+            {
+                Issuer = configuration["Security:TwoFactor:Issuer"] ?? "ERM Hospital",
+                ChallengeExpiryMinutes = ReadIntSetting("Security:TwoFactor:ChallengeExpiryMinutes", 5),
+                SetupExpiryMinutes = ReadIntSetting("Security:TwoFactor:SetupExpiryMinutes", 10),
+                TimeStepSeconds = ReadIntSetting("Security:TwoFactor:TimeStepSeconds", 30),
+                Digits = ReadIntSetting("Security:TwoFactor:Digits", 6),
+                AllowedDriftWindows = ReadIntSetting("Security:TwoFactor:AllowedDriftWindows", 1)
+            };
         }
 
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto)
@@ -157,6 +171,71 @@ namespace ERMSystem.Infrastructure.Services
             }
 
             await _authSecurityMonitor.ClearFailedLoginAttemptsAsync(normalizedUsername);
+
+            if (RequiresMfa(user))
+            {
+                var challengeToken = GenerateOpaqueToken();
+                var expiresAtUtc = DateTime.UtcNow.AddMinutes(_twoFactorOptions.ChallengeExpiryMinutes);
+                var challengePayload = $"{user.Id}|{user.Username}|{expiresAtUtc:O}";
+
+                await _distributedCache.SetStringAsync(
+                    BuildMfaChallengeKey(challengeToken),
+                    challengePayload,
+                    new DistributedCacheEntryOptions
+                    {
+                        AbsoluteExpiration = expiresAtUtc
+                    });
+
+                await RecordSecurityEventAsync(user.Id, user.Username, "MfaChallengeIssued", "Info", "Dang nhap yeu cau xac thuc MFA.");
+
+                return new AuthResponseDto
+                {
+                    Username = user.Username,
+                    Role = user.Role,
+                    RequiresTwoFactor = true,
+                    IsMfaEnabled = true,
+                    MfaChallengeToken = challengeToken,
+                    MfaChallengeExpiresAtUtc = expiresAtUtc
+                };
+            }
+
+            await RecordSecurityEventAsync(user.Id, user.Username, "LoginSucceeded", "Info", "Dang nhap thanh cong.");
+            return await BuildAuthResponseAsync(user);
+        }
+
+        public async Task<AuthResponseDto> VerifyMfaLoginAsync(VerifyMfaLoginDto request)
+        {
+            var challengeToken = request.MfaChallengeToken.Trim();
+            var challengeKey = BuildMfaChallengeKey(challengeToken);
+            var payload = await _distributedCache.GetStringAsync(challengeKey);
+            if (string.IsNullOrWhiteSpace(payload))
+            {
+                throw new UnauthorizedAccessException("MFA challenge is invalid or has expired.");
+            }
+
+            var parts = payload.Split('|', 3, StringSplitOptions.TrimEntries);
+            if (parts.Length != 3 || !Guid.TryParse(parts[0], out var userId))
+            {
+                await _distributedCache.RemoveAsync(challengeKey);
+                throw new UnauthorizedAccessException("MFA challenge is invalid or has expired.");
+            }
+
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null || !RequiresMfa(user))
+            {
+                await _distributedCache.RemoveAsync(challengeKey);
+                throw new UnauthorizedAccessException("MFA challenge is invalid or has expired.");
+            }
+
+            var secretKey = UnprotectMfaSecret(user.MfaSecretProtected);
+            if (!VerifyTotpCode(secretKey, request.Code))
+            {
+                await RecordSecurityEventAsync(user.Id, user.Username, "MfaLoginFailed", "Warning", "Ma MFA khong hop le trong dang nhap.");
+                throw new UnauthorizedAccessException("MFA code is invalid.");
+            }
+
+            await _distributedCache.RemoveAsync(challengeKey);
+            await RecordSecurityEventAsync(user.Id, user.Username, "MfaLoginSucceeded", "Info", "Dang nhap MFA thanh cong.");
             await RecordSecurityEventAsync(user.Id, user.Username, "LoginSucceeded", "Info", "Dang nhap thanh cong.");
             return await BuildAuthResponseAsync(user);
         }
@@ -282,6 +361,142 @@ namespace ERMSystem.Infrastructure.Services
             await RecordSecurityEventAsync(user.Id, user.Username, "PasswordResetSucceeded", "Info", "Password da duoc reset thanh cong.");
         }
 
+        public async Task<MfaStatusDto> GetMfaStatusAsync(Guid userId)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+            {
+                throw new UnauthorizedAccessException("User not found.");
+            }
+
+            return new MfaStatusDto
+            {
+                IsEnabled = RequiresMfa(user),
+                IsSetupPending = await _distributedCache.GetStringAsync(BuildMfaSetupKey(userId)) != null,
+                EnabledAtUtc = user.MfaEnabledAt
+            };
+        }
+
+        public async Task<MfaSetupResponseDto> SetupMfaAsync(Guid userId)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+            {
+                throw new UnauthorizedAccessException("User not found.");
+            }
+
+            if (!IsInternalRole(user.Role))
+            {
+                throw new InvalidOperationException("MFA setup is only available for internal users.");
+            }
+
+            var secretKey = TimeBasedOneTimePassword.GenerateSecretKey();
+            var protectedSecret = _mfaSecretProtector.Protect(secretKey);
+            var expiresAtUtc = DateTime.UtcNow.AddMinutes(_twoFactorOptions.SetupExpiryMinutes);
+
+            await _distributedCache.SetStringAsync(
+                BuildMfaSetupKey(userId),
+                protectedSecret,
+                new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpiration = expiresAtUtc
+                });
+
+            await RecordSecurityEventAsync(user.Id, user.Username, "MfaSetupStarted", "Info", "Nguoi dung bat dau thiet lap MFA.");
+
+            return new MfaSetupResponseDto
+            {
+                ManualEntryKey = secretKey,
+                OtpAuthUri = TimeBasedOneTimePassword.BuildOtpAuthUri(
+                    _twoFactorOptions.Issuer,
+                    user.Username,
+                    secretKey,
+                    _twoFactorOptions.Digits,
+                    _twoFactorOptions.TimeStepSeconds),
+                ExpiresAtUtc = expiresAtUtc
+            };
+        }
+
+        public async Task<MfaStatusDto> EnableMfaAsync(Guid userId, VerifyMfaCodeDto request)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+            {
+                throw new UnauthorizedAccessException("User not found.");
+            }
+
+            var pendingProtectedSecret = await _distributedCache.GetStringAsync(BuildMfaSetupKey(userId));
+            if (string.IsNullOrWhiteSpace(pendingProtectedSecret))
+            {
+                throw new InvalidOperationException("MFA setup session has expired. Please start setup again.");
+            }
+
+            var secretKey = _mfaSecretProtector.Unprotect(pendingProtectedSecret);
+            if (!VerifyTotpCode(secretKey, request.Code))
+            {
+                await RecordSecurityEventAsync(user.Id, user.Username, "MfaEnableFailed", "Warning", "Khong the kich hoat MFA do ma xac thuc khong hop le.");
+                throw new UnauthorizedAccessException("MFA code is invalid.");
+            }
+
+            user.MfaSecretProtected = pendingProtectedSecret;
+            user.MfaEnabled = true;
+            user.MfaEnabledAt = DateTime.UtcNow;
+            await _userRepository.UpdateAsync(user);
+            await _distributedCache.RemoveAsync(BuildMfaSetupKey(userId));
+
+            await RecordSecurityEventAsync(user.Id, user.Username, "MfaEnabled", "Info", "Nguoi dung da kich hoat MFA.");
+
+            return new MfaStatusDto
+            {
+                IsEnabled = true,
+                IsSetupPending = false,
+                EnabledAtUtc = user.MfaEnabledAt
+            };
+        }
+
+        public async Task<MfaStatusDto> DisableMfaAsync(Guid userId, VerifyMfaCodeDto request)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+            {
+                throw new UnauthorizedAccessException("User not found.");
+            }
+
+            if (!RequiresMfa(user))
+            {
+                return new MfaStatusDto
+                {
+                    IsEnabled = false,
+                    IsSetupPending = false,
+                    EnabledAtUtc = null
+                };
+            }
+
+            var secretKey = UnprotectMfaSecret(user.MfaSecretProtected);
+            if (!VerifyTotpCode(secretKey, request.Code))
+            {
+                await RecordSecurityEventAsync(user.Id, user.Username, "MfaDisableFailed", "Warning", "Khong the tat MFA do ma xac thuc khong hop le.");
+                throw new UnauthorizedAccessException("MFA code is invalid.");
+            }
+
+            user.MfaEnabled = false;
+            user.MfaSecretProtected = null;
+            user.MfaEnabledAt = null;
+            user.RefreshTokenHash = null;
+            user.RefreshTokenExpiresAt = null;
+            user.RefreshTokenRevokedAt = DateTime.UtcNow;
+            await _userRepository.UpdateAsync(user);
+            await RevokeHospitalRefreshTokensAsync(user.Id, "MFA da duoc tat va session da bi revoke.");
+            await RecordSecurityEventAsync(user.Id, user.Username, "MfaDisabled", "Warning", "Nguoi dung da tat MFA.");
+
+            return new MfaStatusDto
+            {
+                IsEnabled = false,
+                IsSetupPending = false,
+                EnabledAtUtc = null
+            };
+        }
+
         private async Task<AuthResponseDto> BuildAuthResponseAsync(AppUser user)
         {
             var expiryMinutes = int.Parse(_configuration["Jwt:ExpiryMinutes"] ?? "60");
@@ -304,7 +519,8 @@ namespace ERMSystem.Infrastructure.Services
                 RefreshToken = refreshToken,
                 Username = user.Username,
                 Role = user.Role,
-                ExpiresAt = expiresAt
+                ExpiresAt = expiresAt,
+                IsMfaEnabled = RequiresMfa(user)
             };
         }
 
@@ -386,6 +602,12 @@ namespace ERMSystem.Infrastructure.Services
         {
             var bytes = RandomNumberGenerator.GetBytes(64);
             return Convert.ToBase64String(bytes);
+        }
+
+        private static string GenerateOpaqueToken()
+        {
+            var bytes = RandomNumberGenerator.GetBytes(32);
+            return Convert.ToHexString(bytes);
         }
 
         private static string ComputeSha256(string input)
@@ -650,5 +872,36 @@ namespace ERMSystem.Infrastructure.Services
             var raw = _configuration[key];
             return int.TryParse(raw, out var parsed) ? parsed : fallbackValue;
         }
+
+        private bool RequiresMfa(AppUser user)
+            => user.MfaEnabled && !string.IsNullOrWhiteSpace(user.MfaSecretProtected) && IsInternalRole(user.Role);
+
+        private static bool IsInternalRole(string role)
+            => Array.Exists(AppRole.Internal, candidate => candidate == role);
+
+        private string UnprotectMfaSecret(string? protectedSecret)
+        {
+            if (string.IsNullOrWhiteSpace(protectedSecret))
+            {
+                throw new UnauthorizedAccessException("MFA secret is unavailable.");
+            }
+
+            return _mfaSecretProtector.Unprotect(protectedSecret);
+        }
+
+        private bool VerifyTotpCode(string secretKey, string code)
+            => TimeBasedOneTimePassword.VerifyCode(
+                secretKey,
+                code,
+                DateTime.UtcNow,
+                _twoFactorOptions.TimeStepSeconds,
+                _twoFactorOptions.Digits,
+                _twoFactorOptions.AllowedDriftWindows);
+
+        private static string BuildMfaChallengeKey(string challengeToken)
+            => $"auth:mfa:challenge:{challengeToken.Trim()}";
+
+        private static string BuildMfaSetupKey(Guid userId)
+            => $"auth:mfa:setup:{userId:N}";
     }
 }

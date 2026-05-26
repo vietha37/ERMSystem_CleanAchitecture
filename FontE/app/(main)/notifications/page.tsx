@@ -8,6 +8,7 @@ import { formatDateTimeValue } from "@/lib/dateFormatting";
 import { getApiErrorMessage } from "@/services/error";
 import { hospitalNotificationDeliveryService } from "@/services/hospitalNotificationDeliveryService";
 import {
+  HospitalCrmEngagementSummary,
   NotificationDelivery,
   NotificationDeliverySummary,
   NotificationDeliveryStatus,
@@ -57,6 +58,8 @@ export default function NotificationsPage() {
   const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([]);
   const [statusFilter, setStatusFilter] = useState<DeliveryStatusFilter>("All");
   const [summary, setSummary] = useState<NotificationDeliverySummary | null>(null);
+  const [engagementSummary, setEngagementSummary] =
+    useState<HospitalCrmEngagementSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
@@ -77,18 +80,20 @@ export default function NotificationsPage() {
       }
 
       try {
-        const [response, summaryResponse] = await Promise.all([
+        const [response, summaryResponse, engagementResponse] = await Promise.all([
           hospitalNotificationDeliveryService.getAll(
             statusFilter,
             pageNumber,
             pageSize
           ),
           hospitalNotificationDeliveryService.getSummary(),
+          hospitalNotificationDeliveryService.getEngagementSummary(),
         ]);
 
         setDeliveries(response.items);
         setTotalCount(response.totalCount);
         setSummary(summaryResponse);
+        setEngagementSummary(engagementResponse);
       } catch (error: unknown) {
         toast.error(getApiErrorMessage(error, "Không thể tải danh sách gửi thông báo."));
       } finally {
@@ -283,6 +288,199 @@ export default function NotificationsPage() {
           </p>
         </Card>
       </div>
+
+      <Card className="overflow-hidden border border-cyan-100 p-0 shadow-sm">
+        <div className="border-b border-cyan-100 bg-cyan-50/70 px-6 py-5">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">
+                CRM / patient engagement
+              </p>
+              <h2 className="mt-2 text-xl font-bold text-slate-900">
+                Điều phối chăm sóc sau khám
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm text-slate-600">
+                Theo dõi 3 nhánh chiến dịch đã có trong backend: nhắc tái khám,
+                khảo sát hài lòng và CSKH follow-up.
+              </p>
+            </div>
+
+            <p className="text-sm text-cyan-800">
+              Cập nhật: {formatDateTime(engagementSummary?.generatedAtUtc)}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 px-6 py-5 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-cyan-100 bg-white p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-700">
+              Tổng chiến dịch
+            </p>
+            <p className="mt-3 text-3xl font-bold text-slate-950">
+              {engagementSummary?.totalCampaignMessages ?? 0}
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Tổng số outbox CRM đã được tạo.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-emerald-100 bg-white p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
+              Đã gửi thành công
+            </p>
+            <p className="mt-3 text-3xl font-bold text-slate-950">
+              {engagementSummary?.deliveredDeliveries ?? 0}
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Tổng delivery CRM đã xác nhận gửi.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-amber-100 bg-white p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-700">
+              Đang chờ / cần xử lý
+            </p>
+            <p className="mt-3 text-3xl font-bold text-slate-950">
+              {(engagementSummary?.queuedDeliveries ?? 0) +
+                (engagementSummary?.actionRequiredDeliveries ?? 0)}
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Gồm queued và failed/skipped cần theo dõi.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-violet-100 bg-white p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-700">
+              Tổng người nhận
+            </p>
+            <p className="mt-3 text-3xl font-bold text-slate-950">
+              {engagementSummary?.totalRecipients ?? 0}
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              Tổng Email/SMS được sinh ra từ chiến dịch CRM.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 border-t border-slate-100 px-6 py-5 lg:grid-cols-[1.1fr,1.4fr]">
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-sky-700">
+                  Nhắc tái khám
+                </p>
+                <p className="mt-2 text-2xl font-bold text-slate-950">
+                  {engagementSummary?.revisitReminderMessages ?? 0}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">
+                  Khảo sát hài lòng
+                </p>
+                <p className="mt-2 text-2xl font-bold text-slate-950">
+                  {engagementSummary?.satisfactionSurveyMessages ?? 0}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-700">
+                  CSKH follow-up
+                </p>
+                <p className="mt-2 text-2xl font-bold text-slate-950">
+                  {engagementSummary?.customerCareFollowUpMessages ?? 0}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+              <h3 className="text-sm font-bold text-slate-900">
+                Xu hướng 14 ngày gần nhất
+              </h3>
+              <div className="mt-4 space-y-3">
+                {engagementSummary?.trendPoints?.slice(-7).map((point) => {
+                  const total =
+                    point.revisitReminderCount +
+                    point.satisfactionSurveyCount +
+                    point.customerCareFollowUpCount;
+
+                  return (
+                    <div key={point.date} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-slate-700">{point.label}</span>
+                        <span className="text-slate-500">{total} chiến dịch</span>
+                      </div>
+                      <div className="flex h-2 overflow-hidden rounded-full bg-slate-200">
+                        <div
+                          className="bg-sky-500"
+                          style={{ width: `${Math.min(100, point.revisitReminderCount * 12)}%` }}
+                        />
+                        <div
+                          className="bg-teal-500"
+                          style={{ width: `${Math.min(100, point.satisfactionSurveyCount * 12)}%` }}
+                        />
+                        <div
+                          className="bg-indigo-500"
+                          style={{ width: `${Math.min(100, point.customerCareFollowUpCount * 12)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-white p-4">
+            <h3 className="text-sm font-bold text-slate-900">
+              Hoạt động CRM gần đây
+            </h3>
+            <div className="mt-4 space-y-3">
+              {engagementSummary?.recentActivities?.length ? (
+                engagementSummary.recentActivities.map((activity) => (
+                  <div
+                    key={activity.outboxMessageId}
+                    className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4"
+                  >
+                    <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">
+                          {activity.eventLabel} · {activity.patientName}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          MRN: {activity.medicalRecordNumber || "--"} ·{" "}
+                          {activity.clinicName || "Chưa rõ phòng khám"} ·{" "}
+                          {activity.doctorName || "Chưa rõ bác sĩ"}
+                        </p>
+                      </div>
+                      <p className="text-xs font-medium text-slate-500">
+                        {formatDateTime(activity.availableAtUtc)}
+                      </p>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                      <span className="rounded-full bg-sky-100 px-3 py-1 text-sky-700">
+                        Người nhận: {activity.recipientCount}
+                      </span>
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
+                        Queued: {activity.queuedCount}
+                      </span>
+                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
+                        Delivered: {activity.deliveredCount}
+                      </span>
+                      <span className="rounded-full bg-rose-100 px-3 py-1 text-rose-700">
+                        Failed/Skipped: {activity.failedCount + activity.skippedCount}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
+                  Chưa có hoạt động CRM nào được ghi nhận.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card className="overflow-hidden border border-slate-100 p-0 shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-5 md:flex-row md:items-center md:justify-between">

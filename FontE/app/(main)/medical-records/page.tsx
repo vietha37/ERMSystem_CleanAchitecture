@@ -8,6 +8,7 @@ import { formatDateTimeValue } from "@/lib/dateFormatting";
 import { getApiErrorMessage } from "@/services/error";
 import { hospitalEncounterService } from "@/services/hospitalEncounterService";
 import {
+  HospitalEncounterAttachment,
   CreateHospitalEncounterPayload,
   HospitalEncounterDetail,
   HospitalEncounterEligibleAppointment,
@@ -24,6 +25,7 @@ const ENCOUNTER_STATUS_OPTIONS: Array<{
   { value: "All", label: "Tất cả" },
   { value: "InProgress", label: "Đang khám" },
   { value: "Finalized", label: "Đã chốt hồ sơ" },
+  { value: "Approved", label: "Đã duyệt hồ sơ" },
 ];
 
 type EncounterFormState = {
@@ -78,6 +80,8 @@ function getEncounterStatusLabel(status: HospitalEncounterStatus): string {
       return "Đang khám";
     case "Finalized":
       return "Đã chốt hồ sơ";
+    case "Approved":
+      return "Đã duyệt hồ sơ";
     default:
       return status;
   }
@@ -89,6 +93,8 @@ function getEncounterStatusClass(status: HospitalEncounterStatus): string {
       return "border border-amber-200 bg-amber-50 text-amber-700";
     case "Finalized":
       return "border border-emerald-200 bg-emerald-50 text-emerald-700";
+    case "Approved":
+      return "border border-cyan-200 bg-cyan-50 text-cyan-700";
     default:
       return "border border-slate-200 bg-slate-100 text-slate-700";
   }
@@ -181,6 +187,9 @@ export default function MedicalRecordsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [isSigningEncounter, setIsSigningEncounter] = useState(false);
+  const [approvingEncounterId, setApprovingEncounterId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<HospitalEncounterStatus | "All">(
@@ -192,7 +201,12 @@ export default function MedicalRecordsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEncounterId, setEditingEncounterId] = useState<string | null>(null);
+  const [editingDetail, setEditingDetail] = useState<HospitalEncounterDetail | null>(null);
   const [form, setForm] = useState<EncounterFormState>(EMPTY_FORM);
+  const [attachmentDocumentType, setAttachmentDocumentType] = useState("EncounterAttachment");
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [signatureComment, setSignatureComment] = useState("");
+  const [approvalComment, setApprovalComment] = useState("");
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
@@ -252,6 +266,7 @@ export default function MedicalRecordsPage() {
         {
           InProgress: 0,
           Finalized: 0,
+          Approved: 0,
         } as Record<HospitalEncounterStatus, number>
       ),
     [encounters]
@@ -266,7 +281,12 @@ export default function MedicalRecordsPage() {
 
   const openCreateModal = () => {
     setEditingEncounterId(null);
+    setEditingDetail(null);
     setForm(EMPTY_FORM);
+    setAttachmentDocumentType("EncounterAttachment");
+    setAttachmentFile(null);
+    setSignatureComment("");
+    setApprovalComment("");
     setIsModalOpen(true);
   };
 
@@ -274,7 +294,12 @@ export default function MedicalRecordsPage() {
     try {
       const detail = await hospitalEncounterService.getById(encounterId);
       setEditingEncounterId(encounterId);
+      setEditingDetail(detail);
       setForm(mapDetailToForm(detail));
+      setAttachmentDocumentType("EncounterAttachment");
+      setAttachmentFile(null);
+      setSignatureComment("");
+      setApprovalComment(detail.approvalComment ?? "");
       setIsModalOpen(true);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Không thể tải chi tiết hồ sơ khám."));
@@ -298,7 +323,11 @@ export default function MedicalRecordsPage() {
 
     try {
       if (editingEncounterId) {
-        await hospitalEncounterService.update(editingEncounterId, buildUpdatePayload(form));
+        const updated = await hospitalEncounterService.update(
+          editingEncounterId,
+          buildUpdatePayload(form)
+        );
+        setEditingDetail(updated);
         toast.success("Đã cập nhật hồ sơ khám.");
       } else {
         await hospitalEncounterService.create(buildPayload(form));
@@ -313,6 +342,99 @@ export default function MedicalRecordsPage() {
       toast.error(getApiErrorMessage(error, "Không thể lưu hồ sơ khám."));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleApprove = async (encounterId: string) => {
+    setApprovingEncounterId(encounterId);
+
+    try {
+      await hospitalEncounterService.approve(encounterId, {});
+      toast.success("Đã duyệt hồ sơ khám.");
+      await fetchData(true);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể duyệt hồ sơ khám."));
+    } finally {
+      setApprovingEncounterId(null);
+    }
+  };
+
+  const handleSignEncounter = async () => {
+    if (!editingEncounterId) {
+      return;
+    }
+
+    setIsSigningEncounter(true);
+    try {
+      const updated = await hospitalEncounterService.sign(editingEncounterId, {
+        attestationText: signatureComment.trim() || undefined,
+      });
+      setEditingDetail(updated);
+      setSignatureComment("");
+      toast.success("Đã ký xác nhận hồ sơ.");
+      await fetchData(true);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể ký xác nhận hồ sơ."));
+    } finally {
+      setIsSigningEncounter(false);
+    }
+  };
+
+  const handleApproveFromModal = async () => {
+    if (!editingEncounterId) {
+      return;
+    }
+
+    setApprovingEncounterId(editingEncounterId);
+    try {
+      const updated = await hospitalEncounterService.approve(editingEncounterId, {
+        approvalComment: approvalComment.trim() || undefined,
+      });
+      setEditingDetail(updated);
+      setApprovalComment(updated.approvalComment ?? "");
+      toast.success("Đã duyệt hồ sơ khám.");
+      await fetchData(true);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể duyệt hồ sơ khám."));
+    } finally {
+      setApprovingEncounterId(null);
+    }
+  };
+
+  const isApprovedDetail = editingDetail?.encounterStatus === "Approved";
+  const canSignDetail = !!editingEncounterId && editingDetail?.encounterStatus !== "InProgress";
+  const canApproveDetail =
+    !!editingEncounterId &&
+    editingDetail?.encounterStatus === "Finalized" &&
+    !!editingDetail?.isClinicalNoteSigned;
+
+  const handleUploadAttachment = async () => {
+    if (!editingEncounterId) {
+      toast.error("Cần mở hồ sơ khám trước khi tải tài liệu.");
+      return;
+    }
+
+    if (!attachmentFile) {
+      toast.error("Vui lòng chọn tệp cần tải lên.");
+      return;
+    }
+
+    setIsUploadingAttachment(true);
+    try {
+      const updated = await hospitalEncounterService.uploadAttachment(
+        editingEncounterId,
+        attachmentFile,
+        attachmentDocumentType.trim() || "EncounterAttachment"
+      );
+      setEditingDetail(updated);
+      setAttachmentFile(null);
+      setAttachmentDocumentType("EncounterAttachment");
+      toast.success("Đã tải tài liệu đính kèm.");
+      await fetchData(true);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể tải tài liệu đính kèm."));
+    } finally {
+      setIsUploadingAttachment(false);
     }
   };
 
@@ -379,13 +501,14 @@ export default function MedicalRecordsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Đang khám" value={metrics.InProgress} tone="amber" />
         <MetricCard label="Đã chốt hồ sơ" value={metrics.Finalized} tone="emerald" />
+        <MetricCard label="Đã duyệt hồ sơ" value={metrics.Approved} tone="cyan" />
         <MetricCard
           label="Lịch chờ mở hồ sơ"
           value={availableAppointments.length}
-          tone="cyan"
+          tone="slate"
         />
       </div>
 
@@ -502,15 +625,34 @@ export default function MedicalRecordsPage() {
                       <div className="mt-1 text-xs text-slate-400">
                         Kết thúc: {formatDateTime(encounter.endedAtLocal)}
                       </div>
+                      {encounter.encounterStatus === "Approved" ? (
+                        <div className="mt-1 text-xs font-medium text-cyan-700">
+                          Hồ sơ đã duyệt.
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-6 py-4">
-                      <Button
-                        variant="secondary"
-                        className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                        onClick={() => void openEditModal(encounter.encounterId)}
-                      >
-                        Cập nhật
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="secondary"
+                          className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                          onClick={() => void openEditModal(encounter.encounterId)}
+                        >
+                          {encounter.encounterStatus === "Approved" ? "Xem" : "Cập nhật"}
+                        </Button>
+                        {encounter.encounterStatus === "Finalized" ? (
+                          <Button
+                            variant="secondary"
+                            className="border-cyan-200 text-cyan-700 hover:bg-cyan-50"
+                            onClick={() => void handleApprove(encounter.encounterId)}
+                            disabled={approvingEncounterId === encounter.encounterId}
+                          >
+                            {approvingEncounterId === encounter.encounterId
+                              ? "Đang duyệt..."
+                              : "Duyệt hồ sơ"}
+                          </Button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -555,7 +697,10 @@ export default function MedicalRecordsPage() {
         onClose={() => {
           setIsModalOpen(false);
           setEditingEncounterId(null);
+          setEditingDetail(null);
           setForm(EMPTY_FORM);
+          setAttachmentDocumentType("EncounterAttachment");
+          setAttachmentFile(null);
         }}
         title={editingEncounterId ? "Cập nhật hồ sơ khám" : "Mở hồ sơ khám mới"}
       >
@@ -572,6 +717,7 @@ export default function MedicalRecordsPage() {
                 }
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 required
+                disabled={isApprovedDetail}
               >
                 <option value="">-- Chọn lịch hẹn --</option>
                 {availableAppointments.map((appointment) => (
@@ -598,6 +744,7 @@ export default function MedicalRecordsPage() {
                 className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 placeholder="Ví dụ: Tăng huyết áp"
                 required
+                disabled={isApprovedDetail}
               />
             </div>
 
@@ -613,6 +760,7 @@ export default function MedicalRecordsPage() {
                 }
                 className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 placeholder="ICD-10 nếu có"
+                disabled={isApprovedDetail}
               />
             </div>
           </div>
@@ -630,6 +778,7 @@ export default function MedicalRecordsPage() {
                 }
                 className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
                 placeholder="Working / Final"
+                disabled={isApprovedDetail}
               />
             </div>
 
@@ -646,10 +795,16 @@ export default function MedicalRecordsPage() {
                   }))
                 }
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                disabled={isApprovedDetail}
               >
                 <option value="InProgress">Đang khám</option>
                 <option value="Finalized">Đã chốt hồ sơ</option>
               </select>
+              {editingEncounterId ? (
+                <p className="mt-2 text-xs text-slate-500">
+                  Duyệt hồ sơ là bước riêng sau khi đã chốt hồ sơ khám.
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -665,6 +820,7 @@ export default function MedicalRecordsPage() {
               }
               className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
               placeholder="Tóm tắt diễn biến và kết luận chung"
+              disabled={isApprovedDetail}
             />
           </div>
 
@@ -673,21 +829,25 @@ export default function MedicalRecordsPage() {
               label="Triệu chứng / Subjective"
               value={form.subjective}
               onChange={(value) => setForm((current) => ({ ...current, subjective: value }))}
+              disabled={isApprovedDetail}
             />
             <TextAreaField
               label="Khám thực thể / Objective"
               value={form.objective}
               onChange={(value) => setForm((current) => ({ ...current, objective: value }))}
+              disabled={isApprovedDetail}
             />
             <TextAreaField
               label="Đánh giá / Assessment"
               value={form.assessment}
               onChange={(value) => setForm((current) => ({ ...current, assessment: value }))}
+              disabled={isApprovedDetail}
             />
             <TextAreaField
               label="Hướng điều trị / Care plan"
               value={form.carePlan}
               onChange={(value) => setForm((current) => ({ ...current, carePlan: value }))}
+              disabled={isApprovedDetail}
             />
           </div>
 
@@ -696,11 +856,13 @@ export default function MedicalRecordsPage() {
               label="Chiều cao (cm)"
               value={form.heightCm}
               onChange={(value) => setForm((current) => ({ ...current, heightCm: value }))}
+              disabled={isApprovedDetail}
             />
             <NumberField
               label="Cân nặng (kg)"
               value={form.weightKg}
               onChange={(value) => setForm((current) => ({ ...current, weightKg: value }))}
+              disabled={isApprovedDetail}
             />
             <NumberField
               label="Nhiệt độ (C)"
@@ -708,11 +870,13 @@ export default function MedicalRecordsPage() {
               onChange={(value) =>
                 setForm((current) => ({ ...current, temperatureC: value }))
               }
+              disabled={isApprovedDetail}
             />
             <NumberField
               label="Mạch"
               value={form.pulseRate}
               onChange={(value) => setForm((current) => ({ ...current, pulseRate: value }))}
+              disabled={isApprovedDetail}
             />
             <NumberField
               label="Nhịp thở"
@@ -720,11 +884,13 @@ export default function MedicalRecordsPage() {
               onChange={(value) =>
                 setForm((current) => ({ ...current, respiratoryRate: value }))
               }
+              disabled={isApprovedDetail}
             />
             <NumberField
               label="HA tâm thu"
               value={form.systolicBp}
               onChange={(value) => setForm((current) => ({ ...current, systolicBp: value }))}
+              disabled={isApprovedDetail}
             />
             <NumberField
               label="HA tâm trương"
@@ -732,6 +898,7 @@ export default function MedicalRecordsPage() {
               onChange={(value) =>
                 setForm((current) => ({ ...current, diastolicBp: value }))
               }
+              disabled={isApprovedDetail}
             />
             <NumberField
               label="SpO2 (%)"
@@ -739,8 +906,185 @@ export default function MedicalRecordsPage() {
               onChange={(value) =>
                 setForm((current) => ({ ...current, oxygenSaturation: value }))
               }
+              disabled={isApprovedDetail}
             />
           </div>
+
+          {editingEncounterId && editingDetail && (
+            <div className="space-y-4 rounded-[1.5rem] border border-emerald-100 bg-emerald-50/60 p-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <InfoTile
+                  label="Ký lâm sàng"
+                  value={
+                    editingDetail.isClinicalNoteSigned
+                      ? `${formatDateTime(editingDetail.clinicalNoteSignedAtLocal)}${
+                          editingDetail.clinicalNoteSignedByUsername
+                            ? ` · ${editingDetail.clinicalNoteSignedByUsername}`
+                            : ""
+                        }`
+                      : "Chưa ký"
+                  }
+                />
+                <InfoTile
+                  label="Phê duyệt"
+                  value={
+                    editingDetail.isApproved
+                      ? `${formatDateTime(editingDetail.approvalSignedAtLocal)}${
+                          editingDetail.approvedByUsername
+                            ? ` · ${editingDetail.approvedByUsername}`
+                            : ""
+                        }`
+                      : "Chưa duyệt"
+                  }
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-white/80 bg-white/80 p-4">
+                  <p className="text-sm font-bold text-slate-900">Ký xác nhận hồ sơ</p>
+                  <textarea
+                    rows={3}
+                    value={signatureComment}
+                    onChange={(event) => setSignatureComment(event.target.value)}
+                    placeholder="Nội dung xác nhận hoặc ghi chú chữ ký..."
+                    disabled={!canSignDetail || isSigningEncounter}
+                    className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:bg-slate-100"
+                  />
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => void handleSignEncounter()}
+                      disabled={!canSignDetail || isSigningEncounter}
+                    >
+                      {isSigningEncounter ? "Đang ký..." : "Ký xác nhận"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/80 bg-white/80 p-4">
+                  <p className="text-sm font-bold text-slate-900">Duyệt hồ sơ</p>
+                  <textarea
+                    rows={3}
+                    value={approvalComment}
+                    onChange={(event) => setApprovalComment(event.target.value)}
+                    placeholder="Ghi chú phê duyệt, phạm vi duyệt hoặc nhận xét..."
+                    disabled={!canApproveDetail || approvingEncounterId === editingEncounterId}
+                    className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100 disabled:bg-slate-100"
+                  />
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => void handleApproveFromModal()}
+                      disabled={!canApproveDetail || approvingEncounterId === editingEncounterId}
+                    >
+                      {approvingEncounterId === editingEncounterId
+                        ? "Đang duyệt..."
+                        : "Duyệt hồ sơ"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-slate-900">Dòng thời gian workflow</p>
+                {editingDetail.workflowEvents.length > 0 ? (
+                  editingDetail.workflowEvents.map((event, index) => (
+                    <div
+                      key={`${event.eventType}-${event.occurredAtLocal}-${index}`}
+                      className="rounded-2xl border border-white/80 bg-white/80 px-4 py-4"
+                    >
+                      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{event.label}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {formatDateTime(event.occurredAtLocal)}
+                            {event.performedByUsername
+                              ? ` · ${event.performedByUsername}`
+                              : ""}
+                          </p>
+                        </div>
+                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                          {event.eventType}
+                        </span>
+                      </div>
+                      {event.comment ? (
+                        <p className="mt-3 text-sm leading-6 text-slate-700">{event.comment}</p>
+                      ) : null}
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-emerald-200 bg-white/70 px-4 py-4 text-sm text-slate-500">
+                    Chưa có sự kiện workflow nào ngoài trạng thái cơ bản của hồ sơ.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {editingEncounterId && (
+            <div className="space-y-4 rounded-[1.5rem] border border-cyan-100 bg-cyan-50/60 p-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-cyan-900">Tài liệu đính kèm</p>
+                  <p className="mt-1 text-xs leading-6 text-cyan-800">
+                    Tải trực tiếp PDF, hình ảnh hoặc tài liệu văn phòng vào hồ sơ khám.
+                  </p>
+                </div>
+                <p className="text-xs text-cyan-800">Giới hạn 20 MB mỗi tệp.</p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] md:items-end">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Loại tài liệu
+                  </label>
+                  <input
+                    type="text"
+                    value={attachmentDocumentType}
+                    onChange={(event) => setAttachmentDocumentType(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+                    placeholder="EncounterAttachment"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Chọn tệp
+                  </label>
+                  <input
+                    type="file"
+                    onChange={(event) => setAttachmentFile(event.target.files?.[0] ?? null)}
+                    className="block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 file:mr-4 file:rounded-xl file:border-0 file:bg-cyan-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white"
+                  />
+                </div>
+
+                <Button
+                  type="button"
+                  onClick={() => void handleUploadAttachment()}
+                  disabled={isUploadingAttachment}
+                >
+                  {isUploadingAttachment ? "Đang tải..." : "Tải tài liệu"}
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {editingDetail?.attachments?.length ? (
+                  editingDetail.attachments.map((attachment) => (
+                    <AttachmentRow
+                      key={attachment.attachmentId}
+                      encounterId={editingEncounterId}
+                      attachment={attachment}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-cyan-200 bg-white/70 px-4 py-4 text-sm text-slate-500">
+                    Hồ sơ này chưa có tài liệu đính kèm.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
             <Button
@@ -749,18 +1093,25 @@ export default function MedicalRecordsPage() {
               onClick={() => {
                 setIsModalOpen(false);
                 setEditingEncounterId(null);
+                setEditingDetail(null);
                 setForm(EMPTY_FORM);
+                setAttachmentDocumentType("EncounterAttachment");
+                setAttachmentFile(null);
+                setSignatureComment("");
+                setApprovalComment("");
               }}
             >
               Đóng
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting
-                ? "Đang lưu..."
-                : editingEncounterId
-                  ? "Cập nhật hồ sơ"
-                  : "Tạo hồ sơ"}
-            </Button>
+            {!isApprovedDetail && (
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting
+                  ? "Đang lưu..."
+                  : editingEncounterId
+                    ? "Cập nhật hồ sơ"
+                    : "Tạo hồ sơ"}
+              </Button>
+            )}
           </div>
         </form>
       </Modal>
@@ -775,12 +1126,13 @@ function MetricCard({
 }: {
   label: string;
   value: number;
-  tone: "amber" | "emerald" | "cyan";
+  tone: "amber" | "emerald" | "cyan" | "slate";
 }) {
   const toneClasses = {
     amber: "border-amber-100 bg-amber-50/70 text-amber-700",
     emerald: "border-emerald-100 bg-emerald-50/70 text-emerald-700",
     cyan: "border-cyan-100 bg-cyan-50/70 text-cyan-700",
+    slate: "border-slate-200 bg-slate-50/80 text-slate-700",
   };
 
   return (
@@ -795,10 +1147,12 @@ function TextAreaField({
   label,
   value,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div>
@@ -807,7 +1161,8 @@ function TextAreaField({
         rows={4}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+        disabled={disabled}
+        className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:bg-slate-100"
       />
     </div>
   );
@@ -817,10 +1172,12 @@ function NumberField({
   label,
   value,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div>
@@ -830,8 +1187,73 @@ function NumberField({
         step="0.1"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+        disabled={disabled}
+        className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:bg-slate-100"
       />
+    </div>
+  );
+}
+
+function InfoTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/80 bg-white/80 px-4 py-4">
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function AttachmentRow({
+  encounterId,
+  attachment,
+}: {
+  encounterId: string;
+  attachment: HospitalEncounterAttachment;
+}) {
+  const handleDownload = async () => {
+    try {
+      const ticket = await hospitalEncounterService.createAttachmentDownloadTicket(
+        encounterId,
+        attachment.attachmentId
+      );
+      const link = document.createElement("a");
+      link.href = ticket.downloadUrl;
+      link.download = attachment.fileName;
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể tải tài liệu đính kèm."));
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-cyan-100 bg-white/90 px-4 py-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-900">
+            {attachment.fileName}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {attachment.documentType} · {attachment.contentType}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Tải lên {formatDateTime(attachment.uploadedAtLocal)}
+            {attachment.uploadedByUsername ? ` · ${attachment.uploadedByUsername}` : ""}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void handleDownload()}
+          className="inline-flex items-center justify-center rounded-2xl border border-cyan-200 px-4 py-2 text-sm font-medium text-cyan-700 transition hover:bg-cyan-50"
+        >
+          Tải xuống
+        </button>
+      </div>
     </div>
   );
 }

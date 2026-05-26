@@ -113,6 +113,62 @@ public class HospitalEncountersController : ControllerBase
         }
     }
 
+    [HttpPost("{encounterId:guid}/approve")]
+    [Authorize(Policy = AppPermissions.HospitalEncounters.Update)]
+    public async Task<IActionResult> Approve(
+        Guid encounterId,
+        [FromBody] ApproveHospitalEncounterDto request,
+        CancellationToken ct)
+    {
+        try
+        {
+            var result = await _hospitalEncounterService.ApproveAsync(
+                encounterId,
+                request,
+                ResolveActorUserId(),
+                ResolveActorUsername(),
+                ct);
+            if (result == null)
+            {
+                return NotFound(new { message = "Khong tim thay encounter can duyet." });
+            }
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("{encounterId:guid}/sign")]
+    [Authorize(Policy = AppPermissions.HospitalEncounters.Update)]
+    public async Task<IActionResult> Sign(
+        Guid encounterId,
+        [FromBody] SignHospitalEncounterDto request,
+        CancellationToken ct)
+    {
+        try
+        {
+            var result = await _hospitalEncounterService.SignAsync(
+                encounterId,
+                request,
+                ResolveActorUserId(),
+                ResolveActorUsername(),
+                ct);
+            if (result == null)
+            {
+                return NotFound(new { message = "Khong tim thay encounter can ky xac nhan." });
+            }
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPost("{encounterId:guid}/attachments")]
     [Authorize(Policy = AppPermissions.HospitalEncounters.Update)]
     public async Task<IActionResult> AddAttachment(
@@ -140,6 +196,102 @@ public class HospitalEncountersController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("{encounterId:guid}/attachments/upload")]
+    [Authorize(Policy = AppPermissions.HospitalEncounters.Update)]
+    [RequestSizeLimit(25 * 1024 * 1024)]
+    public async Task<IActionResult> UploadAttachment(
+        Guid encounterId,
+        [FromForm] UploadHospitalEncounterAttachmentForm request,
+        CancellationToken ct)
+    {
+        if (request.File == null || request.File.Length <= 0)
+        {
+            return BadRequest(new { message = "Vui long chon tep tai lieu de tai len." });
+        }
+
+        await using var stream = request.File.OpenReadStream();
+        try
+        {
+            var result = await _hospitalEncounterService.UploadAttachmentAsync(
+                encounterId,
+                request.DocumentType ?? "EncounterAttachment",
+                request.File.FileName,
+                request.File.ContentType,
+                request.File.Length,
+                stream,
+                ResolveActorUserId(),
+                ResolveActorUsername(),
+                ct);
+
+            if (result == null)
+            {
+                return NotFound(new { message = "Khong tim thay encounter de tai len tai lieu." });
+            }
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("{encounterId:guid}/attachments/{attachmentId:guid}/content")]
+    [Authorize(Policy = AppPermissions.HospitalEncounters.Read)]
+    public async Task<IActionResult> DownloadAttachment(
+        Guid encounterId,
+        Guid attachmentId,
+        CancellationToken ct)
+    {
+        var content = await _hospitalEncounterService.GetAttachmentContentAsync(encounterId, attachmentId, ct);
+        if (content == null)
+        {
+            return NotFound(new { message = "Khong tim thay noi dung tai lieu dinh kem." });
+        }
+
+        return File(content.Content, content.ContentType, content.FileName, enableRangeProcessing: true);
+    }
+
+    [HttpGet("{encounterId:guid}/attachments/{attachmentId:guid}/download-ticket")]
+    [Authorize(Policy = AppPermissions.HospitalEncounters.Read)]
+    public async Task<IActionResult> CreateDownloadTicket(
+        Guid encounterId,
+        Guid attachmentId,
+        CancellationToken ct)
+    {
+        var result = await _hospitalEncounterService.CreateAttachmentDownloadTicketAsync(encounterId, attachmentId, ct);
+        if (result == null)
+        {
+            return NotFound(new { message = "Khong tim thay tai lieu dinh kem de tao ticket tai xuong." });
+        }
+
+        result.DownloadUrl =
+            Url.ActionLink(nameof(DownloadAttachmentByTicket), values: new { accessToken = result.AccessToken })
+            ?? $"/api/hospital-encounters/attachments/download-by-ticket?accessToken={Uri.EscapeDataString(result.AccessToken)}";
+
+        return Ok(result);
+    }
+
+    [HttpGet("attachments/download-by-ticket")]
+    [AllowAnonymous]
+    public async Task<IActionResult> DownloadAttachmentByTicket(
+        [FromQuery] string accessToken,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            return BadRequest(new { message = "Access token cua tai lieu khong hop le." });
+        }
+
+        var content = await _hospitalEncounterService.GetAttachmentContentByTicketAsync(accessToken, ct);
+        if (content == null)
+        {
+            return NotFound(new { message = "Download ticket khong hop le hoac da het han." });
+        }
+
+        return File(content.Content, content.ContentType, content.FileName, enableRangeProcessing: true);
+    }
+
     private Guid? ResolveActorUserId()
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -154,5 +306,11 @@ public class HospitalEncountersController : ControllerBase
         return User.FindFirstValue(ClaimTypes.Name)
                ?? User.FindFirstValue(ClaimTypes.Upn)
                ?? User.FindFirstValue("unique_name");
+    }
+
+    public sealed class UploadHospitalEncounterAttachmentForm
+    {
+        public string? DocumentType { get; set; }
+        public IFormFile? File { get; set; }
     }
 }

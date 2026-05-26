@@ -32,6 +32,7 @@ public class RequestObservabilityMiddleware
         var correlationId = ResolveCorrelationId(context, correlationHeaderName);
         context.TraceIdentifier = correlationId;
         context.Response.Headers[correlationHeaderName] = correlationId;
+        Activity.Current?.SetTag("ermsystem.correlation_id", correlationId);
 
         var stopwatch = Stopwatch.StartNew();
         var shouldCollectMetrics = ShouldCollectMetrics(context.Request.Path);
@@ -61,6 +62,11 @@ public class RequestObservabilityMiddleware
             var logLevel = ResolveLogLevel(statusCode, elapsedMs);
             var routeLabel = ResolveRouteLabel(context);
             var isSlowRequest = elapsedMs >= _options.SlowRequestThresholdMs;
+            var activity = Activity.Current;
+
+            activity?.SetTag("ermsystem.route", routeLabel);
+            activity?.SetTag("ermsystem.slow_request", isSlowRequest);
+            activity?.SetTag("ermsystem.elapsed_ms", elapsedMs);
 
             if (shouldCollectMetrics)
             {

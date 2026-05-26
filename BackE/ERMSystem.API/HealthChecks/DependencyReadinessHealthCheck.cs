@@ -10,15 +10,18 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
     private readonly IConfiguration _configuration;
     private readonly ILogger<DependencyReadinessHealthCheck> _logger;
     private readonly BackgroundWorkerHealthRegistry _workerHealthRegistry;
+    private readonly DistributedCacheRuntimeInfo _distributedCacheRuntimeInfo;
 
     public DependencyReadinessHealthCheck(
         IConfiguration configuration,
         ILogger<DependencyReadinessHealthCheck> logger,
-        BackgroundWorkerHealthRegistry workerHealthRegistry)
+        BackgroundWorkerHealthRegistry workerHealthRegistry,
+        DistributedCacheRuntimeInfo distributedCacheRuntimeInfo)
     {
         _configuration = configuration;
         _logger = logger;
         _workerHealthRegistry = workerHealthRegistry;
+        _distributedCacheRuntimeInfo = distributedCacheRuntimeInfo;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -36,7 +39,22 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
             failures,
             cancellationToken);
 
-        await CheckTcpAsync("redis", _configuration["Redis:ConnectionString"], 6379, data, failures, cancellationToken);
+        data["distributedCache"] = new
+        {
+            _distributedCacheRuntimeInfo.Provider,
+            _distributedCacheRuntimeInfo.IsFallback,
+            _distributedCacheRuntimeInfo.Reason
+        };
+
+        if (string.Equals(_distributedCacheRuntimeInfo.Provider, "redis", StringComparison.OrdinalIgnoreCase))
+        {
+            await CheckTcpAsync("redis", _configuration["Redis:ConnectionString"], 6379, data, failures, cancellationToken);
+        }
+        else
+        {
+            data["redis"] = "skipped";
+        }
+
         await CheckTcpAsync(
             "rabbitMq",
             $"{_configuration["RabbitMQ:Host"]}:{_configuration["RabbitMQ:Port"]}",
@@ -166,7 +184,9 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
             "hospital-notification-consumer",
             "hospital-notification-dispatch",
             "retention-cleanup",
-            "revisit-reminder-campaign"
+            "revisit-reminder-campaign",
+            "satisfaction-survey-campaign",
+            "customer-care-follow-up-campaign"
         };
 
         var workerData = new Dictionary<string, object>();

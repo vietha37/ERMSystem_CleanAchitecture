@@ -1,11 +1,14 @@
 import api from "./api";
 import {
+  ApproveHospitalEncounterPayload,
   CreateHospitalEncounterPayload,
+  HospitalEncounterAttachmentDownloadTicket,
   HospitalEncounterDetail,
   HospitalEncounterEligibleAppointment,
   HospitalEncounterSummary,
   HospitalEncounterWorklistQuery,
   PaginatedResult,
+  SignHospitalEncounterPayload,
   UpdateHospitalEncounterPayload,
 } from "./types";
 
@@ -70,6 +73,77 @@ export const hospitalEncounterService = {
     const response = await api.put<HospitalEncounterDetail>(
       `/hospital-encounters/${encounterId}`,
       payload
+    );
+
+    return response.data;
+  },
+
+  approve: async (
+    encounterId: string,
+    payload: ApproveHospitalEncounterPayload = {}
+  ): Promise<HospitalEncounterDetail> => {
+    const response = await api.post<HospitalEncounterDetail>(
+      `/hospital-encounters/${encounterId}/approve`,
+      payload
+    );
+
+    return response.data;
+  },
+
+  sign: async (
+    encounterId: string,
+    payload: SignHospitalEncounterPayload = {}
+  ): Promise<HospitalEncounterDetail> => {
+    const response = await api.post<HospitalEncounterDetail>(
+      `/hospital-encounters/${encounterId}/sign`,
+      payload
+    );
+
+    return response.data;
+  },
+
+  uploadAttachment: async (
+    encounterId: string,
+    file: File,
+    documentType = "EncounterAttachment"
+  ): Promise<HospitalEncounterDetail> => {
+    const formData = new FormData();
+    formData.append("documentType", documentType);
+    formData.append("file", file);
+
+    const response = await api.post<HospitalEncounterDetail>(
+      `/hospital-encounters/${encounterId}/attachments/upload`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    return response.data;
+  },
+
+  downloadAttachment: async (
+    encounterId: string,
+    attachmentId: string
+  ): Promise<Blob> => {
+    const response = await api.get(
+      `/hospital-encounters/${encounterId}/attachments/${attachmentId}/content`,
+      {
+        responseType: "blob",
+      }
+    );
+
+    return response.data as Blob;
+  },
+
+  createAttachmentDownloadTicket: async (
+    encounterId: string,
+    attachmentId: string
+  ): Promise<HospitalEncounterAttachmentDownloadTicket> => {
+    const response = await api.get<HospitalEncounterAttachmentDownloadTicket>(
+      `/hospital-encounters/${encounterId}/attachments/${attachmentId}/download-ticket`
     );
 
     return response.data;

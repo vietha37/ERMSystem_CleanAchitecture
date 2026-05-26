@@ -1,5 +1,13 @@
 import api from './api';
-import { AuthResponse, PatientRegisterPayload, UserRole } from "./types";
+import {
+  AuthResponse,
+  MfaSetupResponse,
+  MfaStatus,
+  PatientRegisterPayload,
+  UserRole,
+  VerifyMfaLoginPayload,
+  VerifyMfaPayload,
+} from "./types";
 import {
   clearAuthSession,
   getAccessToken as getStoredAccessToken,
@@ -37,10 +45,25 @@ function parseJwtPayload(token: string): JwtPayload | null {
 export const authService = {
   login: async (username: string, password: string): Promise<AuthResponse> => {
     const response = await api.post<AuthResponse>('/auth/login', { username, password });
+    if (response.data?.requiresTwoFactor) {
+      return response.data;
+    }
+
     const token = response.data?.accessToken || response.data?.token;
     if (!token || !response.data?.refreshToken) {
       throw new Error('Authentication failed: no token received from server.');
     }
+    setAuthSession(response.data);
+    return response.data;
+  },
+
+  verifyMfaLogin: async (payload: VerifyMfaLoginPayload): Promise<AuthResponse> => {
+    const response = await api.post<AuthResponse>('/auth/verify-mfa-login', payload);
+    const token = response.data?.accessToken || response.data?.token;
+    if (!token || !response.data?.refreshToken) {
+      throw new Error('MFA verification failed: no token received from server.');
+    }
+
     setAuthSession(response.data);
     return response.data;
   },
@@ -153,5 +176,25 @@ export const authService = {
       clearAuthSession();
       return false;
     }
+  },
+
+  getMfaStatus: async (): Promise<MfaStatus> => {
+    const response = await api.get<MfaStatus>('/auth/mfa/status');
+    return response.data;
+  },
+
+  setupMfa: async (): Promise<MfaSetupResponse> => {
+    const response = await api.post<MfaSetupResponse>('/auth/mfa/setup');
+    return response.data;
+  },
+
+  enableMfa: async (payload: VerifyMfaPayload): Promise<MfaStatus> => {
+    const response = await api.post<MfaStatus>('/auth/mfa/enable', payload);
+    return response.data;
+  },
+
+  disableMfa: async (payload: VerifyMfaPayload): Promise<MfaStatus> => {
+    const response = await api.post<MfaStatus>('/auth/mfa/disable', payload);
+    return response.data;
   },
 };

@@ -682,6 +682,55 @@ export default function PrescriptionsPage() {
               />
             </div>
 
+            {(selectedPrescription.warningDetails.length > 0 || selectedPrescription.warnings.length > 0) && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+                <p className="text-sm font-bold text-amber-900">Cảnh báo lâm sàng</p>
+                <div className="mt-3 space-y-2">
+                  {selectedPrescription.warningDetails.length > 0
+                    ? selectedPrescription.warningDetails.map((warning) => (
+                        <div
+                          key={warning.code}
+                          className="rounded-2xl border border-amber-100 bg-white/80 px-4 py-3 text-sm leading-6 text-amber-900"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em] ${
+                                warning.severity === "critical"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-amber-100 text-amber-700"
+                              }`}
+                            >
+                              {warning.severity === "critical" ? "Nghiêm trọng" : "Cảnh báo"}
+                            </span>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                              {warning.category}
+                            </span>
+                          </div>
+                          <p className="mt-3">{warning.message}</p>
+                          {warning.relatedMedicines.length > 0 && (
+                            <p className="mt-2 text-xs text-amber-800">
+                              Thuốc liên quan: {warning.relatedMedicines.join(", ")}
+                            </p>
+                          )}
+                          {warning.recommendation && (
+                            <p className="mt-2 text-xs text-slate-600">
+                              Khuyến nghị: {warning.recommendation}
+                            </p>
+                          )}
+                        </div>
+                      ))
+                    : selectedPrescription.warnings.map((warning, index) => (
+                        <div
+                          key={`${index}-${warning}`}
+                          className="rounded-2xl border border-amber-100 bg-white/80 px-4 py-3 text-sm leading-6 text-amber-900"
+                        >
+                          {warning}
+                        </div>
+                      ))}
+                </div>
+              </div>
+            )}
+
             <div className="overflow-hidden rounded-2xl border border-slate-100">
               <table className="w-full border-collapse text-left text-sm">
                 <thead className="bg-slate-50">

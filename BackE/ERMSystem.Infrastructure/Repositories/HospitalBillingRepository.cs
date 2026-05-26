@@ -323,6 +323,88 @@ public class HospitalBillingRepository : IHospitalBillingRepository
         };
     }
 
+    public async Task<HospitalPaymentRecordSnapshot?> GetPaymentAsync(
+        Guid invoiceId,
+        string paymentReference,
+        CancellationToken ct = default)
+    {
+        var normalizedReference = paymentReference.Trim();
+        return await _hospitalDbContext.Payments
+            .AsNoTracking()
+            .Include(x => x.ReceivedByUser)
+            .Where(x => x.InvoiceId == invoiceId && x.PaymentReference == normalizedReference)
+            .Select(x => new HospitalPaymentRecordSnapshot
+            {
+                PaymentId = x.Id,
+                InvoiceId = x.InvoiceId,
+                PaymentReference = x.PaymentReference,
+                PaymentMethod = x.PaymentMethod,
+                Amount = x.Amount,
+                PaymentStatus = x.PaymentStatus,
+                PaidAtUtc = x.PaidAtUtc,
+                ReceivedByUserId = x.ReceivedByUserId,
+                ReceivedByUsername = x.ReceivedByUser != null ? x.ReceivedByUser.Username : null,
+                ExternalTransactionId = x.ExternalTransactionId
+            })
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<HospitalPaymentReconciliationSnapshot> GetReconciliationSnapshotAsync(CancellationToken ct = default)
+    {
+        var payments = await _hospitalDbContext.Payments
+            .AsNoTracking()
+            .Include(x => x.ReceivedByUser)
+            .OrderByDescending(x => x.PaidAtUtc)
+            .ThenByDescending(x => x.Id)
+            .Take(25)
+            .ToListAsync(ct);
+
+        var aggregate = await _hospitalDbContext.Payments
+            .AsNoTracking()
+            .GroupBy(x => 1)
+            .Select(group => new
+            {
+                PendingPayments = group.Count(x => x.PaymentStatus == "Pending"),
+                CapturedPayments = group.Count(x => x.PaymentStatus == "Captured"),
+                FailedPayments = group.Count(x => x.PaymentStatus == "Failed"),
+                RefundedPayments = group.Count(x => x.PaymentStatus == "Refunded"),
+                PendingAmount = group.Where(x => x.PaymentStatus == "Pending").Sum(x => x.Amount),
+                CapturedAmount = group.Where(x => x.PaymentStatus == "Captured").Sum(x => x.Amount),
+                FailedAmount = group.Where(x => x.PaymentStatus == "Failed").Sum(x => x.Amount),
+                RefundedAmount = group.Where(x => x.PaymentStatus == "Refunded").Sum(x => x.Amount),
+                MissingExternalTransactionCount = group.Count(x =>
+                    x.PaymentMethod != "Cash" &&
+                    (x.PaymentStatus == "Pending" || x.PaymentStatus == "Captured") &&
+                    x.ExternalTransactionId == null)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        return new HospitalPaymentReconciliationSnapshot
+        {
+            GeneratedAtUtc = DateTime.UtcNow,
+            PendingPayments = aggregate?.PendingPayments ?? 0,
+            CapturedPayments = aggregate?.CapturedPayments ?? 0,
+            FailedPayments = aggregate?.FailedPayments ?? 0,
+            RefundedPayments = aggregate?.RefundedPayments ?? 0,
+            PendingAmount = aggregate?.PendingAmount ?? 0,
+            CapturedAmount = aggregate?.CapturedAmount ?? 0,
+            FailedAmount = aggregate?.FailedAmount ?? 0,
+            RefundedAmount = aggregate?.RefundedAmount ?? 0,
+            MissingExternalTransactionCount = aggregate?.MissingExternalTransactionCount ?? 0,
+            RecentPayments = payments.Select(x => new HospitalPaymentSnapshot
+            {
+                PaymentId = x.Id,
+                PaymentReference = x.PaymentReference,
+                PaymentMethod = x.PaymentMethod,
+                Amount = x.Amount,
+                PaymentStatus = x.PaymentStatus,
+                PaidAtUtc = x.PaidAtUtc,
+                ReceivedByUsername = x.ReceivedByUser?.Username,
+                ExternalTransactionId = x.ExternalTransactionId
+            }).ToArray()
+        };
+    }
+
     public Task AddInvoiceAsync(HospitalInvoiceCreateCommand command, CancellationToken ct = default)
     {
         _hospitalDbContext.Invoices.Add(new HospitalInvoiceEntity
@@ -378,6 +460,18 @@ public class HospitalBillingRepository : IHospitalBillingRepository
         });
 
         return Task.CompletedTask;
+    }
+
+    public async Task UpdatePaymentAsync(HospitalPaymentUpdateCommand command, CancellationToken ct = default)
+    {
+        var payment = await _hospitalDbContext.Payments
+            .FirstOrDefaultAsync(x => x.Id == command.PaymentId, ct)
+            ?? throw new KeyNotFoundException("Khong tim thay giao dich thanh toan.");
+
+        payment.PaymentStatus = command.PaymentStatus;
+        payment.PaidAtUtc = command.PaidAtUtc;
+        payment.ReceivedByUserId = command.ReceivedByUserId;
+        payment.ExternalTransactionId = command.ExternalTransactionId;
     }
 
     public async Task UpdateInvoiceAmountsAsync(Guid invoiceId, string invoiceStatus, decimal subtotalAmount, decimal discountAmount, decimal insuranceAmount, decimal totalAmount, CancellationToken ct = default)

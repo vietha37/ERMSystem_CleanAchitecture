@@ -266,6 +266,8 @@ public class HospitalNotificationConsumerService : BackgroundService
             "InvoicePaymentReceived.v1" => "INVOICE_PAYMENT_RECEIVED",
             "InvoiceRefunded.v1" => "INVOICE_REFUNDED",
             "PatientRevisitReminder.v1" => "PATIENT_REVISIT_REMINDER",
+            "PatientSatisfactionSurvey.v1" => "PATIENT_SATISFACTION_SURVEY",
+            "PatientCustomerCareFollowUp.v1" => "PATIENT_CUSTOMER_CARE_FOLLOW_UP",
             _ => "GENERIC_NOTIFICATION"
         };
 

@@ -47,9 +47,9 @@ public class HospitalClinicalOrderService : IHospitalClinicalOrderService
         var encounter = await _hospitalClinicalOrderRepository.GetEncounterForOrderingAsync(request.EncounterId, ct)
             ?? throw new KeyNotFoundException("Khong tim thay encounter de tao chi dinh.");
 
-        if (encounter.EncounterStatus is not ("InProgress" or "Finalized"))
+        if (encounter.EncounterStatus is not ("InProgress" or "Finalized" or "Approved"))
         {
-            throw new InvalidOperationException("Chi duoc tao chi dinh tu encounter dang kham hoac da chot ho so.");
+            throw new InvalidOperationException("Chi duoc tao chi dinh tu encounter dang kham, da chot ho so hoac da duyet.");
         }
 
         var catalogService = await _hospitalClinicalOrderRepository.GetCatalogServiceAsync(normalizedCategory, request.ServiceId, ct)

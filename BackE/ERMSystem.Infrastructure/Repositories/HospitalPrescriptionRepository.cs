@@ -178,6 +178,8 @@ public class HospitalPrescriptionRepository : IHospitalPrescriptionRepository
             PatientId = encounter.PatientId,
             PatientName = encounter.Patient.FullName,
             MedicalRecordNumber = encounter.Patient.MedicalRecordNumber,
+            PatientDateOfBirth = encounter.Patient.DateOfBirth,
+            PatientGender = encounter.Patient.Gender,
             PatientPhone = encounter.Patient.Phone,
             PatientEmail = encounter.Patient.Email,
             DoctorProfileId = encounter.DoctorProfileId,
@@ -185,6 +187,12 @@ public class HospitalPrescriptionRepository : IHospitalPrescriptionRepository
             SpecialtyName = encounter.DoctorProfile.Specialty.Name,
             ClinicName = encounter.Clinic.Name,
             PrimaryDiagnosisName = diagnosis?.DiagnosisName,
+            DiagnosisNames = encounter.Diagnoses
+                .OrderByDescending(x => x.IsPrimary)
+                .ThenByDescending(x => x.NotedAtUtc)
+                .Select(x => x.DiagnosisName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
             CreatedAtUtc = entity.CreatedAtUtc,
             Notes = entity.Notes,
             DispensingHistory = entity.Dispensings
@@ -232,7 +240,7 @@ public class HospitalPrescriptionRepository : IHospitalPrescriptionRepository
             .Include(x => x.DoctorProfile).ThenInclude(x => x.Specialty)
             .Include(x => x.Clinic)
             .Include(x => x.Diagnoses)
-            .Where(x => x.EncounterStatus == "InProgress" || x.EncounterStatus == "Finalized")
+            .Where(x => x.EncounterStatus == "InProgress" || x.EncounterStatus == "Finalized" || x.EncounterStatus == "Approved")
             .OrderByDescending(x => x.UpdatedAtUtc)
             .Take(100)
             .ToListAsync(ct);

@@ -70,7 +70,7 @@ public class HospitalDoctorWorklistService : IHospitalDoctorWorklistService
             TotalAppointments = items.Count,
             CheckedInAppointments = items.Count(x => x.AppointmentStatus == "CheckedIn"),
             InProgressEncounters = items.Count(x => x.EncounterStatus == "InProgress"),
-            FinalizedEncounters = items.Count(x => x.EncounterStatus == "Finalized"),
+            FinalizedEncounters = items.Count(x => x.EncounterStatus is "Finalized" or "Approved"),
             IssuedPrescriptions = items.Count(x => x.PrescriptionId.HasValue),
             Items = items
         };
@@ -106,6 +106,11 @@ public class HospitalDoctorWorklistService : IHospitalDoctorWorklistService
         if (snapshot.PrescriptionId.HasValue)
         {
             return "Da ke don";
+        }
+
+        if (snapshot.EncounterStatus == "Approved")
+        {
+            return "Da duyet ho so";
         }
 
         if (snapshot.EncounterStatus == "Finalized")

@@ -137,6 +137,96 @@ public class HospitalBillingService : IHospitalBillingService
         return MapDetail(created);
     }
 
+    public async Task<HospitalPaymentIntentDto?> CreatePaymentIntentAsync(
+        Guid invoiceId,
+        CreateHospitalPaymentIntentDto request,
+        Guid? actorUserId,
+        string? actorUsername,
+        CancellationToken ct = default)
+    {
+        var invoice = await _hospitalBillingRepository.GetByIdAsync(invoiceId, ct);
+        if (invoice == null)
+        {
+            return null;
+        }
+
+        if (invoice.InvoiceStatus == "Paid")
+        {
+            throw new InvalidOperationException("Hoa don nay da thanh toan du, khong can tao giao dich moi.");
+        }
+
+        var paidAmount = CalculateNetPaidAmount(invoice);
+        var balance = invoice.TotalAmount - paidAmount;
+        if (request.Amount > balance)
+        {
+            throw new InvalidOperationException("So tien giao dich cho thanh toan vuot qua cong no con lai.");
+        }
+
+        var actorHospitalUserId = await _hospitalIdentityBridgeService.ResolveHospitalUserIdAsync(actorUserId, actorUsername, ct);
+        var nowUtc = DateTime.UtcNow;
+        var paymentId = Guid.NewGuid();
+        var paymentReference = string.IsNullOrWhiteSpace(request.PaymentReference)
+            ? GeneratePaymentReference(nowUtc)
+            : request.PaymentReference.Trim();
+        var externalTransactionId = NormalizeText(request.ExternalTransactionId)
+            ?? $"EXT-{Guid.NewGuid():N}";
+
+        await _hospitalBillingRepository.AddPaymentAsync(new HospitalPaymentCreateCommand
+        {
+            PaymentId = paymentId,
+            InvoiceId = invoiceId,
+            PaymentReference = paymentReference,
+            PaymentMethod = request.PaymentMethod.Trim(),
+            Amount = request.Amount,
+            PaymentStatus = "Pending",
+            PaidAtUtc = null,
+            ReceivedByUserId = actorHospitalUserId,
+            ExternalTransactionId = externalTransactionId
+        }, ct);
+
+        await _hospitalBillingRepository.AddOutboxMessageAsync(new HospitalBillingOutboxCreateCommand
+        {
+            OutboxMessageId = Guid.NewGuid(),
+            AggregateType = "Invoice",
+            AggregateId = invoiceId,
+            EventType = "InvoicePaymentIntentCreated.v1",
+            PayloadJson = JsonSerializer.Serialize(new
+            {
+                invoiceId,
+                invoice.InvoiceNumber,
+                paymentReference,
+                paymentMethod = request.PaymentMethod.Trim(),
+                amount = request.Amount,
+                externalTransactionId,
+                createdAtUtc = nowUtc
+            }, JsonOptions),
+            Status = "Pending",
+            AvailableAtUtc = nowUtc
+        }, ct);
+
+        await _hospitalBillingRepository.SaveChangesAsync(ct);
+
+        _businessMetricsRecorder.IncrementEvent("hospital_billing", "payment_intent_created", new Dictionary<string, string?>
+        {
+            ["payment_method"] = request.PaymentMethod.Trim()
+        });
+
+        return new HospitalPaymentIntentDto
+        {
+            PaymentId = paymentId,
+            InvoiceId = invoiceId,
+            InvoiceNumber = invoice.InvoiceNumber,
+            PaymentReference = paymentReference,
+            PaymentMethod = request.PaymentMethod.Trim(),
+            Amount = request.Amount,
+            PaymentStatus = "Pending",
+            ExternalTransactionId = externalTransactionId,
+            CheckoutToken = $"CHK-{Guid.NewGuid():N}",
+            InstructionText = $"Cho gateway callback xac nhan giao dich {paymentReference} cho hoa don {invoice.InvoiceNumber}.",
+            CreatedAtLocal = ConvertUtcToClinicLocal(nowUtc)
+        };
+    }
+
     public async Task<HospitalInvoiceDetailDto?> ReceivePaymentAsync(
         Guid invoiceId,
         ReceiveHospitalPaymentDto request,
@@ -230,6 +320,89 @@ public class HospitalBillingService : IHospitalBillingService
 
         var updated = await _hospitalBillingRepository.GetByIdAsync(invoiceId, ct)
             ?? throw new InvalidOperationException("Khong the tai lai hoa don sau khi ghi nhan thanh toan.");
+
+        return MapDetail(updated);
+    }
+
+    public async Task<HospitalInvoiceDetailDto?> ConfirmPaymentCallbackAsync(
+        ConfirmHospitalPaymentCallbackDto request,
+        CancellationToken ct = default)
+    {
+        var invoice = await _hospitalBillingRepository.GetByIdAsync(request.InvoiceId, ct);
+        if (invoice == null)
+        {
+            return null;
+        }
+
+        var payment = await _hospitalBillingRepository.GetPaymentAsync(request.InvoiceId, request.PaymentReference, ct)
+            ?? throw new InvalidOperationException("Khong tim thay giao dich doi soat theo payment reference.");
+
+        if (payment.PaymentStatus == "Captured")
+        {
+            return MapDetail(invoice);
+        }
+
+        var gatewayStatus = request.GatewayStatus.Trim();
+        var normalizedGatewayStatus = NormalizeGatewayStatus(gatewayStatus);
+        if (request.Amount.HasValue && request.Amount.Value != payment.Amount)
+        {
+            throw new InvalidOperationException("So tien callback khong khop voi giao dich cho xu ly.");
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        await _hospitalBillingRepository.UpdatePaymentAsync(new HospitalPaymentUpdateCommand
+        {
+            PaymentId = payment.PaymentId,
+            PaymentStatus = normalizedGatewayStatus,
+            PaidAtUtc = normalizedGatewayStatus == "Captured" ? nowUtc : null,
+            ReceivedByUserId = payment.ReceivedByUserId,
+            ExternalTransactionId = NormalizeText(request.ExternalTransactionId) ?? payment.ExternalTransactionId
+        }, ct);
+
+        if (normalizedGatewayStatus == "Captured")
+        {
+            var newPaidAmount = CalculateNetPaidAmount(invoice) + payment.Amount;
+            var newStatus = ResolveInvoiceStatus(invoice.TotalAmount, newPaidAmount);
+            await _hospitalBillingRepository.UpdateInvoiceAmountsAsync(
+                request.InvoiceId,
+                newStatus,
+                invoice.SubtotalAmount,
+                invoice.DiscountAmount,
+                invoice.InsuranceAmount,
+                invoice.TotalAmount,
+                ct);
+
+            await _hospitalBillingRepository.AddOutboxMessageAsync(new HospitalBillingOutboxCreateCommand
+            {
+                OutboxMessageId = Guid.NewGuid(),
+                AggregateType = "Invoice",
+                AggregateId = request.InvoiceId,
+                EventType = "InvoicePaymentCaptured.v1",
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    invoiceId = request.InvoiceId,
+                    invoice.InvoiceNumber,
+                    payment.PaymentReference,
+                    amount = payment.Amount,
+                    externalTransactionId = NormalizeText(request.ExternalTransactionId) ?? payment.ExternalTransactionId,
+                    paidAtUtc = nowUtc,
+                    invoiceStatus = newStatus
+                }, JsonOptions),
+                Status = "Pending",
+                AvailableAtUtc = nowUtc
+            }, ct);
+        }
+
+        await _hospitalBillingRepository.SaveChangesAsync(ct);
+        await _dashboardQueryCache.InvalidateAsync(ct);
+
+        _businessMetricsRecorder.IncrementEvent("hospital_billing", "payment_callback_processed", new Dictionary<string, string?>
+        {
+            ["gateway_status"] = normalizedGatewayStatus
+        });
+
+        var updated = await _hospitalBillingRepository.GetByIdAsync(request.InvoiceId, ct)
+            ?? throw new InvalidOperationException("Khong the tai lai hoa don sau callback thanh toan.");
 
         return MapDetail(updated);
     }
@@ -341,6 +514,35 @@ public class HospitalBillingService : IHospitalBillingService
         return MapDetail(updated);
     }
 
+    public async Task<HospitalPaymentReconciliationSummaryDto> GetReconciliationSummaryAsync(CancellationToken ct = default)
+    {
+        var snapshot = await _hospitalBillingRepository.GetReconciliationSnapshotAsync(ct);
+        return new HospitalPaymentReconciliationSummaryDto
+        {
+            GeneratedAtLocal = ConvertUtcToClinicLocal(snapshot.GeneratedAtUtc),
+            PendingPayments = snapshot.PendingPayments,
+            CapturedPayments = snapshot.CapturedPayments,
+            FailedPayments = snapshot.FailedPayments,
+            RefundedPayments = snapshot.RefundedPayments,
+            PendingAmount = snapshot.PendingAmount,
+            CapturedAmount = snapshot.CapturedAmount,
+            FailedAmount = snapshot.FailedAmount,
+            RefundedAmount = snapshot.RefundedAmount,
+            MissingExternalTransactionCount = snapshot.MissingExternalTransactionCount,
+            RecentPayments = snapshot.RecentPayments.Select(x => new HospitalPaymentDto
+            {
+                PaymentId = x.PaymentId,
+                PaymentReference = x.PaymentReference,
+                PaymentMethod = x.PaymentMethod,
+                Amount = x.Amount,
+                PaymentStatus = x.PaymentStatus,
+                PaidAtLocal = x.PaidAtUtc.HasValue ? ConvertUtcToClinicLocal(x.PaidAtUtc.Value) : null,
+                ReceivedByUsername = x.ReceivedByUsername,
+                ExternalTransactionId = x.ExternalTransactionId
+            }).ToList()
+        };
+    }
+
     private static HospitalInvoiceDetailDto MapDetail(HospitalInvoiceAggregateSnapshot invoice)
     {
         var paidAmount = CalculateNetPaidAmount(invoice);
@@ -398,6 +600,25 @@ public class HospitalBillingService : IHospitalBillingService
         => invoice.Payments
             .Where(x => x.PaymentStatus is "Captured" or "Refunded")
             .Sum(x => x.Amount);
+
+    private static string NormalizeGatewayStatus(string gatewayStatus)
+    {
+        if (string.Equals(gatewayStatus, "Captured", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(gatewayStatus, "Success", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(gatewayStatus, "Succeeded", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Captured";
+        }
+
+        if (string.Equals(gatewayStatus, "Failed", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(gatewayStatus, "Declined", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(gatewayStatus, "Cancelled", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Failed";
+        }
+
+        throw new InvalidOperationException("Gateway status khong hop le cho callback thanh toan.");
+    }
 
     private static string ResolveInvoiceStatus(decimal totalAmount, decimal netPaidAmount)
     {

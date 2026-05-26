@@ -77,8 +77,19 @@ public class HospitalPrescriptionDetailDto : HospitalPrescriptionSummaryDto
     public Guid? LatestDispensingId { get; set; }
     public string? DispensingNotes { get; set; }
     public List<string> Warnings { get; set; } = new();
+    public List<HospitalPrescriptionWarningDto> WarningDetails { get; set; } = new();
     public List<HospitalPrescriptionDispensingHistoryDto> DispensingHistory { get; set; } = new();
     public List<HospitalPrescriptionItemDto> Items { get; set; } = new();
+}
+
+public class HospitalPrescriptionWarningDto
+{
+    public string Code { get; set; } = string.Empty;
+    public string Severity { get; set; } = "warning";
+    public string Category { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public string? Recommendation { get; set; }
+    public List<string> RelatedMedicines { get; set; } = new();
 }
 
 public class HospitalPrescriptionDispensingHistoryDto

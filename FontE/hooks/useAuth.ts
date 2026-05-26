@@ -28,7 +28,17 @@ export function useAuth() {
 
   const login = async (username: string, password: string, remember: boolean = false) => {
     try {
-      await authService.login(username, password);
+      const response = await authService.login(username, password);
+      if (response.requiresTwoFactor && response.mfaChallengeToken) {
+        toast.success('Nhập mã xác thực từ ứng dụng MFA để hoàn tất đăng nhập.');
+        return {
+          success: true,
+          requiresTwoFactor: true,
+          challengeToken: response.mfaChallengeToken,
+          challengeExpiresAtUtc: response.mfaChallengeExpiresAtUtc ?? null,
+        };
+      }
+
       const nextRole = authService.getRole();
       const nextUsername = authService.getUsername();
       setIsAuthenticated(true);
@@ -47,6 +57,31 @@ export function useAuth() {
       return { success: true };
     } catch (error: unknown) {
       const msg = getApiErrorMessage(error, 'Invalid username or password');
+      toast.error(msg);
+      return { success: false, error: msg };
+    }
+  };
+
+  const verifyMfaLogin = async (challengeToken: string, code: string, remember: boolean = false) => {
+    try {
+      await authService.verifyMfaLogin({ mfaChallengeToken: challengeToken, code });
+      const nextRole = authService.getRole();
+      const nextUsername = authService.getUsername();
+      setIsAuthenticated(true);
+      setRole(nextRole);
+      setUsername(nextUsername);
+      toast.success('Đăng nhập xác thực hai bước thành công.');
+
+      if (remember) {
+         localStorage.setItem('emr_remember_me', 'true');
+      } else {
+         localStorage.removeItem('emr_remember_me');
+      }
+
+      router.push(nextRole === 'Patient' ? '/portal' : '/dashboard');
+      return { success: true };
+    } catch (error: unknown) {
+      const msg = getApiErrorMessage(error, 'Mã xác thực không hợp lệ');
       toast.error(msg);
       return { success: false, error: msg };
     }
@@ -85,6 +120,7 @@ export function useAuth() {
     role,
     username,
     login,
+    verifyMfaLogin,
     registerPatient,
     logout,
   };

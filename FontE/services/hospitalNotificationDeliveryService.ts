@@ -1,5 +1,6 @@
 import api from "./api";
 import {
+  HospitalCrmEngagementSummary,
   NotificationDeliveryListResult,
   NotificationDeliverySummary,
   NotificationDeliveryStatus,
@@ -30,6 +31,14 @@ export const hospitalNotificationDeliveryService = {
   getSummary: async (): Promise<NotificationDeliverySummary> => {
     const response = await api.get<NotificationDeliverySummary>(
       "/hospital-notification-deliveries/summary"
+    );
+
+    return response.data;
+  },
+
+  getEngagementSummary: async (): Promise<HospitalCrmEngagementSummary> => {
+    const response = await api.get<HospitalCrmEngagementSummary>(
+      "/hospital-notification-deliveries/engagement-summary"
     );
 
     return response.data;

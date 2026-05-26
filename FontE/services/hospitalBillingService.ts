@@ -1,8 +1,12 @@
 import api from "./api";
 import {
+  ConfirmHospitalPaymentCallbackPayload,
+  CreateHospitalPaymentIntentPayload,
   CreateHospitalInvoicePayload,
   HospitalBillingEligibleEncounter,
   HospitalInvoiceDetail,
+  HospitalPaymentIntent,
+  HospitalPaymentReconciliationSummary,
   HospitalInvoiceSummary,
   HospitalInvoiceWorklistQuery,
   PaginatedResult,
@@ -49,6 +53,17 @@ export const hospitalBillingService = {
     return response.data;
   },
 
+  createPaymentIntent: async (
+    invoiceId: string,
+    payload: CreateHospitalPaymentIntentPayload
+  ): Promise<HospitalPaymentIntent> => {
+    const response = await api.post<HospitalPaymentIntent>(
+      `/hospital-billing/${invoiceId}/payment-intents`,
+      payload
+    );
+    return response.data;
+  },
+
   receivePayment: async (
     invoiceId: string,
     payload: ReceiveHospitalPaymentPayload
@@ -56,6 +71,23 @@ export const hospitalBillingService = {
     const response = await api.post<HospitalInvoiceDetail>(
       `/hospital-billing/${invoiceId}/payments`,
       payload
+    );
+    return response.data;
+  },
+
+  confirmPaymentCallback: async (
+    payload: ConfirmHospitalPaymentCallbackPayload
+  ): Promise<HospitalInvoiceDetail> => {
+    const response = await api.post<HospitalInvoiceDetail>(
+      "/hospital-billing/payment-callbacks",
+      payload
+    );
+    return response.data;
+  },
+
+  getReconciliationSummary: async (): Promise<HospitalPaymentReconciliationSummary> => {
+    const response = await api.get<HospitalPaymentReconciliationSummary>(
+      "/hospital-billing/reconciliation/summary"
     );
     return response.data;
   },

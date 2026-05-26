@@ -157,6 +157,49 @@ export type NotificationDeliverySummary = {
   generatedAtUtc: string;
 };
 
+export type HospitalCrmEngagementTrendPoint = {
+  date: string;
+  label: string;
+  revisitReminderCount: number;
+  satisfactionSurveyCount: number;
+  customerCareFollowUpCount: number;
+};
+
+export type HospitalCrmEngagementActivity = {
+  outboxMessageId: Id;
+  patientId: Id;
+  eventType: string;
+  eventLabel: string;
+  patientName: string;
+  medicalRecordNumber?: string | null;
+  clinicName?: string | null;
+  doctorName?: string | null;
+  channel?: string | null;
+  recipientCount: number;
+  queuedCount: number;
+  deliveredCount: number;
+  failedCount: number;
+  skippedCount: number;
+  availableAtUtc: string;
+  publishedAtUtc?: string | null;
+};
+
+export type HospitalCrmEngagementSummary = {
+  generatedAtUtc: string;
+  totalCampaignMessages: number;
+  totalRecipients: number;
+  queuedDeliveries: number;
+  deliveredDeliveries: number;
+  failedDeliveries: number;
+  skippedDeliveries: number;
+  actionRequiredDeliveries: number;
+  revisitReminderMessages: number;
+  satisfactionSurveyMessages: number;
+  customerCareFollowUpMessages: number;
+  trendPoints: HospitalCrmEngagementTrendPoint[];
+  recentActivities: HospitalCrmEngagementActivity[];
+};
+
 export type HospitalPatientPortalProfile = {
   patientId: Id;
   medicalRecordNumber: string;
@@ -368,7 +411,7 @@ export type HospitalAppointmentReschedulePayload = {
   reason?: string;
 };
 
-export type HospitalEncounterStatus = "InProgress" | "Finalized";
+export type HospitalEncounterStatus = "InProgress" | "Finalized" | "Approved";
 
 export type HospitalEncounterSummary = {
   encounterId: Id;
@@ -395,6 +438,14 @@ export type HospitalEncounterDetail = HospitalEncounterSummary & {
   encounterType: string;
   diagnosisCode?: string | null;
   diagnosisType?: string | null;
+  clinicalNoteAuthoredAtLocal?: string | null;
+  clinicalNoteSignedAtLocal?: string | null;
+  isClinicalNoteSigned: boolean;
+  clinicalNoteSignedByUsername?: string | null;
+  approvalSignedAtLocal?: string | null;
+  approvedByUsername?: string | null;
+  approvalComment?: string | null;
+  isApproved: boolean;
   subjective?: string | null;
   objective?: string | null;
   assessment?: string | null;
@@ -407,6 +458,35 @@ export type HospitalEncounterDetail = HospitalEncounterSummary & {
   systolicBp?: number | null;
   diastolicBp?: number | null;
   oxygenSaturation?: number | null;
+  workflowEvents: HospitalEncounterWorkflowEvent[];
+  attachments: HospitalEncounterAttachment[];
+};
+
+export type HospitalEncounterWorkflowEvent = {
+  eventType: string;
+  label: string;
+  comment?: string | null;
+  performedByUsername?: string | null;
+  occurredAtLocal: string;
+};
+
+export type HospitalEncounterAttachment = {
+  attachmentId: Id;
+  documentType: string;
+  fileName: string;
+  contentType: string;
+  storageProvider: string;
+  documentUri: string;
+  uploadedAtLocal: string;
+  uploadedByUserId?: Id | null;
+  uploadedByUsername?: string | null;
+};
+
+export type HospitalEncounterAttachmentDownloadTicket = {
+  storageProvider: string;
+  accessToken: string;
+  downloadUrl: string;
+  expiresAtUtc: string;
 };
 
 export type HospitalEncounterEligibleAppointment = {
@@ -458,6 +538,14 @@ export type UpdateHospitalEncounterPayload = Omit<
   CreateHospitalEncounterPayload,
   "appointmentId"
 >;
+
+export type SignHospitalEncounterPayload = {
+  attestationText?: string;
+};
+
+export type ApproveHospitalEncounterPayload = {
+  approvalComment?: string;
+};
 
 export type HospitalPrescriptionStatus = "Issued" | "Dispensed" | "Cancelled";
 
@@ -515,7 +603,17 @@ export type HospitalPrescriptionDetail = HospitalPrescriptionSummary & {
   latestDispensingId?: Id | null;
   dispensingNotes?: string | null;
   warnings: string[];
+  warningDetails: HospitalPrescriptionWarning[];
   items: HospitalPrescriptionItem[];
+};
+
+export type HospitalPrescriptionWarning = {
+  code: string;
+  severity: string;
+  category: string;
+  message: string;
+  recommendation?: string | null;
+  relatedMedicines: string[];
 };
 
 export type HospitalPrescriptionEligibleEncounter = {
@@ -717,6 +815,34 @@ export type HospitalPayment = {
   externalTransactionId?: string | null;
 };
 
+export type HospitalPaymentIntent = {
+  paymentId: Id;
+  invoiceId: Id;
+  invoiceNumber: string;
+  paymentReference: string;
+  paymentMethod: string;
+  amount: number;
+  paymentStatus: string;
+  externalTransactionId?: string | null;
+  checkoutToken: string;
+  instructionText: string;
+  createdAtLocal: string;
+};
+
+export type HospitalPaymentReconciliationSummary = {
+  generatedAtLocal: string;
+  pendingPayments: number;
+  capturedPayments: number;
+  failedPayments: number;
+  refundedPayments: number;
+  pendingAmount: number;
+  capturedAmount: number;
+  failedAmount: number;
+  refundedAmount: number;
+  missingExternalTransactionCount: number;
+  recentPayments: HospitalPayment[];
+};
+
 export type HospitalInvoiceDetail = HospitalInvoiceSummary & {
   doctorName?: string | null;
   specialtyName?: string | null;
@@ -763,6 +889,21 @@ export type ReceiveHospitalPaymentPayload = {
   externalTransactionId?: string;
 };
 
+export type CreateHospitalPaymentIntentPayload = {
+  paymentMethod: string;
+  paymentReference?: string;
+  amount: number;
+  externalTransactionId?: string;
+};
+
+export type ConfirmHospitalPaymentCallbackPayload = {
+  invoiceId: Id;
+  paymentReference: string;
+  externalTransactionId?: string;
+  gatewayStatus: string;
+  amount?: number;
+};
+
 export type HospitalDoctorWorklistItem = {
   appointmentId: Id;
   appointmentNumber: string;
@@ -806,6 +947,31 @@ export type AuthResponse = {
   username: string;
   role: string;
   expiresAt: string;
+  requiresTwoFactor?: boolean;
+  isMfaEnabled?: boolean;
+  mfaChallengeToken?: string | null;
+  mfaChallengeExpiresAtUtc?: string | null;
+};
+
+export type MfaStatus = {
+  isEnabled: boolean;
+  isSetupPending: boolean;
+  enabledAtUtc?: string | null;
+};
+
+export type MfaSetupResponse = {
+  manualEntryKey: string;
+  otpAuthUri: string;
+  expiresAtUtc: string;
+};
+
+export type VerifyMfaPayload = {
+  code: string;
+};
+
+export type VerifyMfaLoginPayload = {
+  mfaChallengeToken: string;
+  code: string;
 };
 
 export type CreatePatientPayload = {

@@ -46,6 +46,8 @@ public class HospitalPrescriptionAggregateSnapshot
     public Guid PatientId { get; set; }
     public string PatientName { get; set; } = string.Empty;
     public string MedicalRecordNumber { get; set; } = string.Empty;
+    public DateOnly PatientDateOfBirth { get; set; }
+    public string PatientGender { get; set; } = string.Empty;
     public string? PatientPhone { get; set; }
     public string? PatientEmail { get; set; }
     public Guid DoctorProfileId { get; set; }
@@ -53,6 +55,7 @@ public class HospitalPrescriptionAggregateSnapshot
     public string SpecialtyName { get; set; } = string.Empty;
     public string ClinicName { get; set; } = string.Empty;
     public string? PrimaryDiagnosisName { get; set; }
+    public string[] DiagnosisNames { get; set; } = Array.Empty<string>();
     public DateTime CreatedAtUtc { get; set; }
     public string? Notes { get; set; }
     public HospitalPrescriptionDispensingSnapshot[] DispensingHistory { get; set; } = Array.Empty<HospitalPrescriptionDispensingSnapshot>();

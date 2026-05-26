@@ -35,6 +35,55 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
             ["sildenafil", "tadalafil", "vardenafil"],
             "Canh bao ha huyet ap nghiem trong: nitrate khong nen dung cung thuoc uc che PDE5.")
     ];
+    private static readonly PrescriptionTherapeuticClassRule[] TherapeuticClassRules =
+    [
+        new(
+            "NSAID",
+            ["ibuprofen", "diclofenac", "naproxen", "meloxicam", "celecoxib", "etoricoxib", "ketorolac"],
+            "Canh bao trung nhom giam dau khang viem: khong nen dung dong thoi nhieu NSAID trong cung mot don."),
+        new(
+            "benzodiazepine",
+            ["diazepam", "lorazepam", "alprazolam", "clonazepam", "midazolam"],
+            "Canh bao trung nhom an than: phoi hop nhieu benzodiazepine lam tang nguy co uc che ho hap, te nga va lan lu."),
+        new(
+            "opioid",
+            ["morphine", "fentanyl", "tramadol", "codeine", "oxycodone"],
+            "Canh bao trung nhom giam dau opioid: can xac nhan day co chu dich dieu tri va theo doi doc tinh."),
+        new(
+            "ACEi/ARB",
+            ["enalapril", "lisinopril", "perindopril", "ramipril", "captopril", "losartan", "valsartan", "telmisartan"],
+            "Canh bao trung nhom he renin-angiotensin: khong nen phoi hop nhieu ACEi/ARB neu khong co chi dinh rat ro rang.")
+    ];
+    private static readonly DiagnosisContextRule[] DiagnosisContextRules =
+    [
+        new(
+            ["viem da day", "loet da day", "xuat huyet tieu hoa", "loet ta trang", "gastritis", "ulcer", "gastrointestinal bleeding"],
+            ["ibuprofen", "diclofenac", "naproxen", "meloxicam", "celecoxib", "etoricoxib", "ketorolac"],
+            "Canh bao theo benh canh tieu hoa: NSAID co the lam nang viem loet/xuat huyet tieu hoa."),
+        new(
+            ["suy than", "benh than man", "chronic kidney", "ckd", "renal failure", "tang huyet ap", "hypertension", "suy tim", "heart failure"],
+            ["ibuprofen", "diclofenac", "naproxen", "meloxicam", "celecoxib", "etoricoxib", "ketorolac"],
+            "Canh bao theo benh canh tim-than: NSAID co the lam xau chuc nang than, giu nuoc va tang huyet ap."),
+        new(
+            ["dai thao duong", "diabetes"],
+            ["prednisone", "prednisolone", "dexamethasone", "methylprednisolone", "hydrocortisone"],
+            "Canh bao theo benh canh chuyen hoa: corticosteroid co the lam tang duong huyet, can theo doi glucose sat.")
+    ];
+    private static readonly PrescriptionInteractionRule[] AdvancedInteractionRules =
+    [
+        new(
+            ["azithromycin", "clarithromycin", "erythromycin", "levofloxacin", "moxifloxacin", "ondansetron"],
+            ["amiodarone", "haloperidol", "quetiapine", "sotalol"],
+            "Canh bao keo dai QT: phoi hop co the lam tang nguy co loan nhip nguy hiem."),
+        new(
+            ["tramadol", "sertraline", "fluoxetine", "paroxetine", "escitalopram", "venlafaxine"],
+            ["tramadol", "sertraline", "fluoxetine", "paroxetine", "escitalopram", "venlafaxine"],
+            "Canh bao hoi chung serotonin: can danh gia nguy co kich dong, run co, tang than nhiet va thay doi tam than."),
+        new(
+            ["ibuprofen", "diclofenac", "naproxen", "meloxicam", "celecoxib", "etoricoxib", "ketorolac"],
+            ["furosemide", "torsemide", "hydrochlorothiazide", "spironolactone"],
+            "Canh bao nguy co ton thuong than va mat kiem soat huyet ap khi phoi hop NSAID voi thuoc loi tieu.")
+    ];
 
     private readonly IHospitalPrescriptionRepository _hospitalPrescriptionRepository;
     private readonly IHospitalIdentityBridgeService _hospitalIdentityBridgeService;
@@ -91,9 +140,9 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
             throw new InvalidOperationException("Encounter nay da co don thuoc.");
         }
 
-        if (encounter.EncounterStatus is not ("InProgress" or "Finalized"))
+        if (encounter.EncounterStatus is not ("InProgress" or "Finalized" or "Approved"))
         {
-            throw new InvalidOperationException("Chi duoc phat hanh don thuoc cho encounter dang kham hoac da chot ho so.");
+            throw new InvalidOperationException("Chi duoc phat hanh don thuoc cho encounter dang kham, da chot ho so hoac da duyet.");
         }
 
         var medicineIds = request.Items.Select(x => x.MedicineId).Distinct().ToArray();
@@ -287,6 +336,8 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
 
     private static HospitalPrescriptionDetailDto MapDetail(HospitalPrescriptionAggregateSnapshot prescription)
     {
+        var warningDetails = BuildPrescriptionWarningDetails(prescription);
+
         return new HospitalPrescriptionDetailDto
         {
             PrescriptionId = prescription.PrescriptionId,
@@ -312,7 +363,8 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
             DispensedByUsername = prescription.DispensedByUsername,
             DispensingNotes = prescription.DispensingNotes,
             Notes = prescription.Notes,
-            Warnings = BuildPrescriptionWarnings(prescription.Items),
+            WarningDetails = warningDetails,
+            Warnings = warningDetails.Select(x => x.Message).ToList(),
             DispensingHistory = prescription.DispensingHistory
                 .Select(dispensing => new HospitalPrescriptionDispensingHistoryDto
                 {
@@ -419,14 +471,18 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
         }
     }
 
-    private static List<string> BuildPrescriptionWarnings(IReadOnlyCollection<HospitalPrescriptionItemSnapshot> items)
+    private static List<HospitalPrescriptionWarningDto> BuildPrescriptionWarningDetails(HospitalPrescriptionAggregateSnapshot prescription)
     {
-        var warnings = new List<string>();
-        var normalizedItems = items
+        var warnings = new List<HospitalPrescriptionWarningDto>();
+        var normalizedItems = prescription.Items
             .Select(item => new NormalizedPrescriptionItemSnapshot(
                 item,
                 NormalizeMedicationDescriptor(item.MedicineName),
                 NormalizeMedicationDescriptor(item.GenericName)))
+            .ToArray();
+        var normalizedDiagnoses = prescription.DiagnosisNames
+            .Select(NormalizeMedicationDescriptor)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
             .ToArray();
 
         var duplicateGenericGroups = normalizedItems
@@ -438,7 +494,15 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
         foreach (var group in duplicateGenericGroups)
         {
             var medicineNames = string.Join(", ", group.Select(x => x.Source.MedicineName).Distinct(StringComparer.OrdinalIgnoreCase));
-            warnings.Add($"Canh bao trung hoat chat: {group.Key} xuat hien trong cac thuoc {medicineNames}.");
+            AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+            {
+                Code = $"duplicate-generic:{NormalizeCodeToken(group.Key)}",
+                Severity = "warning",
+                Category = "duplicate-ingredient",
+                Message = $"Canh bao trung hoat chat: {group.Key} xuat hien trong cac thuoc {medicineNames}.",
+                Recommendation = "Can xac nhan day khong phai ke trung hoat chat ngoai y muon.",
+                RelatedMedicines = group.Select(x => x.Source.MedicineName).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+            });
         }
 
         foreach (var rule in InteractionRules)
@@ -448,7 +512,84 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
                 continue;
             }
 
-            warnings.Add($"{rule.WarningMessage} Cap thuoc lien quan: {primaryMatch.Source.MedicineName} + {secondaryMatch.Source.MedicineName}.");
+            AddInteractionWarning(
+                warnings,
+                "major-drug-interaction",
+                "critical",
+                rule.WarningMessage,
+                primaryMatch,
+                secondaryMatch,
+                "Can can nhac doi phac do hoac them ke hoach theo doi sat.");
+        }
+
+        foreach (var rule in AdvancedInteractionRules)
+        {
+            if (!TryFindInteractionPair(normalizedItems, rule, out var primaryMatch, out var secondaryMatch))
+            {
+                continue;
+            }
+
+            AddInteractionWarning(
+                warnings,
+                "advanced-interaction",
+                rule.WarningMessage.Contains("QT", StringComparison.OrdinalIgnoreCase) ? "critical" : "warning",
+                rule.WarningMessage,
+                primaryMatch,
+                secondaryMatch,
+                "Can danh gia nguy co-loi ich va xem xet theo doi lam sang/can lam sang phu hop.");
+        }
+
+        foreach (var rule in TherapeuticClassRules)
+        {
+            var matches = normalizedItems
+                .Where(item => rule.Matchers.Any(item.ContainsToken))
+                .GroupBy(item => item.MedicineId)
+                .Select(group => group.First())
+                .ToArray();
+            if (matches.Length < 2)
+            {
+                continue;
+            }
+
+            var medicineNames = string.Join(", ", matches.Select(x => x.Source.MedicineName));
+            AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+            {
+                Code = $"duplicate-class:{NormalizeCodeToken(rule.ClassName)}",
+                Severity = "warning",
+                Category = "therapeutic-duplication",
+                Message = $"{rule.WarningMessage} Thuoc lien quan: {medicineNames}.",
+                Recommendation = "Can xac nhan phoi hop cung nhom co muc tieu dieu tri ro rang.",
+                RelatedMedicines = matches.Select(x => x.Source.MedicineName).ToList()
+            });
+        }
+
+        foreach (var rule in DiagnosisContextRules)
+        {
+            if (!normalizedDiagnoses.Any(diagnosis => rule.DiagnosisMatchers.Any(matcher => diagnosis.Contains(NormalizeMedicationDescriptor(matcher), StringComparison.Ordinal))))
+            {
+                continue;
+            }
+
+            var matches = normalizedItems
+                .Where(item => rule.MedicineMatchers.Any(item.ContainsToken))
+                .GroupBy(item => item.MedicineId)
+                .Select(group => group.First())
+                .ToArray();
+            if (matches.Length == 0)
+            {
+                continue;
+            }
+
+            var medicineNames = string.Join(", ", matches.Select(x => x.Source.MedicineName));
+            AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+            {
+                Code = $"diagnosis-context:{NormalizeCodeToken(rule.WarningMessage)}",
+                Severity = "warning",
+                Category = "diagnosis-context",
+                Message = $"{rule.WarningMessage} Thuoc lien quan: {medicineNames}.",
+                Recommendation = "Can doi chieu chan doan hien tai va muc tieu dieu tri truoc khi giu phac do.",
+                RelatedMedicines = matches.Select(x => x.Source.MedicineName).ToList()
+            });
         }
 
         var controlledItems = normalizedItems
@@ -457,11 +598,190 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
             .ToArray();
         foreach (var item in controlledItems)
         {
-            warnings.Add(
-                $"Canh bao theo doi keo dai: {item.Source.MedicineName} co lieu trinh {item.Source.DurationDays} ngay, can xac nhan chi dinh va ke hoach tai kham.");
+            AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+            {
+                Code = $"prolonged-controlled:{item.MedicineId}",
+                Severity = "warning",
+                Category = "duration-risk",
+                Message = $"Canh bao theo doi keo dai: {item.Source.MedicineName} co lieu trinh {item.Source.DurationDays} ngay, can xac nhan chi dinh va ke hoach tai kham.",
+                Recommendation = "Can ghi ro moc tai kham, muc tieu dung thuoc va tieu chi giam/ngung thuoc.",
+                RelatedMedicines = [item.Source.MedicineName]
+            });
+        }
+
+        var prolongedSteroids = normalizedItems
+            .Where(item => item.Source.DurationDays.HasValue && item.Source.DurationDays.Value >= 14)
+            .Where(IsSystemicCorticosteroid)
+            .ToArray();
+        foreach (var item in prolongedSteroids)
+        {
+            AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+            {
+                Code = $"prolonged-steroid:{item.MedicineId}",
+                Severity = "warning",
+                Category = "duration-risk",
+                Message = $"Canh bao corticosteroid keo dai: {item.Source.MedicineName} du kien dung {item.Source.DurationDays} ngay, can xem xet du phong bien chung va ke hoach giam lieu neu phu hop.",
+                Recommendation = "Can xem xet du phong bien chung va ke hoach taper neu phac do cho phep.",
+                RelatedMedicines = [item.Source.MedicineName]
+            });
+        }
+
+        var acetaminophenItems = normalizedItems
+            .Where(item => item.ContainsToken("paracetamol") || item.ContainsToken("acetaminophen"))
+            .GroupBy(item => item.MedicineId)
+            .Select(group => group.First())
+            .ToArray();
+        if (acetaminophenItems.Length > 1)
+        {
+            var medicineNames = string.Join(", ", acetaminophenItems.Select(x => x.Source.MedicineName));
+            AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+            {
+                Code = "duplicate-acetaminophen",
+                Severity = "critical",
+                Category = "duplicate-ingredient",
+                Message = $"Canh bao trung thanh phan giam dau-ha sot: paracetamol/acetaminophen co trong cac thuoc {medicineNames}, can tranh vuot lieu toi da hang ngay.",
+                Recommendation = "Can tinh tong lieu paracetamol hang ngay va loai bo thuoc trung lap neu khong can thiet.",
+                RelatedMedicines = acetaminophenItems.Select(x => x.Source.MedicineName).ToList()
+            });
+        }
+
+        if (TryCalculateAge(prescription.PatientDateOfBirth, out var patientAge))
+        {
+            if (patientAge < 18)
+            {
+                var aspirinItems = normalizedItems.Where(item => item.ContainsToken("aspirin")).ToArray();
+                foreach (var item in aspirinItems)
+                {
+                    AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+                    {
+                        Code = $"age-aspirin:{item.MedicineId}",
+                        Severity = "warning",
+                        Category = "age-risk",
+                        Message = $"Canh bao theo do tuoi: {item.Source.MedicineName} can than trong benh nhan duoi 18 tuoi, dac biet neu co benh canh nhiem virus.",
+                        Recommendation = "Can xac nhan chi dinh va can nhac lua chon an toan hon neu phu hop.",
+                        RelatedMedicines = [item.Source.MedicineName]
+                    });
+                }
+            }
+
+            if (patientAge < 8)
+            {
+                var tetracyclineItems = normalizedItems
+                    .Where(item => item.ContainsToken("tetracycline") || item.ContainsToken("doxycycline"))
+                    .ToArray();
+                foreach (var item in tetracyclineItems)
+                {
+                    AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+                    {
+                        Code = $"age-tetracycline:{item.MedicineId}",
+                        Severity = "warning",
+                        Category = "age-risk",
+                        Message = $"Canh bao theo do tuoi: {item.Source.MedicineName} khong phai lua chon uu tien cho tre nho duoi 8 tuoi neu khong co chi dinh dac biet.",
+                        Recommendation = "Can can nhac khang sinh thay the phu hop voi lua tuoi neu co the.",
+                        RelatedMedicines = [item.Source.MedicineName]
+                    });
+                }
+            }
+
+            if (patientAge >= 65)
+            {
+                var sedativeItems = normalizedItems.Where(item => IsControlledSedative(item) || IsControlledAnalgesic(item)).ToArray();
+                if (sedativeItems.Length > 0)
+                {
+                    var medicineNames = string.Join(", ", sedativeItems.Select(x => x.Source.MedicineName));
+                    AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+                    {
+                        Code = "geriatric-sedative-risk",
+                        Severity = "warning",
+                        Category = "geriatric-risk",
+                        Message = $"Canh bao nguoi cao tuoi: {medicineNames} co the lam tang nguy co te nga, lan lu va uc che ho hap; can bat dau lieu than trong va danh gia lai som.",
+                        Recommendation = "Can uu tien lieu thap, theo doi sat va danh gia lai som sau khi ke don.",
+                        RelatedMedicines = sedativeItems.Select(x => x.Source.MedicineName).ToList()
+                    });
+                }
+
+                var anticholinergicItems = normalizedItems
+                    .Where(item => item.ContainsToken("diphenhydramine")
+                                   || item.ContainsToken("chlorpheniramine")
+                                   || item.ContainsToken("promethazine"))
+                    .ToArray();
+                if (anticholinergicItems.Length > 0)
+                {
+                    AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+                    {
+                        Code = "geriatric-anticholinergic-risk",
+                        Severity = "warning",
+                        Category = "geriatric-risk",
+                        Message = $"Canh bao nguoi cao tuoi: {string.Join(", ", anticholinergicItems.Select(x => x.Source.MedicineName))} co the lam tang nguy co lan lu, kho tieu va bi tieu.",
+                        Recommendation = "Can can nhac thuoc thay the it tac dung khang cholinergic hon neu phu hop.",
+                        RelatedMedicines = anticholinergicItems.Select(x => x.Source.MedicineName).ToList()
+                    });
+                }
+
+                var nsaidItems = normalizedItems
+                    .Where(item => TherapeuticClassRules.First(x => x.ClassName == "NSAID").Matchers.Any(item.ContainsToken))
+                    .ToArray();
+                var raasItems = normalizedItems
+                    .Where(item => TherapeuticClassRules.First(x => x.ClassName == "ACEi/ARB").Matchers.Any(item.ContainsToken))
+                    .ToArray();
+                var diureticItems = normalizedItems
+                    .Where(item => item.ContainsToken("furosemide")
+                                   || item.ContainsToken("torsemide")
+                                   || item.ContainsToken("hydrochlorothiazide")
+                                   || item.ContainsToken("spironolactone"))
+                    .ToArray();
+                if (nsaidItems.Length > 0 && raasItems.Length > 0 && diureticItems.Length > 0)
+                {
+                    AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+                    {
+                        Code = "triple-whammy-aki-risk",
+                        Severity = "critical",
+                        Category = "renal-risk",
+                        Message = "Canh bao nguy co suy than cap: phoi hop NSAID, ACEi/ARB va loi tieu trong cung don can duoc danh gia rat chat.",
+                        Recommendation = "Can can nhac rut gon phac do va theo doi creatinine, dien giai va huyet ap neu buoc phai dung.",
+                        RelatedMedicines = nsaidItems.Select(x => x.Source.MedicineName)
+                            .Concat(raasItems.Select(x => x.Source.MedicineName))
+                            .Concat(diureticItems.Select(x => x.Source.MedicineName))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList()
+                    });
+                }
+            }
         }
 
         return warnings;
+    }
+
+    private static void AddUniqueWarning(ICollection<HospitalPrescriptionWarningDto> warnings, HospitalPrescriptionWarningDto warning)
+    {
+        if (warnings.Any(x => string.Equals(x.Code, warning.Code, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        warnings.Add(warning);
+    }
+
+    private static void AddInteractionWarning(
+        ICollection<HospitalPrescriptionWarningDto> warnings,
+        string category,
+        string severity,
+        string baseMessage,
+        NormalizedPrescriptionItemSnapshot primaryMatch,
+        NormalizedPrescriptionItemSnapshot secondaryMatch,
+        string recommendation)
+    {
+        AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+        {
+            Code = $"{category}:{NormalizeCodeToken(primaryMatch.Source.MedicineName)}:{NormalizeCodeToken(secondaryMatch.Source.MedicineName)}",
+            Severity = severity,
+            Category = category,
+            Message = $"{baseMessage} Cap thuoc lien quan: {primaryMatch.Source.MedicineName} + {secondaryMatch.Source.MedicineName}.",
+            Recommendation = recommendation,
+            RelatedMedicines = new[] { primaryMatch.Source.MedicineName, secondaryMatch.Source.MedicineName }
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList()
+        });
     }
 
     private static bool TryFindInteractionPair(
@@ -514,6 +834,13 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
            || item.ContainsToken("codeine")
            || item.ContainsToken("oxycodone");
 
+    private static bool IsSystemicCorticosteroid(NormalizedPrescriptionItemSnapshot item)
+        => item.ContainsToken("prednisone")
+           || item.ContainsToken("prednisolone")
+           || item.ContainsToken("dexamethasone")
+           || item.ContainsToken("methylprednisolone")
+           || item.ContainsToken("hydrocortisone");
+
     private static string NormalizeMedicationDescriptor(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -523,6 +850,9 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
 
         return Regex.Replace(value.Trim().ToLowerInvariant(), @"[^a-z0-9]+", " ").Trim();
     }
+
+    private static string NormalizeCodeToken(string? value)
+        => Regex.Replace((value ?? string.Empty).Trim().ToLowerInvariant(), @"[^a-z0-9]+", "-").Trim('-');
 
     private static bool TryExtractPositiveNumber(string input, out decimal value)
     {
@@ -545,6 +875,24 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
                    System.Globalization.CultureInfo.InvariantCulture,
                    out value)
                && value > 0;
+    }
+
+    private static bool TryCalculateAge(DateOnly dateOfBirth, out int age)
+    {
+        age = 0;
+        if (dateOfBirth == default)
+        {
+            return false;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        age = today.Year - dateOfBirth.Year;
+        if (dateOfBirth > today.AddYears(-age))
+        {
+            age--;
+        }
+
+        return age >= 0;
     }
 
     private static string GenerateOrderNumber(DateTime nowUtc)
@@ -571,6 +919,16 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
     private readonly record struct PrescriptionInteractionRule(
         string[] PrimaryMatchers,
         string[] SecondaryMatchers,
+        string WarningMessage);
+
+    private readonly record struct PrescriptionTherapeuticClassRule(
+        string ClassName,
+        string[] Matchers,
+        string WarningMessage);
+
+    private readonly record struct DiagnosisContextRule(
+        string[] DiagnosisMatchers,
+        string[] MedicineMatchers,
         string WarningMessage);
 
     private readonly record struct NormalizedPrescriptionItemSnapshot(

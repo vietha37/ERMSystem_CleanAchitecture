@@ -12,6 +12,8 @@ import {
   HospitalInvoiceDetail,
   HospitalInvoiceStatus,
   HospitalInvoiceSummary,
+  HospitalPaymentIntent,
+  HospitalPaymentReconciliationSummary,
 } from "@/services/types";
 import toast from "react-hot-toast";
 
@@ -75,6 +77,8 @@ export default function BillingPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isGatewayModalOpen, setIsGatewayModalOpen] = useState(false);
+  const [isGatewayCallbackModalOpen, setIsGatewayCallbackModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedEncounterId, setSelectedEncounterId] = useState("");
   const [discountAmount, setDiscountAmount] = useState("0");
@@ -84,6 +88,13 @@ export default function BillingPage() {
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
+  const [gatewayInvoice, setGatewayInvoice] = useState<HospitalInvoiceSummary | null>(null);
+  const [gatewayMethod, setGatewayMethod] = useState("Transfer");
+  const [gatewayAmount, setGatewayAmount] = useState("");
+  const [gatewayIntent, setGatewayIntent] = useState<HospitalPaymentIntent | null>(null);
+  const [gatewayStatus, setGatewayStatus] = useState("Captured");
+  const [reconciliationSummary, setReconciliationSummary] =
+    useState<HospitalPaymentReconciliationSummary | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -102,7 +113,7 @@ export default function BillingPage() {
     }
 
     try {
-      const [worklist, encounters] = await Promise.all([
+      const [worklist, encounters, reconciliation] = await Promise.all([
         hospitalBillingService.getAll({
           pageNumber,
           pageSize,
@@ -110,11 +121,13 @@ export default function BillingPage() {
           textSearch: debouncedSearch || undefined,
         }),
         hospitalBillingService.getEligibleEncounters(),
+        hospitalBillingService.getReconciliationSummary(),
       ]);
 
       setInvoices(worklist.items);
       setTotalCount(worklist.totalCount);
       setEligibleEncounters(encounters);
+      setReconciliationSummary(reconciliation);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Không thể tải dữ liệu hóa đơn."));
     } finally {
@@ -206,6 +219,62 @@ export default function BillingPage() {
     }
   };
 
+  const handleCreateGatewayIntent = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!gatewayInvoice) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const intent = await hospitalBillingService.createPaymentIntent(gatewayInvoice.invoiceId, {
+        paymentMethod: gatewayMethod,
+        amount: Number(gatewayAmount),
+      });
+      setGatewayIntent(intent);
+      setGatewayStatus("Captured");
+      setIsGatewayModalOpen(false);
+      setIsGatewayCallbackModalOpen(true);
+      toast.success("Đã tạo giao dịch chờ xác nhận.");
+      await fetchData(true);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể tạo giao dịch thanh toán."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmGatewayCallback = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!gatewayIntent) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const updated = await hospitalBillingService.confirmPaymentCallback({
+        invoiceId: gatewayIntent.invoiceId,
+        paymentReference: gatewayIntent.paymentReference,
+        externalTransactionId: gatewayIntent.externalTransactionId || undefined,
+        gatewayStatus,
+        amount: gatewayIntent.amount,
+      });
+      setSelectedInvoice(updated);
+      setGatewayIntent(null);
+      setIsGatewayCallbackModalOpen(false);
+      toast.success(
+        gatewayStatus === "Captured"
+          ? "Đã xác nhận callback thanh toán thành công."
+          : "Đã ghi nhận callback thất bại."
+      );
+      await fetchData(true);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể xử lý callback thanh toán."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="rounded-[2rem] border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 p-6 shadow-sm">
@@ -252,6 +321,31 @@ export default function BillingPage() {
         <MetricCard label="Đã thanh toán" value={metrics.Paid} tone="emerald" />
         <MetricCard label="Hồ sơ chờ lập" value={availableEncounters.length} tone="slate" />
       </div>
+
+      {reconciliationSummary && (
+        <Card className="border border-violet-100 bg-violet-50/70 p-5 shadow-sm">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.24em] text-violet-700">
+                Đối soát thanh toán
+              </p>
+              <h2 className="mt-2 text-lg font-bold text-slate-950">
+                Payment queue và snapshot giao dịch
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Cập nhật {formatDateTime(reconciliationSummary.generatedAtLocal)}
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-5">
+              <MiniMetric label="Pending" value={`${reconciliationSummary.pendingPayments}`} />
+              <MiniMetric label="Captured" value={`${reconciliationSummary.capturedPayments}`} />
+              <MiniMetric label="Failed" value={`${reconciliationSummary.failedPayments}`} />
+              <MiniMetric label="Refunded" value={`${reconciliationSummary.refundedPayments}`} />
+              <MiniMetric label="Thiếu external ID" value={`${reconciliationSummary.missingExternalTransactionCount}`} />
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card className="overflow-hidden border border-slate-100 p-0 shadow-sm">
         {isLoading ? (
@@ -306,6 +400,20 @@ export default function BillingPage() {
                             setIsPaymentModalOpen(true);
                           }}>
                             Thu tiền
+                          </Button>
+                        )}
+                        {invoice.balanceAmount > 0 && invoice.invoiceStatus !== "Cancelled" && (
+                          <Button
+                            variant="secondary"
+                            onClick={() => {
+                              setGatewayInvoice(invoice);
+                              setGatewayMethod("Transfer");
+                              setGatewayAmount(invoice.balanceAmount.toString());
+                              setGatewayIntent(null);
+                              setIsGatewayModalOpen(true);
+                            }}
+                          >
+                            Táº¡o giao dá»‹ch
                           </Button>
                         )}
                       </div>
@@ -399,6 +507,56 @@ export default function BillingPage() {
         </form>
       </Modal>
 
+      <Modal isOpen={isGatewayModalOpen} onClose={() => setIsGatewayModalOpen(false)} title="Tạo giao dịch gateway">
+        <form className="space-y-4" onSubmit={handleCreateGatewayIntent}>
+          <select
+            value={gatewayMethod}
+            onChange={(event) => setGatewayMethod(event.target.value)}
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+          >
+            <option value="Transfer">Chuyển khoản gateway</option>
+            <option value="Card">Thẻ / cổng thanh toán</option>
+            <option value="EWallet">Ví điện tử</option>
+          </select>
+          <input
+            type="number"
+            value={gatewayAmount}
+            onChange={(event) => setGatewayAmount(event.target.value)}
+            placeholder="Số tiền giao dịch"
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+          />
+          <div className="rounded-2xl border border-violet-100 bg-violet-50/70 px-4 py-4 text-sm text-slate-700">
+            Tạo giao dịch `Pending` để mô phỏng luồng gateway callback vào API.
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="secondary" onClick={() => setIsGatewayModalOpen(false)}>Đóng</Button>
+            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Đang tạo..." : "Tạo giao dịch"}</Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={isGatewayCallbackModalOpen} onClose={() => setIsGatewayCallbackModalOpen(false)} title="Xử lý callback thanh toán">
+        <form className="space-y-4" onSubmit={handleConfirmGatewayCallback}>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-700">
+            <div className="font-medium text-slate-900">{gatewayIntent?.paymentReference || "--"}</div>
+            <div className="mt-1">External Tx: {gatewayIntent?.externalTransactionId || "--"}</div>
+            <div className="mt-1">Số tiền: {gatewayIntent ? formatCurrency(gatewayIntent.amount) : "--"}</div>
+          </div>
+          <select
+            value={gatewayStatus}
+            onChange={(event) => setGatewayStatus(event.target.value)}
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
+          >
+            <option value="Captured">Captured / Success</option>
+            <option value="Failed">Failed</option>
+          </select>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="secondary" onClick={() => setIsGatewayCallbackModalOpen(false)}>Đóng</Button>
+            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Đang xử lý..." : "Gửi callback"}</Button>
+          </div>
+        </form>
+      </Modal>
+
       <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title="Chi tiết hóa đơn">
         {!selectedInvoice ? (
           <div className="py-8 text-sm text-slate-500">Đang tải chi tiết...</div>
@@ -441,6 +599,10 @@ export default function BillingPage() {
                       <div className="mt-1 text-sm text-slate-600">
                         {payment.paymentMethod} - {formatCurrency(payment.amount)} - {formatDateTime(payment.paidAtLocal)}
                       </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {payment.paymentStatus}
+                        {payment.externalTransactionId ? ` / ${payment.externalTransactionId}` : ""}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -466,6 +628,17 @@ function MetricCard({ label, value, tone }: { label: string; value: number; tone
       <p className="text-xs font-bold uppercase tracking-[0.24em]">{label}</p>
       <p className="mt-3 text-3xl font-bold">{value}</p>
     </Card>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/80 bg-white/80 px-4 py-4">
+      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </div>
+      <div className="mt-2 text-sm font-semibold text-slate-900">{value}</div>
+    </div>
   );
 }
 

@@ -13,9 +13,12 @@ public interface IHospitalBillingRepository
     Task<HospitalBillingEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default);
     Task<HospitalBillingEncounterSnapshot?> GetEncounterForInvoiceAsync(Guid encounterId, CancellationToken ct = default);
     Task<HospitalBillingDashboardSnapshot> GetDashboardSnapshotAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
+    Task<HospitalPaymentRecordSnapshot?> GetPaymentAsync(Guid invoiceId, string paymentReference, CancellationToken ct = default);
+    Task<HospitalPaymentReconciliationSnapshot> GetReconciliationSnapshotAsync(CancellationToken ct = default);
     Task AddInvoiceAsync(HospitalInvoiceCreateCommand command, CancellationToken ct = default);
     Task AddInvoiceItemAsync(HospitalInvoiceItemCreateCommand command, CancellationToken ct = default);
     Task AddPaymentAsync(HospitalPaymentCreateCommand command, CancellationToken ct = default);
+    Task UpdatePaymentAsync(HospitalPaymentUpdateCommand command, CancellationToken ct = default);
     Task UpdateInvoiceAmountsAsync(Guid invoiceId, string invoiceStatus, decimal subtotalAmount, decimal discountAmount, decimal insuranceAmount, decimal totalAmount, CancellationToken ct = default);
     Task AddOutboxMessageAsync(HospitalBillingOutboxCreateCommand command, CancellationToken ct = default);
     Task SaveChangesAsync(CancellationToken ct = default);
@@ -69,6 +72,35 @@ public class HospitalPaymentSnapshot
     public DateTime? PaidAtUtc { get; set; }
     public string? ReceivedByUsername { get; set; }
     public string? ExternalTransactionId { get; set; }
+}
+
+public class HospitalPaymentRecordSnapshot
+{
+    public Guid PaymentId { get; set; }
+    public Guid InvoiceId { get; set; }
+    public string PaymentReference { get; set; } = string.Empty;
+    public string PaymentMethod { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string PaymentStatus { get; set; } = string.Empty;
+    public DateTime? PaidAtUtc { get; set; }
+    public Guid? ReceivedByUserId { get; set; }
+    public string? ReceivedByUsername { get; set; }
+    public string? ExternalTransactionId { get; set; }
+}
+
+public class HospitalPaymentReconciliationSnapshot
+{
+    public DateTime GeneratedAtUtc { get; set; }
+    public int PendingPayments { get; set; }
+    public int CapturedPayments { get; set; }
+    public int FailedPayments { get; set; }
+    public int RefundedPayments { get; set; }
+    public decimal PendingAmount { get; set; }
+    public decimal CapturedAmount { get; set; }
+    public decimal FailedAmount { get; set; }
+    public decimal RefundedAmount { get; set; }
+    public int MissingExternalTransactionCount { get; set; }
+    public HospitalPaymentSnapshot[] RecentPayments { get; set; } = Array.Empty<HospitalPaymentSnapshot>();
 }
 
 public class HospitalBillingEncounterSnapshot
@@ -147,6 +179,15 @@ public class HospitalPaymentCreateCommand
     public string PaymentReference { get; set; } = string.Empty;
     public string PaymentMethod { get; set; } = string.Empty;
     public decimal Amount { get; set; }
+    public string PaymentStatus { get; set; } = string.Empty;
+    public DateTime? PaidAtUtc { get; set; }
+    public Guid? ReceivedByUserId { get; set; }
+    public string? ExternalTransactionId { get; set; }
+}
+
+public class HospitalPaymentUpdateCommand
+{
+    public Guid PaymentId { get; set; }
     public string PaymentStatus { get; set; } = string.Empty;
     public DateTime? PaidAtUtc { get; set; }
     public Guid? ReceivedByUserId { get; set; }

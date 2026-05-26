@@ -31,6 +31,9 @@ namespace ERMSystem.Application.Services
         public Task<NotificationDeliverySummaryDto> GetSummaryAsync(CancellationToken ct = default)
             => _repository.GetSummaryAsync(ct);
 
+        public Task<HospitalCrmEngagementSummaryDto> GetEngagementSummaryAsync(CancellationToken ct = default)
+            => _repository.GetEngagementSummaryAsync(ct);
+
         public async Task<NotificationDeliveryRetryResult> RetryDeliveryAsync(
             Guid deliveryId,
             Guid? actorUserId,

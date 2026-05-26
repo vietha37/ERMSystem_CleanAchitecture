@@ -90,6 +90,25 @@ namespace ERMSystem.API.Controllers
             }
         }
 
+        // POST: api/auth/verify-mfa-login
+        [HttpPost("verify-mfa-login")]
+        [AllowAnonymous]
+        public async Task<IActionResult> VerifyMfaLogin([FromBody] VerifyMfaLoginDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var response = await _authService.VerifyMfaLoginAsync(request);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(ex.Message);
+            }
+        }
+
         // POST: api/auth/refresh
         [HttpPost("refresh")]
         [AllowAnonymous]
@@ -171,6 +190,109 @@ namespace ERMSystem.API.Controllers
 
             await _authService.LogoutAllAsync(userId);
             return NoContent();
+        }
+
+        // GET: api/auth/mfa/status
+        [HttpGet("mfa/status")]
+        [Authorize]
+        public async Task<IActionResult> GetMfaStatus()
+        {
+            if (!TryGetCurrentUserId(out var userId))
+            {
+                return Unauthorized("Invalid token subject.");
+            }
+
+            try
+            {
+                return Ok(await _authService.GetMfaStatusAsync(userId));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(ex.Message);
+            }
+        }
+
+        // POST: api/auth/mfa/setup
+        [HttpPost("mfa/setup")]
+        [Authorize(Roles = "Admin,Doctor,Receptionist")]
+        public async Task<IActionResult> SetupMfa()
+        {
+            if (!TryGetCurrentUserId(out var userId))
+            {
+                return Unauthorized("Invalid token subject.");
+            }
+
+            try
+            {
+                return Ok(await _authService.SetupMfaAsync(userId));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(ex.Message);
+            }
+        }
+
+        // POST: api/auth/mfa/enable
+        [HttpPost("mfa/enable")]
+        [Authorize(Roles = "Admin,Doctor,Receptionist")]
+        public async Task<IActionResult> EnableMfa([FromBody] VerifyMfaCodeDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            if (!TryGetCurrentUserId(out var userId))
+            {
+                return Unauthorized("Invalid token subject.");
+            }
+
+            try
+            {
+                return Ok(await _authService.EnableMfaAsync(userId, request));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(ex.Message);
+            }
+        }
+
+        // POST: api/auth/mfa/disable
+        [HttpPost("mfa/disable")]
+        [Authorize(Roles = "Admin,Doctor,Receptionist")]
+        public async Task<IActionResult> DisableMfa([FromBody] VerifyMfaCodeDto request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            if (!TryGetCurrentUserId(out var userId))
+            {
+                return Unauthorized("Invalid token subject.");
+            }
+
+            try
+            {
+                return Ok(await _authService.DisableMfaAsync(userId, request));
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(ex.Message);
+            }
+        }
+
+        private bool TryGetCurrentUserId(out Guid userId)
+        {
+            var rawUserId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue(ClaimTypes.Name)
+                ?? User.FindFirstValue("sub");
+
+            return Guid.TryParse(rawUserId, out userId);
         }
     }
 }
