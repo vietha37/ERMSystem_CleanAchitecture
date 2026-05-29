@@ -85,6 +85,16 @@ export const hospitalBillingService = {
     return response.data;
   },
 
+  simulatePaymentCallback: async (
+    payload: ConfirmHospitalPaymentCallbackPayload
+  ): Promise<HospitalInvoiceDetail> => {
+    const response = await api.post<HospitalInvoiceDetail>(
+      "/hospital-billing/payment-callbacks/simulate",
+      payload
+    );
+    return response.data;
+  },
+
   getReconciliationSummary: async (): Promise<HospitalPaymentReconciliationSummary> => {
     const response = await api.get<HospitalPaymentReconciliationSummary>(
       "/hospital-billing/reconciliation/summary"

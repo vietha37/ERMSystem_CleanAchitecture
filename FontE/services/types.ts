@@ -484,6 +484,7 @@ export type HospitalEncounterAttachment = {
 
 export type HospitalEncounterAttachmentDownloadTicket = {
   storageProvider: string;
+  accessMode: string;
   accessToken: string;
   downloadUrl: string;
   expiresAtUtc: string;
@@ -819,6 +820,7 @@ export type HospitalPaymentIntent = {
   paymentId: Id;
   invoiceId: Id;
   invoiceNumber: string;
+  gatewayProvider: string;
   paymentReference: string;
   paymentMethod: string;
   amount: number;
@@ -826,6 +828,7 @@ export type HospitalPaymentIntent = {
   externalTransactionId?: string | null;
   checkoutToken: string;
   instructionText: string;
+  callbackMode: string;
   createdAtLocal: string;
 };
 
@@ -890,6 +893,7 @@ export type ReceiveHospitalPaymentPayload = {
 };
 
 export type CreateHospitalPaymentIntentPayload = {
+  gatewayProvider?: string;
   paymentMethod: string;
   paymentReference?: string;
   amount: number;
@@ -898,6 +902,9 @@ export type CreateHospitalPaymentIntentPayload = {
 
 export type ConfirmHospitalPaymentCallbackPayload = {
   invoiceId: Id;
+  gatewayProvider?: string;
+  gatewayEventId?: string;
+  gatewayTimestampUtc?: string;
   paymentReference: string;
   externalTransactionId?: string;
   gatewayStatus: string;

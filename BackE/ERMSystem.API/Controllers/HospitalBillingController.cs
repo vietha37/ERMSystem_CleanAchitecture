@@ -2,6 +2,7 @@ using System.Security.Claims;
 using ERMSystem.Application.DTOs;
 using ERMSystem.Application.Interfaces;
 using ERMSystem.Application.Authorization;
+using ERMSystem.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,10 +14,14 @@ namespace ERMSystem.API.Controllers;
 public class HospitalBillingController : ControllerBase
 {
     private readonly IHospitalBillingService _hospitalBillingService;
+    private readonly PaymentGatewayCallbackVerifier _paymentGatewayCallbackVerifier;
 
-    public HospitalBillingController(IHospitalBillingService hospitalBillingService)
+    public HospitalBillingController(
+        IHospitalBillingService hospitalBillingService,
+        PaymentGatewayCallbackVerifier paymentGatewayCallbackVerifier)
     {
         _hospitalBillingService = hospitalBillingService;
+        _paymentGatewayCallbackVerifier = paymentGatewayCallbackVerifier;
     }
 
     [HttpGet]
@@ -173,7 +178,52 @@ public class HospitalBillingController : ControllerBase
 
         try
         {
-            var result = await _hospitalBillingService.ConfirmPaymentCallbackAsync(request, ct);
+            request.GatewayProvider ??= _paymentGatewayCallbackVerifier.GetDefaultProvider();
+            if (!_paymentGatewayCallbackVerifier.TryValidate(request, Request.Headers, out var failureReason))
+            {
+                return Unauthorized(new { message = failureReason });
+            }
+
+            var result = await _hospitalBillingService.ConfirmPaymentCallbackAsync(
+                request,
+                null,
+                "gateway-webhook",
+                false,
+                ct);
+            if (result == null)
+            {
+                return NotFound(new { message = "Khong tim thay hoa don cho callback thanh toan." });
+            }
+
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("payment-callbacks/simulate")]
+    [Authorize(Policy = AppPermissions.HospitalBilling.CollectPayment)]
+    public async Task<IActionResult> SimulatePaymentCallback([FromBody] ConfirmHospitalPaymentCallbackDto request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        request.GatewayProvider ??= _paymentGatewayCallbackVerifier.GetDefaultProvider();
+        request.GatewayEventId ??= $"SIM-{Guid.NewGuid():N}";
+        request.GatewayTimestampUtc ??= DateTime.UtcNow;
+
+        try
+        {
+            var result = await _hospitalBillingService.ConfirmPaymentCallbackAsync(
+                request,
+                ResolveActorUserId(),
+                ResolveActorUsername(),
+                true,
+                ct);
             if (result == null)
             {
                 return NotFound(new { message = "Khong tim thay hoa don cho callback thanh toan." });

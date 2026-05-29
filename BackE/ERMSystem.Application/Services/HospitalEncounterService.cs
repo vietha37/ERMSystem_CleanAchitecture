@@ -587,9 +587,10 @@ public class HospitalEncounterService : IHospitalEncounterService
         return new HospitalEncounterAttachmentDownloadTicketDto
         {
             StorageProvider = ticket.Provider,
+            AccessMode = ticket.AccessMode,
             AccessToken = ticket.AccessToken,
+            DownloadUrl = ticket.DownloadUrl ?? string.Empty,
             ExpiresAtUtc = ticket.ExpiresAtUtc,
-            DownloadUrl = string.Empty
         };
     }
 

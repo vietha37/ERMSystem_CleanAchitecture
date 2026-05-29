@@ -97,6 +97,7 @@ public class HospitalEncounterAttachmentDto
 public class HospitalEncounterAttachmentDownloadTicketDto
 {
     public string StorageProvider { get; set; } = "local";
+    public string AccessMode { get; set; } = "ProxyTicket";
     public string AccessToken { get; set; } = string.Empty;
     public string DownloadUrl { get; set; } = string.Empty;
     public DateTime ExpiresAtUtc { get; set; }

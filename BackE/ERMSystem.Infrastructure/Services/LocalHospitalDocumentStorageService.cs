@@ -120,7 +120,9 @@ public class LocalHospitalDocumentStorageService : IHospitalDocumentStorageServi
         return new HospitalDocumentStorageAccessTicket
         {
             Provider = Provider,
+            AccessMode = "ProxyTicket",
             AccessToken = accessToken,
+            DownloadUrl = null,
             ExpiresAtUtc = expiresAtUtc
         };
     }

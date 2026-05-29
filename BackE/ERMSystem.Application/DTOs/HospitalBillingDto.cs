@@ -70,6 +70,7 @@ public class HospitalPaymentIntentDto
     public Guid PaymentId { get; set; }
     public Guid InvoiceId { get; set; }
     public string InvoiceNumber { get; set; } = string.Empty;
+    public string GatewayProvider { get; set; } = string.Empty;
     public string PaymentReference { get; set; } = string.Empty;
     public string PaymentMethod { get; set; } = string.Empty;
     public decimal Amount { get; set; }
@@ -77,6 +78,7 @@ public class HospitalPaymentIntentDto
     public string? ExternalTransactionId { get; set; }
     public string CheckoutToken { get; set; } = string.Empty;
     public string InstructionText { get; set; } = string.Empty;
+    public string CallbackMode { get; set; } = string.Empty;
     public DateTime CreatedAtLocal { get; set; }
 }
 
@@ -153,6 +155,9 @@ public class ReceiveHospitalPaymentDto
 
 public class CreateHospitalPaymentIntentDto
 {
+    [MaxLength(50)]
+    public string? GatewayProvider { get; set; }
+
     [Required]
     [MaxLength(50)]
     public string PaymentMethod { get; set; } = string.Empty;
@@ -171,6 +176,14 @@ public class ConfirmHospitalPaymentCallbackDto
 {
     [Required]
     public Guid InvoiceId { get; set; }
+
+    [MaxLength(50)]
+    public string? GatewayProvider { get; set; }
+
+    [MaxLength(100)]
+    public string? GatewayEventId { get; set; }
+
+    public DateTime? GatewayTimestampUtc { get; set; }
 
     [Required]
     [MaxLength(100)]

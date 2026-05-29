@@ -1218,10 +1218,16 @@ function AttachmentRow({
         encounterId,
         attachment.attachmentId
       );
+      if (!ticket.downloadUrl) {
+        throw new Error("Download URL is unavailable for this attachment.");
+      }
       const link = document.createElement("a");
       link.href = ticket.downloadUrl;
       link.download = attachment.fileName;
       link.rel = "noopener";
+      if (ticket.accessMode === "DirectUrl") {
+        link.target = "_blank";
+      }
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -1249,6 +1255,7 @@ function AttachmentRow({
         <button
           type="button"
           onClick={() => void handleDownload()}
+          aria-label={`Tải xuống tài liệu ${attachment.fileName}`}
           className="inline-flex items-center justify-center rounded-2xl border border-cyan-200 px-4 py-2 text-sm font-medium text-cyan-700 transition hover:bg-cyan-50"
         >
           Tải xuống

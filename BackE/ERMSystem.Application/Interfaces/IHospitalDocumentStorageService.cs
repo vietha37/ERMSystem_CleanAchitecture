@@ -48,7 +48,9 @@ public class HospitalDocumentStorageWriteResult
 public class HospitalDocumentStorageAccessTicket
 {
     public string Provider { get; set; } = string.Empty;
+    public string AccessMode { get; set; } = "ProxyTicket";
     public string AccessToken { get; set; } = string.Empty;
+    public string? DownloadUrl { get; set; }
     public DateTime ExpiresAtUtc { get; set; }
 }
 

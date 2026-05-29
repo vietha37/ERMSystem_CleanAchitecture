@@ -26,6 +26,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<RequestObservabilityOptions>(builder.Configuration.GetSection("Observability"));
 builder.Services.Configure<OpenTelemetryTracingOptions>(builder.Configuration.GetSection("OpenTelemetry"));
 builder.Services.Configure<OperationalAlertOptions>(builder.Configuration.GetSection("OperationalAlerts"));
+builder.Services.Configure<PaymentGatewayCallbackOptions>(builder.Configuration.GetSection("PaymentGateway"));
 builder.Services.Configure<TwoFactorAuthOptions>(builder.Configuration.GetSection("Security:TwoFactor"));
 builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection("RabbitMQ"));
 builder.Services.Configure<OutboxPublisherOptions>(builder.Configuration.GetSection("OutboxPublisher"));
@@ -45,6 +46,7 @@ builder.Services.AddSingleton<DashboardCacheMetricsRegistry>();
 builder.Services.AddSingleton<NotificationPipelineMetricsReader>();
 builder.Services.AddSingleton<OperationalAlertEvaluator>();
 builder.Services.AddSingleton<OperationalAlertWebhookNotifier>();
+builder.Services.AddSingleton<PaymentGatewayCallbackVerifier>();
 builder.Services.AddHttpClient("operational-alert-webhook", (serviceProvider, client) =>
 {
     var options = serviceProvider
@@ -392,6 +394,12 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+    })
     .ConfigureApiBehaviorOptions(options =>
     {
         options.InvalidModelStateResponseFactory = context =>

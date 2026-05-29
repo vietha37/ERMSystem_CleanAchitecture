@@ -265,9 +265,13 @@ public class HospitalEncountersController : ControllerBase
             return NotFound(new { message = "Khong tim thay tai lieu dinh kem de tao ticket tai xuong." });
         }
 
-        result.DownloadUrl =
-            Url.ActionLink(nameof(DownloadAttachmentByTicket), values: new { accessToken = result.AccessToken })
-            ?? $"/api/hospital-encounters/attachments/download-by-ticket?accessToken={Uri.EscapeDataString(result.AccessToken)}";
+        if (string.IsNullOrWhiteSpace(result.DownloadUrl) &&
+            !string.IsNullOrWhiteSpace(result.AccessToken))
+        {
+            result.DownloadUrl =
+                Url.ActionLink(nameof(DownloadAttachmentByTicket), values: new { accessToken = result.AccessToken })
+                ?? $"/api/hospital-encounters/attachments/download-by-ticket?accessToken={Uri.EscapeDataString(result.AccessToken)}";
+        }
 
         return Ok(result);
     }

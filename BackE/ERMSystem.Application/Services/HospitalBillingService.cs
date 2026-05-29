@@ -165,6 +165,7 @@ public class HospitalBillingService : IHospitalBillingService
         var actorHospitalUserId = await _hospitalIdentityBridgeService.ResolveHospitalUserIdAsync(actorUserId, actorUsername, ct);
         var nowUtc = DateTime.UtcNow;
         var paymentId = Guid.NewGuid();
+        var gatewayProvider = NormalizeText(request.GatewayProvider) ?? "MockGateway";
         var paymentReference = string.IsNullOrWhiteSpace(request.PaymentReference)
             ? GeneratePaymentReference(nowUtc)
             : request.PaymentReference.Trim();
@@ -194,6 +195,7 @@ public class HospitalBillingService : IHospitalBillingService
             {
                 invoiceId,
                 invoice.InvoiceNumber,
+                gatewayProvider,
                 paymentReference,
                 paymentMethod = request.PaymentMethod.Trim(),
                 amount = request.Amount,
@@ -216,13 +218,15 @@ public class HospitalBillingService : IHospitalBillingService
             PaymentId = paymentId,
             InvoiceId = invoiceId,
             InvoiceNumber = invoice.InvoiceNumber,
+            GatewayProvider = gatewayProvider,
             PaymentReference = paymentReference,
             PaymentMethod = request.PaymentMethod.Trim(),
             Amount = request.Amount,
             PaymentStatus = "Pending",
             ExternalTransactionId = externalTransactionId,
             CheckoutToken = $"CHK-{Guid.NewGuid():N}",
-            InstructionText = $"Cho gateway callback xac nhan giao dich {paymentReference} cho hoa don {invoice.InvoiceNumber}.",
+            InstructionText = $"Gateway {gatewayProvider} can callback co chu ky de xac nhan giao dich {paymentReference} cho hoa don {invoice.InvoiceNumber}.",
+            CallbackMode = "SignedWebhook",
             CreatedAtLocal = ConvertUtcToClinicLocal(nowUtc)
         };
     }
@@ -326,6 +330,9 @@ public class HospitalBillingService : IHospitalBillingService
 
     public async Task<HospitalInvoiceDetailDto?> ConfirmPaymentCallbackAsync(
         ConfirmHospitalPaymentCallbackDto request,
+        Guid? actorUserId,
+        string? actorUsername,
+        bool isSimulation,
         CancellationToken ct = default)
     {
         var invoice = await _hospitalBillingRepository.GetByIdAsync(request.InvoiceId, ct);
@@ -337,16 +344,41 @@ public class HospitalBillingService : IHospitalBillingService
         var payment = await _hospitalBillingRepository.GetPaymentAsync(request.InvoiceId, request.PaymentReference, ct)
             ?? throw new InvalidOperationException("Khong tim thay giao dich doi soat theo payment reference.");
 
-        if (payment.PaymentStatus == "Captured")
-        {
-            return MapDetail(invoice);
-        }
-
         var gatewayStatus = request.GatewayStatus.Trim();
         var normalizedGatewayStatus = NormalizeGatewayStatus(gatewayStatus);
+        var gatewayProvider = NormalizeText(request.GatewayProvider) ?? "MockGateway";
+        var gatewayEventId = NormalizeText(request.GatewayEventId)
+            ?? throw new InvalidOperationException("Gateway event id khong hop le.");
+        var gatewayTimestampUtc = request.GatewayTimestampUtc?.ToUniversalTime()
+            ?? throw new InvalidOperationException("Gateway timestamp khong hop le.");
+
+        if (payment.PaymentStatus == "Refunded")
+        {
+            throw new InvalidOperationException("Giao dich da hoan tien, khong the nhan callback thanh toan moi.");
+        }
+
         if (request.Amount.HasValue && request.Amount.Value != payment.Amount)
         {
             throw new InvalidOperationException("So tien callback khong khop voi giao dich cho xu ly.");
+        }
+
+        if (!string.Equals(payment.PaymentStatus, "Pending", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.Equals(payment.PaymentStatus, normalizedGatewayStatus, StringComparison.OrdinalIgnoreCase))
+            {
+                await _complianceAuditRecorder.RecordAsync(
+                    actorUserId,
+                    actorUsername ?? "gateway",
+                    "InvoicePaymentCallbackDuplicate",
+                    "Info",
+                    $"InvoiceId={request.InvoiceId}; InvoiceNumber={invoice.InvoiceNumber}; PaymentReference={payment.PaymentReference}; GatewayProvider={gatewayProvider}; GatewayEventId={gatewayEventId}; PaymentStatus={payment.PaymentStatus}; CallbackMode={(isSimulation ? "Simulation" : "Webhook")}; GatewayTimestampUtc={gatewayTimestampUtc:O}.",
+                    ct);
+
+                return MapDetail(invoice);
+            }
+
+            throw new InvalidOperationException(
+                $"Khong the ap callback {normalizedGatewayStatus} cho giao dich dang o trang thai {payment.PaymentStatus}.");
         }
 
         var nowUtc = DateTime.UtcNow;
@@ -392,14 +424,48 @@ public class HospitalBillingService : IHospitalBillingService
                 AvailableAtUtc = nowUtc
             }, ct);
         }
+        else
+        {
+            await _hospitalBillingRepository.AddOutboxMessageAsync(new HospitalBillingOutboxCreateCommand
+            {
+                OutboxMessageId = Guid.NewGuid(),
+                AggregateType = "Invoice",
+                AggregateId = request.InvoiceId,
+                EventType = "InvoicePaymentFailed.v1",
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    invoiceId = request.InvoiceId,
+                    invoice.InvoiceNumber,
+                    gatewayProvider,
+                    gatewayEventId,
+                    payment.PaymentReference,
+                    amount = payment.Amount,
+                    externalTransactionId = NormalizeText(request.ExternalTransactionId) ?? payment.ExternalTransactionId,
+                    failedAtUtc = nowUtc,
+                    invoiceStatus = invoice.InvoiceStatus
+                }, JsonOptions),
+                Status = "Pending",
+                AvailableAtUtc = nowUtc
+            }, ct);
+        }
 
         await _hospitalBillingRepository.SaveChangesAsync(ct);
         await _dashboardQueryCache.InvalidateAsync(ct);
 
         _businessMetricsRecorder.IncrementEvent("hospital_billing", "payment_callback_processed", new Dictionary<string, string?>
         {
-            ["gateway_status"] = normalizedGatewayStatus
+            ["gateway_status"] = normalizedGatewayStatus,
+            ["gateway_provider"] = gatewayProvider,
+            ["callback_mode"] = isSimulation ? "simulation" : "webhook"
         });
+
+        await _complianceAuditRecorder.RecordAsync(
+            actorUserId,
+            actorUsername ?? "gateway",
+            "InvoicePaymentCallbackProcessed",
+            normalizedGatewayStatus == "Captured" ? "Info" : "Warning",
+            $"InvoiceId={request.InvoiceId}; InvoiceNumber={invoice.InvoiceNumber}; PaymentReference={payment.PaymentReference}; GatewayProvider={gatewayProvider}; GatewayEventId={gatewayEventId}; GatewayStatus={normalizedGatewayStatus}; CallbackMode={(isSimulation ? "Simulation" : "Webhook")}; GatewayTimestampUtc={gatewayTimestampUtc:O}.",
+            ct);
 
         var updated = await _hospitalBillingRepository.GetByIdAsync(request.InvoiceId, ct)
             ?? throw new InvalidOperationException("Khong the tai lai hoa don sau callback thanh toan.");
