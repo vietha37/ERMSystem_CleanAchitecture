@@ -11,11 +11,13 @@ public interface IHospitalEncounterService
 {
     Task<PaginatedResult<HospitalEncounterSummaryDto>> GetWorklistAsync(
         HospitalEncounterWorklistRequestDto request,
+        string currentRole,
+        string? currentUsername,
         CancellationToken ct = default);
 
-    Task<HospitalEncounterDetailDto?> GetByIdAsync(Guid encounterId, CancellationToken ct = default);
+    Task<HospitalEncounterDetailDto?> GetByIdAsync(Guid encounterId, string currentRole, string? currentUsername, CancellationToken ct = default);
 
-    Task<HospitalEncounterEligibleAppointmentDto[]> GetEligibleAppointmentsAsync(CancellationToken ct = default);
+    Task<HospitalEncounterEligibleAppointmentDto[]> GetEligibleAppointmentsAsync(string currentRole, string? currentUsername, CancellationToken ct = default);
 
     Task<HospitalEncounterDetailDto> CreateAsync(
         CreateHospitalEncounterDto request,

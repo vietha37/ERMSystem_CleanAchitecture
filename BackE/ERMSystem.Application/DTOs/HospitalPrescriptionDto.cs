@@ -29,6 +29,8 @@ public class HospitalPrescriptionWorklistRequestDto
 
     [MaxLength(200)]
     public string? TextSearch { get; set; }
+
+    public Guid? DoctorProfileId { get; set; }
 }
 
 public class HospitalPrescriptionSummaryDto

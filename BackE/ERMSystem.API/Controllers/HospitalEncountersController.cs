@@ -25,7 +25,11 @@ public class HospitalEncountersController : ControllerBase
         [FromQuery] HospitalEncounterWorklistRequestDto request,
         CancellationToken ct)
     {
-        var result = await _hospitalEncounterService.GetWorklistAsync(request, ct);
+        var result = await _hospitalEncounterService.GetWorklistAsync(
+            request,
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         return Ok(result);
     }
 
@@ -33,7 +37,10 @@ public class HospitalEncountersController : ControllerBase
     [Authorize(Policy = AppPermissions.HospitalEncounters.Read)]
     public async Task<IActionResult> GetEligibleAppointments(CancellationToken ct)
     {
-        var result = await _hospitalEncounterService.GetEligibleAppointmentsAsync(ct);
+        var result = await _hospitalEncounterService.GetEligibleAppointmentsAsync(
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         return Ok(result);
     }
 
@@ -41,7 +48,11 @@ public class HospitalEncountersController : ControllerBase
     [Authorize(Policy = AppPermissions.HospitalEncounters.Read)]
     public async Task<IActionResult> GetById(Guid encounterId, CancellationToken ct)
     {
-        var result = await _hospitalEncounterService.GetByIdAsync(encounterId, ct);
+        var result = await _hospitalEncounterService.GetByIdAsync(
+            encounterId,
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         if (result == null)
         {
             return NotFound(new { message = "Khong tim thay encounter." });
@@ -311,6 +322,14 @@ public class HospitalEncountersController : ControllerBase
                ?? User.FindFirstValue(ClaimTypes.Upn)
                ?? User.FindFirstValue("unique_name");
     }
+
+    private string ResolveCurrentRole()
+        => User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+
+    private string? ResolveCurrentUsername()
+        => User.FindFirstValue(ClaimTypes.Name)
+           ?? User.FindFirstValue(ClaimTypes.Upn)
+           ?? User.FindFirstValue("unique_name");
 
     public sealed class UploadHospitalEncounterAttachmentForm
     {

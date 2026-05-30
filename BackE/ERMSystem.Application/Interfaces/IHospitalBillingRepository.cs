@@ -10,11 +10,11 @@ public interface IHospitalBillingRepository
         CancellationToken ct = default);
 
     Task<HospitalInvoiceAggregateSnapshot?> GetByIdAsync(Guid invoiceId, CancellationToken ct = default);
-    Task<HospitalBillingEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default);
+    Task<HospitalBillingEligibleEncounterDto[]> GetEligibleEncountersAsync(Guid? doctorProfileId, CancellationToken ct = default);
     Task<HospitalBillingEncounterSnapshot?> GetEncounterForInvoiceAsync(Guid encounterId, CancellationToken ct = default);
     Task<HospitalBillingDashboardSnapshot> GetDashboardSnapshotAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
     Task<HospitalPaymentRecordSnapshot?> GetPaymentAsync(Guid invoiceId, string paymentReference, CancellationToken ct = default);
-    Task<HospitalPaymentReconciliationSnapshot> GetReconciliationSnapshotAsync(CancellationToken ct = default);
+    Task<HospitalPaymentReconciliationSnapshot> GetReconciliationSnapshotAsync(Guid? doctorProfileId, CancellationToken ct = default);
     Task AddInvoiceAsync(HospitalInvoiceCreateCommand command, CancellationToken ct = default);
     Task AddInvoiceItemAsync(HospitalInvoiceItemCreateCommand command, CancellationToken ct = default);
     Task AddPaymentAsync(HospitalPaymentCreateCommand command, CancellationToken ct = default);
@@ -31,6 +31,7 @@ public class HospitalInvoiceAggregateSnapshot
     public Guid PatientId { get; set; }
     public string PatientName { get; set; } = string.Empty;
     public string MedicalRecordNumber { get; set; } = string.Empty;
+    public Guid? DoctorProfileId { get; set; }
     public string? PatientPhone { get; set; }
     public string? PatientEmail { get; set; }
     public Guid? EncounterId { get; set; }
@@ -110,6 +111,7 @@ public class HospitalBillingEncounterSnapshot
     public Guid PatientId { get; set; }
     public string PatientName { get; set; } = string.Empty;
     public string MedicalRecordNumber { get; set; } = string.Empty;
+    public Guid DoctorProfileId { get; set; }
     public string? PatientPhone { get; set; }
     public string? PatientEmail { get; set; }
     public string DoctorName { get; set; } = string.Empty;

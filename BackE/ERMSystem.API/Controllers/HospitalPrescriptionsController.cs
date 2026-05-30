@@ -25,7 +25,11 @@ public class HospitalPrescriptionsController : ControllerBase
         [FromQuery] HospitalPrescriptionWorklistRequestDto request,
         CancellationToken ct)
     {
-        var result = await _hospitalPrescriptionService.GetWorklistAsync(request, ct);
+        var result = await _hospitalPrescriptionService.GetWorklistAsync(
+            request,
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         return Ok(result);
     }
 
@@ -33,7 +37,10 @@ public class HospitalPrescriptionsController : ControllerBase
     [Authorize(Policy = AppPermissions.Prescriptions.Read)]
     public async Task<IActionResult> GetEligibleEncounters(CancellationToken ct)
     {
-        var result = await _hospitalPrescriptionService.GetEligibleEncountersAsync(ct);
+        var result = await _hospitalPrescriptionService.GetEligibleEncountersAsync(
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         return Ok(result);
     }
 
@@ -49,7 +56,11 @@ public class HospitalPrescriptionsController : ControllerBase
     [Authorize(Policy = AppPermissions.Prescriptions.Read)]
     public async Task<IActionResult> GetById(Guid prescriptionId, CancellationToken ct)
     {
-        var result = await _hospitalPrescriptionService.GetByIdAsync(prescriptionId, ct);
+        var result = await _hospitalPrescriptionService.GetByIdAsync(
+            prescriptionId,
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         if (result == null)
         {
             return NotFound(new { message = "Khong tim thay don thuoc." });
@@ -156,4 +167,12 @@ public class HospitalPrescriptionsController : ControllerBase
                ?? User.FindFirstValue(ClaimTypes.Upn)
                ?? User.FindFirstValue("unique_name");
     }
+
+    private string ResolveCurrentRole()
+        => User.FindFirstValue(ClaimTypes.Role)
+           ?? User.FindFirstValue("role")
+           ?? string.Empty;
+
+    private string? ResolveCurrentUsername()
+        => ResolveActorUsername();
 }

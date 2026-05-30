@@ -49,6 +49,11 @@ public class HospitalEncounterRepository : IHospitalEncounterRepository
                 (x.Appointment == null && x.StartedAtUtc >= fromUtc && x.StartedAtUtc < toUtc));
         }
 
+        if (request.DoctorProfileId.HasValue)
+        {
+            query = query.Where(x => x.DoctorProfileId == request.DoctorProfileId.Value);
+        }
+
         if (!string.IsNullOrWhiteSpace(request.TextSearch))
         {
             var keyword = request.TextSearch.Trim();

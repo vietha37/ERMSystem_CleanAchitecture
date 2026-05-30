@@ -19,6 +19,8 @@ public class HospitalClinicalOrderWorklistRequestDto
 
     [MaxLength(200)]
     public string? TextSearch { get; set; }
+
+    public Guid? DoctorProfileId { get; set; }
 }
 
 public class HospitalClinicalOrderCatalogItemDto
@@ -58,6 +60,7 @@ public class HospitalClinicalOrderSummaryDto
     public Guid PatientId { get; set; }
     public string PatientName { get; set; } = string.Empty;
     public string MedicalRecordNumber { get; set; } = string.Empty;
+    public Guid DoctorProfileId { get; set; }
     public string DoctorName { get; set; } = string.Empty;
     public string SpecialtyName { get; set; } = string.Empty;
     public string ClinicName { get; set; } = string.Empty;

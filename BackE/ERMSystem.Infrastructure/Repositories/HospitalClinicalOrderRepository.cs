@@ -77,6 +77,11 @@ public class HospitalClinicalOrderRepository : IHospitalClinicalOrderRepository
                 Like(x.EncounterNumber, keyword!));
         }
 
+        if (request.DoctorProfileId.HasValue)
+        {
+            combined = combined.Where(x => x.DoctorProfileId == request.DoctorProfileId.Value);
+        }
+
         var ordered = combined
             .OrderByDescending(x => x.RequestedAtLocal)
             .ToArray();
@@ -123,9 +128,9 @@ public class HospitalClinicalOrderRepository : IHospitalClinicalOrderRepository
         return imagingOrder == null ? null : MapImagingDetail(imagingOrder);
     }
 
-    public async Task<HospitalClinicalOrderEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default)
+    public async Task<HospitalClinicalOrderEligibleEncounterDto[]> GetEligibleEncountersAsync(Guid? doctorProfileId, CancellationToken ct = default)
     {
-        var encounters = await _hospitalDbContext.Encounters
+        var query = _hospitalDbContext.Encounters
             .AsNoTracking()
             .Include(x => x.Patient)
             .Include(x => x.DoctorProfile).ThenInclude(x => x.StaffProfile)
@@ -133,6 +138,14 @@ public class HospitalClinicalOrderRepository : IHospitalClinicalOrderRepository
             .Include(x => x.Clinic)
             .Include(x => x.Diagnoses)
             .Where(x => x.EncounterStatus == "InProgress" || x.EncounterStatus == "Finalized" || x.EncounterStatus == "Approved")
+            .AsQueryable();
+
+        if (doctorProfileId.HasValue)
+        {
+            query = query.Where(x => x.DoctorProfileId == doctorProfileId.Value);
+        }
+
+        var encounters = await query
             .OrderByDescending(x => x.UpdatedAtUtc)
             .Take(100)
             .ToListAsync(ct);
@@ -427,6 +440,7 @@ public class HospitalClinicalOrderRepository : IHospitalClinicalOrderRepository
             PatientId = encounter.PatientId,
             PatientName = encounter.Patient.FullName,
             MedicalRecordNumber = encounter.Patient.MedicalRecordNumber,
+            DoctorProfileId = encounter.DoctorProfileId,
             DoctorName = encounter.DoctorProfile.StaffProfile.FullName,
             SpecialtyName = encounter.DoctorProfile.Specialty.Name,
             ClinicName = encounter.Clinic.Name,
@@ -456,6 +470,7 @@ public class HospitalClinicalOrderRepository : IHospitalClinicalOrderRepository
             PatientId = encounter.PatientId,
             PatientName = encounter.Patient.FullName,
             MedicalRecordNumber = encounter.Patient.MedicalRecordNumber,
+            DoctorProfileId = encounter.DoctorProfileId,
             DoctorName = encounter.DoctorProfile.StaffProfile.FullName,
             SpecialtyName = encounter.DoctorProfile.Specialty.Name,
             ClinicName = encounter.Clinic.Name,
@@ -489,6 +504,7 @@ public class HospitalClinicalOrderRepository : IHospitalClinicalOrderRepository
             PatientId = encounter.PatientId,
             PatientName = encounter.Patient.FullName,
             MedicalRecordNumber = encounter.Patient.MedicalRecordNumber,
+            DoctorProfileId = encounter.DoctorProfileId,
             DoctorName = encounter.DoctorProfile.StaffProfile.FullName,
             SpecialtyName = encounter.DoctorProfile.Specialty.Name,
             ClinicName = encounter.Clinic.Name,
@@ -534,6 +550,7 @@ public class HospitalClinicalOrderRepository : IHospitalClinicalOrderRepository
             PatientId = encounter.PatientId,
             PatientName = encounter.Patient.FullName,
             MedicalRecordNumber = encounter.Patient.MedicalRecordNumber,
+            DoctorProfileId = encounter.DoctorProfileId,
             DoctorName = encounter.DoctorProfile.StaffProfile.FullName,
             SpecialtyName = encounter.DoctorProfile.Specialty.Name,
             ClinicName = encounter.Clinic.Name,

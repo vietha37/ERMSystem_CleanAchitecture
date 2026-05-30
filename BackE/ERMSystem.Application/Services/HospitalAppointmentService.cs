@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ERMSystem.Application.DTOs;
 using ERMSystem.Application.DTOs.Common;
 using ERMSystem.Application.Interfaces;
+using ERMSystem.Application.Utilities;
 
 namespace ERMSystem.Application.Services
 {
@@ -14,15 +15,18 @@ namespace ERMSystem.Application.Services
         private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
         private readonly IHospitalDoctorRepository _hospitalDoctorRepository;
+        private readonly IHospitalDoctorWorklistRepository _hospitalDoctorWorklistRepository;
         private readonly IHospitalAppointmentRepository _hospitalAppointmentRepository;
         private readonly IBusinessMetricsRecorder _businessMetricsRecorder;
 
         public HospitalAppointmentService(
             IHospitalDoctorRepository hospitalDoctorRepository,
+            IHospitalDoctorWorklistRepository hospitalDoctorWorklistRepository,
             IHospitalAppointmentRepository hospitalAppointmentRepository,
             IBusinessMetricsRecorder businessMetricsRecorder)
         {
             _hospitalDoctorRepository = hospitalDoctorRepository;
+            _hospitalDoctorWorklistRepository = hospitalDoctorWorklistRepository;
             _hospitalAppointmentRepository = hospitalAppointmentRepository;
             _businessMetricsRecorder = businessMetricsRecorder;
         }
@@ -179,8 +183,10 @@ namespace ERMSystem.Application.Services
 
         public Task<PaginatedResult<HospitalAppointmentWorklistItemDto>> GetWorklistAsync(
             HospitalAppointmentWorklistRequestDto request,
+            string currentRole,
+            string? currentUsername,
             CancellationToken ct = default)
-            => _hospitalAppointmentRepository.GetWorklistAsync(request, ct);
+            => GetScopedWorklistAsync(request, currentRole, currentUsername, ct);
 
         public async Task<HospitalAppointmentWorklistItemDto?> CheckInAsync(
             Guid appointmentId,
@@ -514,11 +520,44 @@ namespace ERMSystem.Application.Services
             return TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), ResolveClinicTimeZone());
         }
 
+        private async Task<PaginatedResult<HospitalAppointmentWorklistItemDto>> GetScopedWorklistAsync(
+            HospitalAppointmentWorklistRequestDto request,
+            string currentRole,
+            string? currentUsername,
+            CancellationToken ct)
+        {
+            if (string.Equals(currentRole, "Doctor", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.IsNullOrWhiteSpace(currentUsername))
+                {
+                    return new PaginatedResult<HospitalAppointmentWorklistItemDto>(
+                        Array.Empty<HospitalAppointmentWorklistItemDto>(),
+                        0,
+                        request.PageNumber,
+                        request.PageSize);
+                }
+
+                var doctorProfile = await _hospitalDoctorWorklistRepository.ResolveDoctorByUsernameAsync(currentUsername, ct);
+                if (doctorProfile == null)
+                {
+                    return new PaginatedResult<HospitalAppointmentWorklistItemDto>(
+                        Array.Empty<HospitalAppointmentWorklistItemDto>(),
+                        0,
+                        request.PageNumber,
+                        request.PageSize);
+                }
+
+                request.DoctorProfileId = doctorProfile.DoctorProfileId;
+            }
+
+            return await _hospitalAppointmentRepository.GetWorklistAsync(request, ct);
+        }
+
         private static string GenerateMedicalRecordNumber(DateTime nowUtc)
-            => $"MRN-{nowUtc:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
+            => CompactCodeGenerator.Generate("MR", nowUtc);
 
         private static string GenerateAppointmentNumber(DateTime nowUtc)
-            => $"APT-{nowUtc:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
+            => CompactCodeGenerator.Generate("AP", nowUtc);
 
         private static string? BuildNotes(string? notes, string? serviceCode)
         {

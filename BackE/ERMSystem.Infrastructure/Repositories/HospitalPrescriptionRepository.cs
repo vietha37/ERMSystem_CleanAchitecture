@@ -70,6 +70,11 @@ public class HospitalPrescriptionRepository : IHospitalPrescriptionRepository
                 x.OrderHeader.Encounter.Diagnoses.Any(d => EF.Functions.Like(d.DiagnosisName, pattern)));
         }
 
+        if (request.DoctorProfileId.HasValue)
+        {
+            query = query.Where(x => x.OrderHeader.Encounter.DoctorProfileId == request.DoctorProfileId.Value);
+        }
+
         var totalCount = await query.CountAsync(ct);
         var items = await query
             .OrderByDescending(x => x.CreatedAtUtc)
@@ -231,9 +236,9 @@ public class HospitalPrescriptionRepository : IHospitalPrescriptionRepository
         };
     }
 
-    public async Task<HospitalPrescriptionEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default)
+    public async Task<HospitalPrescriptionEligibleEncounterDto[]> GetEligibleEncountersAsync(Guid? doctorProfileId, CancellationToken ct = default)
     {
-        var encounters = await _hospitalDbContext.Encounters
+        var query = _hospitalDbContext.Encounters
             .AsNoTracking()
             .Include(x => x.Patient)
             .Include(x => x.DoctorProfile).ThenInclude(x => x.StaffProfile)
@@ -241,6 +246,14 @@ public class HospitalPrescriptionRepository : IHospitalPrescriptionRepository
             .Include(x => x.Clinic)
             .Include(x => x.Diagnoses)
             .Where(x => x.EncounterStatus == "InProgress" || x.EncounterStatus == "Finalized" || x.EncounterStatus == "Approved")
+            .AsQueryable();
+
+        if (doctorProfileId.HasValue)
+        {
+            query = query.Where(x => x.DoctorProfileId == doctorProfileId.Value);
+        }
+
+        var encounters = await query
             .OrderByDescending(x => x.UpdatedAtUtc)
             .Take(100)
             .ToListAsync(ct);

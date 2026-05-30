@@ -2,6 +2,7 @@ using System.Text.Json;
 using ERMSystem.Application.DTOs;
 using ERMSystem.Application.DTOs.Common;
 using ERMSystem.Application.Interfaces;
+using ERMSystem.Application.Utilities;
 
 namespace ERMSystem.Application.Services;
 
@@ -10,28 +11,53 @@ public class HospitalClinicalOrderService : IHospitalClinicalOrderService
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IHospitalClinicalOrderRepository _hospitalClinicalOrderRepository;
     private readonly IHospitalIdentityBridgeService _hospitalIdentityBridgeService;
+    private readonly IHospitalDoctorWorklistRepository _hospitalDoctorWorklistRepository;
 
     public HospitalClinicalOrderService(
         IHospitalClinicalOrderRepository hospitalClinicalOrderRepository,
-        IHospitalIdentityBridgeService hospitalIdentityBridgeService)
+        IHospitalIdentityBridgeService hospitalIdentityBridgeService,
+        IHospitalDoctorWorklistRepository hospitalDoctorWorklistRepository)
     {
         _hospitalClinicalOrderRepository = hospitalClinicalOrderRepository;
         _hospitalIdentityBridgeService = hospitalIdentityBridgeService;
+        _hospitalDoctorWorklistRepository = hospitalDoctorWorklistRepository;
     }
 
     public Task<PaginatedResult<HospitalClinicalOrderSummaryDto>> GetWorklistAsync(
         HospitalClinicalOrderWorklistRequestDto request,
+        string currentRole,
+        string? currentUsername,
         CancellationToken ct = default)
-        => _hospitalClinicalOrderRepository.GetWorklistAsync(request, ct);
+        => GetScopedWorklistAsync(request, currentRole, currentUsername, ct);
 
-    public async Task<HospitalClinicalOrderDetailDto?> GetByIdAsync(Guid clinicalOrderId, CancellationToken ct = default)
+    public async Task<HospitalClinicalOrderDetailDto?> GetByIdAsync(
+        Guid clinicalOrderId,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct = default)
     {
         var detail = await _hospitalClinicalOrderRepository.GetByIdAsync(clinicalOrderId, ct);
-        return detail == null ? null : MapDetail(detail);
+        if (detail == null)
+        {
+            return null;
+        }
+
+        if (!await CanAccessDoctorScopedDataAsync(detail.DoctorProfileId, currentRole, currentUsername, ct))
+        {
+            return null;
+        }
+
+        return MapDetail(detail);
     }
 
-    public Task<HospitalClinicalOrderEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default)
-        => _hospitalClinicalOrderRepository.GetEligibleEncountersAsync(ct);
+    public async Task<HospitalClinicalOrderEligibleEncounterDto[]> GetEligibleEncountersAsync(
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct = default)
+    {
+        var doctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        return await _hospitalClinicalOrderRepository.GetEligibleEncountersAsync(doctorProfileId, ct);
+    }
 
     public Task<HospitalClinicalOrderCatalogItemDto[]> GetCatalogAsync(CancellationToken ct = default)
         => _hospitalClinicalOrderRepository.GetCatalogAsync(ct);
@@ -294,6 +320,55 @@ public class HospitalClinicalOrderService : IHospitalClinicalOrderService
     private Task<Guid?> ResolveHospitalActorUserIdAsync(Guid? actorUserId, string? actorUsername, CancellationToken ct)
         => _hospitalIdentityBridgeService.ResolveHospitalUserIdAsync(actorUserId, actorUsername, ct);
 
+    private async Task<PaginatedResult<HospitalClinicalOrderSummaryDto>> GetScopedWorklistAsync(
+        HospitalClinicalOrderWorklistRequestDto request,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct)
+    {
+        var doctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        if (string.Equals(currentRole, "Doctor", StringComparison.OrdinalIgnoreCase) && !doctorProfileId.HasValue)
+        {
+            return new PaginatedResult<HospitalClinicalOrderSummaryDto>(
+                Array.Empty<HospitalClinicalOrderSummaryDto>(),
+                0,
+                request.PageNumber,
+                request.PageSize);
+        }
+
+        request.DoctorProfileId = doctorProfileId;
+        return await _hospitalClinicalOrderRepository.GetWorklistAsync(request, ct);
+    }
+
+    private async Task<Guid?> ResolveScopedDoctorProfileIdAsync(
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct)
+    {
+        if (!string.Equals(currentRole, "Doctor", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(currentUsername))
+        {
+            return null;
+        }
+
+        var doctorProfile = await _hospitalDoctorWorklistRepository.ResolveDoctorByUsernameAsync(currentUsername, ct);
+        return doctorProfile?.DoctorProfileId;
+    }
+
+    private async Task<bool> CanAccessDoctorScopedDataAsync(
+        Guid doctorProfileId,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct)
+    {
+        var scopedDoctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        return !scopedDoctorProfileId.HasValue || scopedDoctorProfileId.Value == doctorProfileId;
+    }
+
     private static HospitalClinicalOrderDetailDto MapDetail(HospitalClinicalOrderDetailSnapshot detail)
     {
         return new HospitalClinicalOrderDetailDto
@@ -377,11 +452,11 @@ public class HospitalClinicalOrderService : IHospitalClinicalOrderService
 
     private static string GenerateOrderNumber(string category, DateTime nowUtc)
         => category == "Lab"
-            ? $"ORD-LAB-{nowUtc:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}"
-            : $"ORD-IMG-{nowUtc:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
+            ? CompactCodeGenerator.Generate("LB", nowUtc)
+            : CompactCodeGenerator.Generate("IM", nowUtc);
 
     private static string GenerateSpecimenCode(DateTime nowUtc)
-        => $"SPC-{nowUtc:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
+        => CompactCodeGenerator.Generate("SP", nowUtc);
 
     private static TimeZoneInfo ResolveClinicTimeZone()
     {

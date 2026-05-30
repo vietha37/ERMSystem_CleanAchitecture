@@ -18,6 +18,8 @@ namespace ERMSystem.Application.DTOs
 
         [MaxLength(200)]
         public string? TextSearch { get; set; }
+
+        public Guid? DoctorProfileId { get; set; }
     }
 
     public class HospitalAppointmentWorklistItemDto

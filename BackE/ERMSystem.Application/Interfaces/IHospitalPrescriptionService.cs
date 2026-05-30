@@ -10,10 +10,12 @@ public interface IHospitalPrescriptionService
 {
     Task<PaginatedResult<HospitalPrescriptionSummaryDto>> GetWorklistAsync(
         HospitalPrescriptionWorklistRequestDto request,
+        string currentRole,
+        string? currentUsername,
         CancellationToken ct = default);
 
-    Task<HospitalPrescriptionDetailDto?> GetByIdAsync(Guid prescriptionId, CancellationToken ct = default);
-    Task<HospitalPrescriptionEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default);
+    Task<HospitalPrescriptionDetailDto?> GetByIdAsync(Guid prescriptionId, string currentRole, string? currentUsername, CancellationToken ct = default);
+    Task<HospitalPrescriptionEligibleEncounterDto[]> GetEligibleEncountersAsync(string currentRole, string? currentUsername, CancellationToken ct = default);
     Task<HospitalMedicineCatalogDto[]> GetMedicineCatalogAsync(CancellationToken ct = default);
     Task<HospitalPrescriptionDetailDto> CreateAsync(
         CreateHospitalPrescriptionDto request,

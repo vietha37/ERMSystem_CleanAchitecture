@@ -7,10 +7,12 @@ public interface IHospitalBillingService
 {
     Task<PaginatedResult<HospitalInvoiceSummaryDto>> GetWorklistAsync(
         HospitalInvoiceWorklistRequestDto request,
+        string currentRole,
+        string? currentUsername,
         CancellationToken ct = default);
 
-    Task<HospitalInvoiceDetailDto?> GetByIdAsync(Guid invoiceId, CancellationToken ct = default);
-    Task<HospitalBillingEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default);
+    Task<HospitalInvoiceDetailDto?> GetByIdAsync(Guid invoiceId, string currentRole, string? currentUsername, CancellationToken ct = default);
+    Task<HospitalBillingEligibleEncounterDto[]> GetEligibleEncountersAsync(string currentRole, string? currentUsername, CancellationToken ct = default);
     Task<HospitalInvoiceDetailDto> CreateInvoiceAsync(CreateHospitalInvoiceDto request, CancellationToken ct = default);
     Task<HospitalPaymentIntentDto?> CreatePaymentIntentAsync(Guid invoiceId, CreateHospitalPaymentIntentDto request, Guid? actorUserId, string? actorUsername, CancellationToken ct = default);
     Task<HospitalInvoiceDetailDto?> ReceivePaymentAsync(Guid invoiceId, ReceiveHospitalPaymentDto request, Guid? actorUserId, string? actorUsername, CancellationToken ct = default);
@@ -21,5 +23,5 @@ public interface IHospitalBillingService
         bool isSimulation,
         CancellationToken ct = default);
     Task<HospitalInvoiceDetailDto?> RefundPaymentAsync(Guid invoiceId, RefundHospitalPaymentDto request, Guid? actorUserId, string? actorUsername, CancellationToken ct = default);
-    Task<HospitalPaymentReconciliationSummaryDto> GetReconciliationSummaryAsync(CancellationToken ct = default);
+    Task<HospitalPaymentReconciliationSummaryDto> GetReconciliationSummaryAsync(string currentRole, string? currentUsername, CancellationToken ct = default);
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import ProtectedLayout from "@/components/layout/ProtectedLayout";
 import { useAuth } from "@/hooks/useAuth";
@@ -205,6 +206,40 @@ export default function PatientPortalPage() {
     <ProtectedLayout>
       <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.16),_transparent_24%),linear-gradient(180deg,_#eff8ff_0%,_#ffffff_100%)] px-4 py-8 md:px-6">
         <div className="mx-auto max-w-7xl space-y-6">
+          <section className="sticky top-4 z-30 rounded-[1.75rem] border border-white/70 bg-white/86 px-5 py-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-700">
+                  Điều hướng nhanh
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Bạn có thể quay lại website công khai để xem bác sĩ, chuyên khoa hoặc đặt lịch mới.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2 text-sm">
+                <Link
+                  href="/"
+                  className="rounded-full border border-slate-200 px-4 py-2 font-semibold text-slate-700 transition hover:border-cyan-300 hover:text-cyan-700"
+                >
+                  Về trang chủ
+                </Link>
+                <Link
+                  href="/doctors"
+                  className="rounded-full border border-slate-200 px-4 py-2 font-semibold text-slate-700 transition hover:border-cyan-300 hover:text-cyan-700"
+                >
+                  Xem bác sĩ
+                </Link>
+                <Link
+                  href="/booking"
+                  className="rounded-full bg-slate-950 px-5 py-2 font-semibold text-white transition hover:bg-cyan-700"
+                >
+                  Đặt lịch mới
+                </Link>
+              </div>
+            </div>
+          </section>
+
           <section className="overflow-hidden rounded-[2.5rem] border border-cyan-100 bg-white/90 shadow-[0_30px_90px_rgba(15,23,42,0.08)] backdrop-blur">
             <div className="grid gap-8 px-8 py-8 lg:grid-cols-[1.2fr_0.8fr] lg:px-10 lg:py-10">
               <div>

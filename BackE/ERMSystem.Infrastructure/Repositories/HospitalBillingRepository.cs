@@ -48,6 +48,11 @@ public class HospitalBillingRepository : IHospitalBillingRepository
                 (x.Encounter != null && EF.Functions.Like(x.Encounter.EncounterNumber, pattern)));
         }
 
+        if (request.DoctorProfileId.HasValue)
+        {
+            query = query.Where(x => x.Encounter != null && x.Encounter.DoctorProfileId == request.DoctorProfileId.Value);
+        }
+
         var totalCount = await query.CountAsync(ct);
         var invoices = await query
             .OrderByDescending(x => x.IssuedAtUtc)
@@ -81,14 +86,22 @@ public class HospitalBillingRepository : IHospitalBillingRepository
         return invoice == null ? null : MapAggregate(invoice);
     }
 
-    public async Task<HospitalBillingEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default)
+    public async Task<HospitalBillingEligibleEncounterDto[]> GetEligibleEncountersAsync(Guid? doctorProfileId, CancellationToken ct = default)
     {
-        var encounters = await _hospitalDbContext.Encounters
+        var query = _hospitalDbContext.Encounters
             .AsNoTracking()
             .Include(x => x.Patient)
             .Include(x => x.DoctorProfile).ThenInclude(x => x.StaffProfile)
             .Include(x => x.DoctorProfile).ThenInclude(x => x.Specialty)
             .Include(x => x.Clinic)
+            .AsQueryable();
+
+        if (doctorProfileId.HasValue)
+        {
+            query = query.Where(x => x.DoctorProfileId == doctorProfileId.Value);
+        }
+
+        var encounters = await query
             .OrderByDescending(x => x.UpdatedAtUtc)
             .Take(100)
             .ToListAsync(ct);
@@ -135,6 +148,7 @@ public class HospitalBillingRepository : IHospitalBillingRepository
                 PatientId = x.PatientId,
                 PatientName = x.Patient.FullName,
                 MedicalRecordNumber = x.Patient.MedicalRecordNumber,
+                DoctorProfileId = x.DoctorProfileId,
                 DoctorName = x.DoctorProfile.StaffProfile.FullName,
                 SpecialtyName = x.DoctorProfile.Specialty.Name,
                 ClinicName = x.Clinic.Name,
@@ -175,7 +189,7 @@ public class HospitalBillingRepository : IHospitalBillingRepository
             new()
             {
                 ItemType = "Consultation",
-                Description = $"Kham {encounter.DoctorProfile.Specialty.Name}",
+                Description = $"Khám {encounter.DoctorProfile.Specialty.Name}",
                 Quantity = 1,
                 UnitPrice = encounter.DoctorProfile.ConsultationFee ?? 0,
                 LineAmount = encounter.DoctorProfile.ConsultationFee ?? 0,
@@ -349,18 +363,25 @@ public class HospitalBillingRepository : IHospitalBillingRepository
             .FirstOrDefaultAsync(ct);
     }
 
-    public async Task<HospitalPaymentReconciliationSnapshot> GetReconciliationSnapshotAsync(CancellationToken ct = default)
+    public async Task<HospitalPaymentReconciliationSnapshot> GetReconciliationSnapshotAsync(Guid? doctorProfileId, CancellationToken ct = default)
     {
-        var payments = await _hospitalDbContext.Payments
+        var paymentsQuery = _hospitalDbContext.Payments
             .AsNoTracking()
             .Include(x => x.ReceivedByUser)
+            .AsQueryable();
+
+        if (doctorProfileId.HasValue)
+        {
+            paymentsQuery = paymentsQuery.Where(x => x.Invoice.Encounter != null && x.Invoice.Encounter.DoctorProfileId == doctorProfileId.Value);
+        }
+
+        var payments = await paymentsQuery
             .OrderByDescending(x => x.PaidAtUtc)
             .ThenByDescending(x => x.Id)
             .Take(25)
             .ToListAsync(ct);
 
-        var aggregate = await _hospitalDbContext.Payments
-            .AsNoTracking()
+        var aggregate = await paymentsQuery
             .GroupBy(x => 1)
             .Select(group => new
             {
@@ -519,6 +540,7 @@ public class HospitalBillingRepository : IHospitalBillingRepository
             PatientId = invoice.PatientId,
             PatientName = invoice.Patient.FullName,
             MedicalRecordNumber = invoice.Patient.MedicalRecordNumber,
+            DoctorProfileId = invoice.Encounter?.DoctorProfileId,
             EncounterId = invoice.EncounterId,
             EncounterNumber = invoice.Encounter?.EncounterNumber,
             InvoiceStatus = invoice.InvoiceStatus,
@@ -544,6 +566,7 @@ public class HospitalBillingRepository : IHospitalBillingRepository
             PatientId = invoice.PatientId,
             PatientName = invoice.Patient.FullName,
             MedicalRecordNumber = invoice.Patient.MedicalRecordNumber,
+            DoctorProfileId = invoice.Encounter?.DoctorProfileId,
             PatientPhone = invoice.Patient.Phone,
             PatientEmail = invoice.Patient.Email,
             EncounterId = invoice.EncounterId,

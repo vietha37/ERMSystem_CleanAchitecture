@@ -13,7 +13,7 @@ public interface IHospitalPrescriptionRepository
         CancellationToken ct = default);
 
     Task<HospitalPrescriptionAggregateSnapshot?> GetByIdAsync(Guid prescriptionId, CancellationToken ct = default);
-    Task<HospitalPrescriptionEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default);
+    Task<HospitalPrescriptionEligibleEncounterDto[]> GetEligibleEncountersAsync(Guid? doctorProfileId, CancellationToken ct = default);
     Task<HospitalMedicineCatalogDto[]> GetMedicineCatalogAsync(CancellationToken ct = default);
     Task<HospitalPrescriptionEncounterSnapshot?> GetEncounterForPrescriptionAsync(Guid encounterId, CancellationToken ct = default);
     Task<HospitalMedicineSnapshot[]> GetMedicinesByIdsAsync(Guid[] medicineIds, CancellationToken ct = default);

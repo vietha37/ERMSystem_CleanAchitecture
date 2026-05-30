@@ -17,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.DataProtection;
+using ERMSystem.Application.Utilities;
 
 namespace ERMSystem.Infrastructure.Services
 {
@@ -856,7 +857,7 @@ namespace ERMSystem.Infrastructure.Services
         }
 
         private static string GenerateMedicalRecordNumber(DateTime nowUtc)
-            => $"MRN-{nowUtc:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
+            => CompactCodeGenerator.Generate("MR", nowUtc);
 
         private static string GeneratePasswordResetToken()
         {

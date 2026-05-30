@@ -13,6 +13,8 @@ namespace ERMSystem.Application.Interfaces
 
         Task<PaginatedResult<HospitalAppointmentWorklistItemDto>> GetWorklistAsync(
             HospitalAppointmentWorklistRequestDto request,
+            string currentRole,
+            string? currentUsername,
             CancellationToken ct = default);
 
         Task<HospitalAppointmentWorklistItemDto?> CheckInAsync(

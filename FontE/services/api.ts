@@ -71,9 +71,10 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config as typeof error.config & { _retry?: boolean };
+    const isUnauthorized = error.response?.status === 401;
 
     if (
-      error.response?.status === 401 &&
+      isUnauthorized &&
       originalRequest &&
       !originalRequest._retry &&
       !isAuthEndpoint(originalRequest.url)
@@ -92,7 +93,7 @@ api.interceptors.response.use(
       }
     }
 
-    if (typeof window !== "undefined" && !isAuthEndpoint(originalRequest?.url)) {
+    if (typeof window !== "undefined" && isUnauthorized && !isAuthEndpoint(originalRequest?.url)) {
       clearAuthSession();
       window.location.href = "/login";
     }

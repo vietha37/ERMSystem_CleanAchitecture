@@ -3,6 +3,7 @@ using ERMSystem.Application.Interfaces;
 using ERMSystem.Application.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace ERMSystem.API.Controllers;
 
@@ -23,7 +24,11 @@ public class HospitalAppointmentsController : ControllerBase
         [FromQuery] HospitalAppointmentWorklistRequestDto request,
         CancellationToken ct)
     {
-        var result = await _hospitalAppointmentService.GetWorklistAsync(request, ct);
+        var result = await _hospitalAppointmentService.GetWorklistAsync(
+            request,
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         return Ok(result);
     }
 
@@ -154,4 +159,12 @@ public class HospitalAppointmentsController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    private string ResolveCurrentRole()
+        => User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+
+    private string? ResolveCurrentUsername()
+        => User.FindFirstValue(ClaimTypes.Name)
+           ?? User.FindFirstValue(ClaimTypes.Upn)
+           ?? User.FindFirstValue("unique_name");
 }

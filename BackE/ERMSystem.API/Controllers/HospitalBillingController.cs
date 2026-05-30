@@ -28,7 +28,11 @@ public class HospitalBillingController : ControllerBase
     [Authorize(Policy = AppPermissions.HospitalBilling.Read)]
     public async Task<IActionResult> GetWorklist([FromQuery] HospitalInvoiceWorklistRequestDto request, CancellationToken ct)
     {
-        var result = await _hospitalBillingService.GetWorklistAsync(request, ct);
+        var result = await _hospitalBillingService.GetWorklistAsync(
+            request,
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         return Ok(result);
     }
 
@@ -36,7 +40,10 @@ public class HospitalBillingController : ControllerBase
     [Authorize(Policy = AppPermissions.HospitalBilling.Read)]
     public async Task<IActionResult> GetEligibleEncounters(CancellationToken ct)
     {
-        var result = await _hospitalBillingService.GetEligibleEncountersAsync(ct);
+        var result = await _hospitalBillingService.GetEligibleEncountersAsync(
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         return Ok(result);
     }
 
@@ -44,7 +51,11 @@ public class HospitalBillingController : ControllerBase
     [Authorize(Policy = AppPermissions.HospitalBilling.Read)]
     public async Task<IActionResult> GetById(Guid invoiceId, CancellationToken ct)
     {
-        var result = await _hospitalBillingService.GetByIdAsync(invoiceId, ct);
+        var result = await _hospitalBillingService.GetByIdAsync(
+            invoiceId,
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         if (result == null)
         {
             return NotFound(new { message = "Khong tim thay hoa don." });
@@ -241,7 +252,10 @@ public class HospitalBillingController : ControllerBase
     [Authorize(Policy = AppPermissions.HospitalBilling.Read)]
     public async Task<IActionResult> GetReconciliationSummary(CancellationToken ct)
     {
-        var result = await _hospitalBillingService.GetReconciliationSummaryAsync(ct);
+        var result = await _hospitalBillingService.GetReconciliationSummaryAsync(
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         return Ok(result);
     }
 
@@ -257,4 +271,12 @@ public class HospitalBillingController : ControllerBase
         => User.FindFirstValue(ClaimTypes.Name)
            ?? User.FindFirstValue(ClaimTypes.Upn)
            ?? User.FindFirstValue("unique_name");
+
+    private string ResolveCurrentRole()
+        => User.FindFirstValue(ClaimTypes.Role)
+           ?? User.FindFirstValue("role")
+           ?? string.Empty;
+
+    private string? ResolveCurrentUsername()
+        => ResolveActorUsername();
 }

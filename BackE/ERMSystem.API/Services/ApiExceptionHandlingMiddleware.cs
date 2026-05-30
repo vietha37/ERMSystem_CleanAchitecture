@@ -38,6 +38,18 @@ public class ApiExceptionHandlingMiddleware
             throw exception;
         }
 
+        if (exception is OperationCanceledException && context.RequestAborted.IsCancellationRequested)
+        {
+            _logger.LogInformation(
+                "Request canceled by client for {HttpMethod} {RequestPath}. ErrorCorrelationId={ErrorCorrelationId}",
+                context.Request.Method,
+                context.Request.Path.Value,
+                context.TraceIdentifier);
+
+            context.Response.StatusCode = 499;
+            return;
+        }
+
         var (statusCode, errorCode, message, logLevel) = MapException(exception);
 
         _logger.Log(

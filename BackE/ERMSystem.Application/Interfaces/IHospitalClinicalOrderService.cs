@@ -7,10 +7,12 @@ public interface IHospitalClinicalOrderService
 {
     Task<PaginatedResult<HospitalClinicalOrderSummaryDto>> GetWorklistAsync(
         HospitalClinicalOrderWorklistRequestDto request,
+        string currentRole,
+        string? currentUsername,
         CancellationToken ct = default);
 
-    Task<HospitalClinicalOrderDetailDto?> GetByIdAsync(Guid clinicalOrderId, CancellationToken ct = default);
-    Task<HospitalClinicalOrderEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default);
+    Task<HospitalClinicalOrderDetailDto?> GetByIdAsync(Guid clinicalOrderId, string currentRole, string? currentUsername, CancellationToken ct = default);
+    Task<HospitalClinicalOrderEligibleEncounterDto[]> GetEligibleEncountersAsync(string currentRole, string? currentUsername, CancellationToken ct = default);
     Task<HospitalClinicalOrderCatalogItemDto[]> GetCatalogAsync(CancellationToken ct = default);
     Task<HospitalClinicalOrderDetailDto> CreateAsync(
         CreateHospitalClinicalOrderDto request,

@@ -25,7 +25,11 @@ public class HospitalClinicalOrdersController : ControllerBase
         [FromQuery] HospitalClinicalOrderWorklistRequestDto request,
         CancellationToken ct)
     {
-        var result = await _hospitalClinicalOrderService.GetWorklistAsync(request, ct);
+        var result = await _hospitalClinicalOrderService.GetWorklistAsync(
+            request,
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         return Ok(result);
     }
 
@@ -33,7 +37,10 @@ public class HospitalClinicalOrdersController : ControllerBase
     [Authorize(Policy = AppPermissions.HospitalClinicalOrders.Read)]
     public async Task<IActionResult> GetEligibleEncounters(CancellationToken ct)
     {
-        var result = await _hospitalClinicalOrderService.GetEligibleEncountersAsync(ct);
+        var result = await _hospitalClinicalOrderService.GetEligibleEncountersAsync(
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         return Ok(result);
     }
 
@@ -49,7 +56,11 @@ public class HospitalClinicalOrdersController : ControllerBase
     [Authorize(Policy = AppPermissions.HospitalClinicalOrders.Read)]
     public async Task<IActionResult> GetById(Guid clinicalOrderId, CancellationToken ct)
     {
-        var result = await _hospitalClinicalOrderService.GetByIdAsync(clinicalOrderId, ct);
+        var result = await _hospitalClinicalOrderService.GetByIdAsync(
+            clinicalOrderId,
+            ResolveCurrentRole(),
+            ResolveCurrentUsername(),
+            ct);
         if (result == null)
         {
             return NotFound(new { message = "Khong tim thay chi dinh can lam sang." });
@@ -171,4 +182,12 @@ public class HospitalClinicalOrdersController : ControllerBase
                ?? User.FindFirstValue(ClaimTypes.Upn)
                ?? User.FindFirstValue("unique_name");
     }
+
+    private string ResolveCurrentRole()
+        => User.FindFirstValue(ClaimTypes.Role)
+           ?? User.FindFirstValue("role")
+           ?? string.Empty;
+
+    private string? ResolveCurrentUsername()
+        => ResolveActorUsername();
 }

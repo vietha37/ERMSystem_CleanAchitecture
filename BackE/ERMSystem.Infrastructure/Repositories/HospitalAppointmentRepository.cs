@@ -158,6 +158,11 @@ public class HospitalAppointmentRepository : IHospitalAppointmentRepository
             query = query.Where(x => x.AppointmentStartUtc >= fromUtc && x.AppointmentStartUtc < toUtc);
         }
 
+        if (request.DoctorProfileId.HasValue)
+        {
+            query = query.Where(x => x.DoctorProfileId == request.DoctorProfileId.Value);
+        }
+
         if (!string.IsNullOrWhiteSpace(request.TextSearch))
         {
             var keyword = request.TextSearch.Trim();

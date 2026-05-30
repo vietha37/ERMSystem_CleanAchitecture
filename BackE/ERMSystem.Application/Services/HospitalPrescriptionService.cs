@@ -5,6 +5,7 @@ using System.Text.Json;
 using ERMSystem.Application.DTOs;
 using ERMSystem.Application.DTOs.Common;
 using ERMSystem.Application.Interfaces;
+using ERMSystem.Application.Utilities;
 
 namespace ERMSystem.Application.Services;
 
@@ -88,30 +89,55 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
     private readonly IHospitalPrescriptionRepository _hospitalPrescriptionRepository;
     private readonly IHospitalIdentityBridgeService _hospitalIdentityBridgeService;
     private readonly IBusinessMetricsRecorder _businessMetricsRecorder;
+    private readonly IHospitalDoctorWorklistRepository _hospitalDoctorWorklistRepository;
 
     public HospitalPrescriptionService(
         IHospitalPrescriptionRepository hospitalPrescriptionRepository,
         IHospitalIdentityBridgeService hospitalIdentityBridgeService,
-        IBusinessMetricsRecorder businessMetricsRecorder)
+        IBusinessMetricsRecorder businessMetricsRecorder,
+        IHospitalDoctorWorklistRepository hospitalDoctorWorklistRepository)
     {
         _hospitalPrescriptionRepository = hospitalPrescriptionRepository;
         _hospitalIdentityBridgeService = hospitalIdentityBridgeService;
         _businessMetricsRecorder = businessMetricsRecorder;
+        _hospitalDoctorWorklistRepository = hospitalDoctorWorklistRepository;
     }
 
     public Task<PaginatedResult<HospitalPrescriptionSummaryDto>> GetWorklistAsync(
         HospitalPrescriptionWorklistRequestDto request,
+        string currentRole,
+        string? currentUsername,
         CancellationToken ct = default)
-        => _hospitalPrescriptionRepository.GetWorklistAsync(request, ct);
+        => GetScopedWorklistAsync(request, currentRole, currentUsername, ct);
 
-    public async Task<HospitalPrescriptionDetailDto?> GetByIdAsync(Guid prescriptionId, CancellationToken ct = default)
+    public async Task<HospitalPrescriptionDetailDto?> GetByIdAsync(
+        Guid prescriptionId,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct = default)
     {
         var prescription = await _hospitalPrescriptionRepository.GetByIdAsync(prescriptionId, ct);
-        return prescription == null ? null : MapDetail(prescription);
+        if (prescription == null)
+        {
+            return null;
+        }
+
+        if (!await CanAccessDoctorScopedDataAsync(prescription.DoctorProfileId, currentRole, currentUsername, ct))
+        {
+            return null;
+        }
+
+        return MapDetail(prescription);
     }
 
-    public Task<HospitalPrescriptionEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default)
-        => _hospitalPrescriptionRepository.GetEligibleEncountersAsync(ct);
+    public async Task<HospitalPrescriptionEligibleEncounterDto[]> GetEligibleEncountersAsync(
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct = default)
+    {
+        var doctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        return await _hospitalPrescriptionRepository.GetEligibleEncountersAsync(doctorProfileId, ct);
+    }
 
     public Task<HospitalMedicineCatalogDto[]> GetMedicineCatalogAsync(CancellationToken ct = default)
         => _hospitalPrescriptionRepository.GetMedicineCatalogAsync(ct);
@@ -329,6 +355,55 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
     {
         await _hospitalPrescriptionRepository.DeletePrescriptionAsync(prescriptionId, ct);
         await _hospitalPrescriptionRepository.SaveChangesAsync(ct);
+    }
+
+    private async Task<PaginatedResult<HospitalPrescriptionSummaryDto>> GetScopedWorklistAsync(
+        HospitalPrescriptionWorklistRequestDto request,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct)
+    {
+        var doctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        if (string.Equals(currentRole, "Doctor", StringComparison.OrdinalIgnoreCase) && !doctorProfileId.HasValue)
+        {
+            return new PaginatedResult<HospitalPrescriptionSummaryDto>(
+                Array.Empty<HospitalPrescriptionSummaryDto>(),
+                0,
+                request.PageNumber,
+                request.PageSize);
+        }
+
+        request.DoctorProfileId = doctorProfileId;
+        return await _hospitalPrescriptionRepository.GetWorklistAsync(request, ct);
+    }
+
+    private async Task<Guid?> ResolveScopedDoctorProfileIdAsync(
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct)
+    {
+        if (!string.Equals(currentRole, "Doctor", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(currentUsername))
+        {
+            return null;
+        }
+
+        var doctorProfile = await _hospitalDoctorWorklistRepository.ResolveDoctorByUsernameAsync(currentUsername, ct);
+        return doctorProfile?.DoctorProfileId;
+    }
+
+    private async Task<bool> CanAccessDoctorScopedDataAsync(
+        Guid doctorProfileId,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct)
+    {
+        var scopedDoctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        return !scopedDoctorProfileId.HasValue || scopedDoctorProfileId.Value == doctorProfileId;
     }
 
     private Task<Guid?> ResolveHospitalActorUserIdAsync(Guid? actorUserId, string? actorUsername, CancellationToken ct)
@@ -896,10 +971,10 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
     }
 
     private static string GenerateOrderNumber(DateTime nowUtc)
-        => $"ORD-PHA-{nowUtc:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
+        => CompactCodeGenerator.Generate("PO", nowUtc);
 
     private static string GeneratePrescriptionNumber(DateTime nowUtc)
-        => $"RX-{nowUtc:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
+        => CompactCodeGenerator.Generate("RX", nowUtc);
 
     private static TimeZoneInfo ResolveClinicTimeZone()
     {

@@ -10,7 +10,7 @@ public interface IHospitalClinicalOrderRepository
         CancellationToken ct = default);
 
     Task<HospitalClinicalOrderDetailSnapshot?> GetByIdAsync(Guid clinicalOrderId, CancellationToken ct = default);
-    Task<HospitalClinicalOrderEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default);
+    Task<HospitalClinicalOrderEligibleEncounterDto[]> GetEligibleEncountersAsync(Guid? doctorProfileId, CancellationToken ct = default);
     Task<HospitalClinicalOrderCatalogItemDto[]> GetCatalogAsync(CancellationToken ct = default);
     Task<HospitalClinicalOrderEncounterSnapshot?> GetEncounterForOrderingAsync(Guid encounterId, CancellationToken ct = default);
     Task<HospitalClinicalOrderServiceSnapshot?> GetCatalogServiceAsync(string category, Guid serviceId, CancellationToken ct = default);
@@ -39,6 +39,7 @@ public class HospitalClinicalOrderDetailSnapshot
     public Guid PatientId { get; set; }
     public string PatientName { get; set; } = string.Empty;
     public string MedicalRecordNumber { get; set; } = string.Empty;
+    public Guid DoctorProfileId { get; set; }
     public string DoctorName { get; set; } = string.Empty;
     public string SpecialtyName { get; set; } = string.Empty;
     public string ClinicName { get; set; } = string.Empty;

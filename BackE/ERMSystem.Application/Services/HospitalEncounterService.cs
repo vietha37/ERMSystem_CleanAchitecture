@@ -5,6 +5,7 @@ using System.Text.Json;
 using ERMSystem.Application.DTOs;
 using ERMSystem.Application.DTOs.Common;
 using ERMSystem.Application.Interfaces;
+using ERMSystem.Application.Utilities;
 
 namespace ERMSystem.Application.Services;
 
@@ -17,32 +18,60 @@ public class HospitalEncounterService : IHospitalEncounterService
     private readonly IHospitalIdentityBridgeService _hospitalIdentityBridgeService;
     private readonly IBusinessMetricsRecorder _businessMetricsRecorder;
     private readonly IHospitalDocumentStorageService _hospitalDocumentStorageService;
+    private readonly IHospitalDoctorWorklistRepository _hospitalDoctorWorklistRepository;
 
     public HospitalEncounterService(
         IHospitalEncounterRepository hospitalEncounterRepository,
         IHospitalIdentityBridgeService hospitalIdentityBridgeService,
         IBusinessMetricsRecorder businessMetricsRecorder,
-        IHospitalDocumentStorageService hospitalDocumentStorageService)
+        IHospitalDocumentStorageService hospitalDocumentStorageService,
+        IHospitalDoctorWorklistRepository hospitalDoctorWorklistRepository)
     {
         _hospitalEncounterRepository = hospitalEncounterRepository;
         _hospitalIdentityBridgeService = hospitalIdentityBridgeService;
         _businessMetricsRecorder = businessMetricsRecorder;
         _hospitalDocumentStorageService = hospitalDocumentStorageService;
+        _hospitalDoctorWorklistRepository = hospitalDoctorWorklistRepository;
     }
 
     public Task<PaginatedResult<HospitalEncounterSummaryDto>> GetWorklistAsync(
         HospitalEncounterWorklistRequestDto request,
+        string currentRole,
+        string? currentUsername,
         CancellationToken ct = default)
-        => _hospitalEncounterRepository.GetWorklistAsync(request, ct);
+        => GetScopedWorklistAsync(request, currentRole, currentUsername, ct);
 
-    public async Task<HospitalEncounterDetailDto?> GetByIdAsync(Guid encounterId, CancellationToken ct = default)
+    public async Task<HospitalEncounterDetailDto?> GetByIdAsync(
+        Guid encounterId,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct = default)
     {
         var encounter = await _hospitalEncounterRepository.GetEncounterAggregateAsync(encounterId, ct);
-        return encounter == null ? null : MapDetail(encounter);
+        if (encounter == null)
+        {
+            return null;
+        }
+
+        if (!await CanAccessDoctorScopedEncounterAsync(encounter.DoctorProfileId, currentRole, currentUsername, ct))
+        {
+            return null;
+        }
+
+        return MapDetail(encounter);
     }
 
-    public Task<HospitalEncounterEligibleAppointmentDto[]> GetEligibleAppointmentsAsync(CancellationToken ct = default)
-        => _hospitalEncounterRepository.GetEligibleAppointmentsAsync(ct);
+    public async Task<HospitalEncounterEligibleAppointmentDto[]> GetEligibleAppointmentsAsync(
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct = default)
+    {
+        var items = await _hospitalEncounterRepository.GetEligibleAppointmentsAsync(ct);
+        var doctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        return doctorProfileId.HasValue
+            ? items.Where(x => x.DoctorProfileId == doctorProfileId.Value).ToArray()
+            : items;
+    }
 
     public async Task<HospitalEncounterDetailDto> CreateAsync(
         CreateHospitalEncounterDto request,
@@ -707,8 +736,61 @@ public class HospitalEncounterService : IHospitalEncounterService
         return string.IsNullOrWhiteSpace(normalized) ? "application/octet-stream" : normalized;
     }
 
+    private async Task<PaginatedResult<HospitalEncounterSummaryDto>> GetScopedWorklistAsync(
+        HospitalEncounterWorklistRequestDto request,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct)
+    {
+        var doctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        if (string.Equals(currentRole, "Doctor", StringComparison.OrdinalIgnoreCase) && !doctorProfileId.HasValue)
+        {
+            return new PaginatedResult<HospitalEncounterSummaryDto>(
+                Array.Empty<HospitalEncounterSummaryDto>(),
+                0,
+                request.PageNumber,
+                request.PageSize);
+        }
+
+        if (doctorProfileId.HasValue)
+        {
+            request.DoctorProfileId = doctorProfileId.Value;
+        }
+
+        return await _hospitalEncounterRepository.GetWorklistAsync(request, ct);
+    }
+
+    private async Task<Guid?> ResolveScopedDoctorProfileIdAsync(
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct)
+    {
+        if (!string.Equals(currentRole, "Doctor", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(currentUsername))
+        {
+            return null;
+        }
+
+        var doctorProfile = await _hospitalDoctorWorklistRepository.ResolveDoctorByUsernameAsync(currentUsername, ct);
+        return doctorProfile?.DoctorProfileId;
+    }
+
+    private async Task<bool> CanAccessDoctorScopedEncounterAsync(
+        Guid encounterDoctorProfileId,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct)
+    {
+        var scopedDoctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        return !scopedDoctorProfileId.HasValue || scopedDoctorProfileId.Value == encounterDoctorProfileId;
+    }
+
     private static string GenerateEncounterNumber(DateTime nowUtc)
-        => $"ENC-{nowUtc:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
+        => CompactCodeGenerator.Generate("EN", nowUtc);
 
     private HospitalEncounterDetailDto MapDetail(HospitalEncounterAggregateSnapshot encounter)
     {

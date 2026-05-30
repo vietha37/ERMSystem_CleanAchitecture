@@ -2,6 +2,7 @@ using System.Text.Json;
 using ERMSystem.Application.DTOs;
 using ERMSystem.Application.DTOs.Common;
 using ERMSystem.Application.Interfaces;
+using ERMSystem.Application.Utilities;
 
 namespace ERMSystem.Application.Services;
 
@@ -14,34 +15,59 @@ public class HospitalBillingService : IHospitalBillingService
     private readonly IBusinessMetricsRecorder _businessMetricsRecorder;
     private readonly IComplianceAuditRecorder _complianceAuditRecorder;
     private readonly IDashboardQueryCache _dashboardQueryCache;
+    private readonly IHospitalDoctorWorklistRepository _hospitalDoctorWorklistRepository;
 
     public HospitalBillingService(
         IHospitalBillingRepository hospitalBillingRepository,
         IHospitalIdentityBridgeService hospitalIdentityBridgeService,
         IBusinessMetricsRecorder businessMetricsRecorder,
         IComplianceAuditRecorder complianceAuditRecorder,
-        IDashboardQueryCache dashboardQueryCache)
+        IDashboardQueryCache dashboardQueryCache,
+        IHospitalDoctorWorklistRepository hospitalDoctorWorklistRepository)
     {
         _hospitalBillingRepository = hospitalBillingRepository;
         _hospitalIdentityBridgeService = hospitalIdentityBridgeService;
         _businessMetricsRecorder = businessMetricsRecorder;
         _complianceAuditRecorder = complianceAuditRecorder;
         _dashboardQueryCache = dashboardQueryCache;
+        _hospitalDoctorWorklistRepository = hospitalDoctorWorklistRepository;
     }
 
     public Task<PaginatedResult<HospitalInvoiceSummaryDto>> GetWorklistAsync(
         HospitalInvoiceWorklistRequestDto request,
+        string currentRole,
+        string? currentUsername,
         CancellationToken ct = default)
-        => _hospitalBillingRepository.GetWorklistAsync(request, ct);
+        => GetScopedWorklistAsync(request, currentRole, currentUsername, ct);
 
-    public async Task<HospitalInvoiceDetailDto?> GetByIdAsync(Guid invoiceId, CancellationToken ct = default)
+    public async Task<HospitalInvoiceDetailDto?> GetByIdAsync(
+        Guid invoiceId,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct = default)
     {
         var invoice = await _hospitalBillingRepository.GetByIdAsync(invoiceId, ct);
-        return invoice == null ? null : MapDetail(invoice);
+        if (invoice == null)
+        {
+            return null;
+        }
+
+        if (!await CanAccessDoctorScopedDataAsync(invoice.DoctorProfileId, currentRole, currentUsername, ct))
+        {
+            return null;
+        }
+
+        return MapDetail(invoice);
     }
 
-    public Task<HospitalBillingEligibleEncounterDto[]> GetEligibleEncountersAsync(CancellationToken ct = default)
-        => _hospitalBillingRepository.GetEligibleEncountersAsync(ct);
+    public async Task<HospitalBillingEligibleEncounterDto[]> GetEligibleEncountersAsync(
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct = default)
+    {
+        var doctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        return await _hospitalBillingRepository.GetEligibleEncountersAsync(doctorProfileId, ct);
+    }
 
     public async Task<HospitalInvoiceDetailDto> CreateInvoiceAsync(CreateHospitalInvoiceDto request, CancellationToken ct = default)
     {
@@ -580,9 +606,13 @@ public class HospitalBillingService : IHospitalBillingService
         return MapDetail(updated);
     }
 
-    public async Task<HospitalPaymentReconciliationSummaryDto> GetReconciliationSummaryAsync(CancellationToken ct = default)
+    public async Task<HospitalPaymentReconciliationSummaryDto> GetReconciliationSummaryAsync(
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct = default)
     {
-        var snapshot = await _hospitalBillingRepository.GetReconciliationSnapshotAsync(ct);
+        var doctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        var snapshot = await _hospitalBillingRepository.GetReconciliationSnapshotAsync(doctorProfileId, ct);
         return new HospitalPaymentReconciliationSummaryDto
         {
             GeneratedAtLocal = ConvertUtcToClinicLocal(snapshot.GeneratedAtUtc),
@@ -609,6 +639,55 @@ public class HospitalBillingService : IHospitalBillingService
         };
     }
 
+    private async Task<PaginatedResult<HospitalInvoiceSummaryDto>> GetScopedWorklistAsync(
+        HospitalInvoiceWorklistRequestDto request,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct)
+    {
+        var doctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        if (string.Equals(currentRole, "Doctor", StringComparison.OrdinalIgnoreCase) && !doctorProfileId.HasValue)
+        {
+            return new PaginatedResult<HospitalInvoiceSummaryDto>(
+                Array.Empty<HospitalInvoiceSummaryDto>(),
+                0,
+                request.PageNumber,
+                request.PageSize);
+        }
+
+        request.DoctorProfileId = doctorProfileId;
+        return await _hospitalBillingRepository.GetWorklistAsync(request, ct);
+    }
+
+    private async Task<Guid?> ResolveScopedDoctorProfileIdAsync(
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct)
+    {
+        if (!string.Equals(currentRole, "Doctor", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(currentUsername))
+        {
+            return null;
+        }
+
+        var doctorProfile = await _hospitalDoctorWorklistRepository.ResolveDoctorByUsernameAsync(currentUsername, ct);
+        return doctorProfile?.DoctorProfileId;
+    }
+
+    private async Task<bool> CanAccessDoctorScopedDataAsync(
+        Guid? doctorProfileId,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct)
+    {
+        var scopedDoctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        return !scopedDoctorProfileId.HasValue || (doctorProfileId.HasValue && scopedDoctorProfileId.Value == doctorProfileId.Value);
+    }
+
     private static HospitalInvoiceDetailDto MapDetail(HospitalInvoiceAggregateSnapshot invoice)
     {
         var paidAmount = CalculateNetPaidAmount(invoice);
@@ -620,6 +699,7 @@ public class HospitalBillingService : IHospitalBillingService
             PatientId = invoice.PatientId,
             PatientName = invoice.PatientName,
             MedicalRecordNumber = invoice.MedicalRecordNumber,
+            DoctorProfileId = invoice.DoctorProfileId,
             EncounterId = invoice.EncounterId,
             EncounterNumber = invoice.EncounterNumber,
             DoctorName = invoice.DoctorName,
@@ -708,13 +788,13 @@ public class HospitalBillingService : IHospitalBillingService
     }
 
     private static string GenerateInvoiceNumber(DateTime nowUtc)
-        => $"INV-{nowUtc:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
+        => CompactCodeGenerator.Generate("IV", nowUtc);
 
     private static string GeneratePaymentReference(DateTime nowUtc)
-        => $"PAY-{nowUtc:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
+        => CompactCodeGenerator.Generate("PY", nowUtc);
 
     private static string GenerateRefundReference(DateTime nowUtc)
-        => $"REF-{nowUtc:yyyyMMddHHmmss}-{Random.Shared.Next(1000, 9999)}";
+        => CompactCodeGenerator.Generate("RF", nowUtc);
 
     private static TimeZoneInfo ResolveClinicTimeZone()
     {
