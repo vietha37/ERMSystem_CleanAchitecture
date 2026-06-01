@@ -728,6 +728,7 @@ CREATE TABLE billing.Payments (
     InvoiceId UNIQUEIDENTIFIER NOT NULL,
     PaymentReference NVARCHAR(100) NOT NULL,
     PaymentMethod NVARCHAR(50) NOT NULL,
+    GatewayProvider NVARCHAR(50) NULL,
     Amount DECIMAL(18,2) NOT NULL,
     PaymentStatus NVARCHAR(30) NOT NULL,
     PaidAtUtc DATETIME2 NULL,
