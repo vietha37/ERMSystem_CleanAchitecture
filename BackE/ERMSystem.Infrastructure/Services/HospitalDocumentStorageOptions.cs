@@ -1,8 +1,16 @@
 namespace ERMSystem.Infrastructure.Services;
 
-public class LocalDocumentStorageOptions
+public class HospitalDocumentStorageOptions
 {
-    public string Provider { get; set; } = "local";
+    public string DefaultProvider { get; set; } = "LocalStorage";
+    public Dictionary<string, HospitalDocumentStorageProviderOptions> Providers { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
+}
+
+public class HospitalDocumentStorageProviderOptions
+{
+    public string Type { get; set; } = "Local";
+    public bool Enabled { get; set; } = true;
     public string AccessMode { get; set; } = "ProxyTicket";
     public string? PublicBaseUrl { get; set; }
     public string RootPath { get; set; } = "App_Data/ObjectStorage";

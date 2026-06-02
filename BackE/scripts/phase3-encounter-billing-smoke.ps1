@@ -6,6 +6,8 @@ $env:DOTNET_CLI_HOME = "D:\ERMSystem\.dotnet-home"
 $env:DOTNET_ADD_GLOBAL_TOOLS_TO_PATH = "0"
 $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = "1"
 
+Add-Type -AssemblyName System.Net.Http
+
 $apiProj = "D:\ERMSystem\BackE\ERMSystem.API\ERMSystem.API.csproj"
 $baseUrl = "http://localhost:5219"
 
@@ -216,6 +218,66 @@ try {
     throw "Encounter attachment khong duoc luu."
   }
 
+  $uploadTempFile = Join-Path $env:TEMP ("encounter-attachment-" + $suffix + ".txt")
+  [System.IO.File]::WriteAllText($uploadTempFile, "phase3 attachment smoke " + $suffix)
+
+  $multipart = New-Object System.Net.Http.MultipartFormDataContent
+  $documentTypeContent = New-Object System.Net.Http.StringContent("EncounterSummary")
+  $fileStream = [System.IO.File]::OpenRead($uploadTempFile)
+  $fileContent = New-Object System.Net.Http.StreamContent($fileStream)
+  $fileContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("text/plain")
+  $multipart.Add($documentTypeContent, "DocumentType")
+  $multipart.Add($fileContent, "File", [System.IO.Path]::GetFileName($uploadTempFile))
+
+  $httpClient = New-Object System.Net.Http.HttpClient
+  $httpClient.DefaultRequestHeaders.Authorization = New-Object System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", $login.token)
+  $uploadResponse = $httpClient.PostAsync("$baseUrl/api/hospital-encounters/$($encounter.encounterId)/attachments/upload", $multipart).GetAwaiter().GetResult()
+  if (-not $uploadResponse.IsSuccessStatusCode) {
+    $uploadBody = $uploadResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+    throw "Upload attachment khong thanh cong: $uploadBody"
+  }
+
+  $uploadedEncounter = $uploadResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
+  $latestAttachment = @($uploadedEncounter.attachments | Sort-Object uploadedAtLocal -Descending) | Select-Object -First 1
+  if ($null -eq $latestAttachment) {
+    throw "Khong tim thay attachment vua upload de test download ticket."
+  }
+
+  $downloadTicket = Invoke-RestMethod `
+    -Method Get `
+    -Uri "$baseUrl/api/hospital-encounters/$($encounter.encounterId)/attachments/$($latestAttachment.attachmentId)/download-ticket" `
+    -Headers $headers
+
+  if ([string]::IsNullOrWhiteSpace($downloadTicket.storageProvider)) {
+    throw "Download ticket khong tra ve storage provider."
+  }
+
+  if ($downloadTicket.accessMode -ne "ProxyTicket") {
+    throw "Download ticket dang le o che do ProxyTicket voi cau hinh hien tai."
+  }
+
+  if ([string]::IsNullOrWhiteSpace($downloadTicket.accessToken) -or [string]::IsNullOrWhiteSpace($downloadTicket.downloadUrl)) {
+    throw "Download ticket khong tra ve du access token/download url."
+  }
+
+  $downloadUrl = $downloadTicket.downloadUrl
+  if ($downloadUrl.StartsWith("/")) {
+    $downloadUrl = "$baseUrl$downloadUrl"
+  }
+
+  $downloadByTicket = Invoke-WebRequest `
+    -Method Get `
+    -Uri $downloadUrl `
+    -UseBasicParsing
+
+  if ($downloadByTicket.StatusCode -ne 200) {
+    throw "Tai attachment bang download ticket khong thanh cong."
+  }
+
+  if (-not $downloadByTicket.Content.Contains("phase3 attachment smoke")) {
+    throw "Noi dung attachment tai qua download ticket khong dung."
+  }
+
   $medicines = Invoke-RestMethod `
     -Method Get `
     -Uri "$baseUrl/api/hospital-prescriptions/medicine-catalog" `
@@ -385,6 +447,7 @@ try {
   Write-Output ("encounter_number=" + $encounter.encounterNumber)
   Write-Output ("encounter_signed=" + $encounter.isClinicalNoteSigned)
   Write-Output ("encounter_attachments=" + $encounterWithAttachment.attachments.Count)
+  Write-Output ("attachment_ticket_mode=" + $downloadTicket.accessMode)
   Write-Output ("invalid_prescription_rejected=" + $invalidPrescriptionRejected)
   Write-Output ("prescription_number=" + $prescription.prescriptionNumber)
   Write-Output ("prescription_warning_count=" + $prescription.warnings.Count)
@@ -394,6 +457,21 @@ try {
   Write-Output ("payment_status=" + $paidInvoice.invoiceStatus)
 }
 finally {
+  if ($fileStream) {
+    $fileStream.Dispose()
+  }
+  if ($fileContent) {
+    $fileContent.Dispose()
+  }
+  if ($multipart) {
+    $multipart.Dispose()
+  }
+  if ($httpClient) {
+    $httpClient.Dispose()
+  }
+  if ($uploadTempFile -and (Test-Path $uploadTempFile)) {
+    Remove-Item -LiteralPath $uploadTempFile -Force
+  }
   if ($process -and -not $process.HasExited) {
     Stop-Process -Id $process.Id -Force
   }

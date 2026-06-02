@@ -12,6 +12,9 @@ namespace ERMSystem.Application.DTOs
         [MinLength(6)]
         public string Password { get; set; } = string.Empty;
 
+        [MinLength(3)]
+        public string? Name { get; set; }
+
         [Required]
         [RegularExpression("^(Admin|Doctor|Receptionist)$",
             ErrorMessage = "Role must be Admin, Doctor, or Receptionist.")]

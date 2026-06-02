@@ -15,6 +15,7 @@ public interface IHospitalBillingRepository
     Task<HospitalBillingDashboardSnapshot> GetDashboardSnapshotAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
     Task<HospitalPaymentRecordSnapshot?> GetPaymentAsync(Guid invoiceId, string paymentReference, CancellationToken ct = default);
     Task<HospitalPaymentReconciliationSnapshot> GetReconciliationSnapshotAsync(Guid? doctorProfileId, CancellationToken ct = default);
+    Task<HospitalPaymentRecordSnapshot[]> FindPaymentsForReconciliationAsync(HospitalPaymentReconciliationLookupQuery query, CancellationToken ct = default);
     Task AddInvoiceAsync(HospitalInvoiceCreateCommand command, CancellationToken ct = default);
     Task AddInvoiceItemAsync(HospitalInvoiceItemCreateCommand command, CancellationToken ct = default);
     Task AddPaymentAsync(HospitalPaymentCreateCommand command, CancellationToken ct = default);
@@ -68,6 +69,7 @@ public class HospitalPaymentSnapshot
     public Guid PaymentId { get; set; }
     public string PaymentReference { get; set; } = string.Empty;
     public string PaymentMethod { get; set; } = string.Empty;
+    public string? GatewayProvider { get; set; }
     public decimal Amount { get; set; }
     public string PaymentStatus { get; set; } = string.Empty;
     public DateTime? PaidAtUtc { get; set; }
@@ -81,6 +83,7 @@ public class HospitalPaymentRecordSnapshot
     public Guid InvoiceId { get; set; }
     public string PaymentReference { get; set; } = string.Empty;
     public string PaymentMethod { get; set; } = string.Empty;
+    public string? GatewayProvider { get; set; }
     public decimal Amount { get; set; }
     public string PaymentStatus { get; set; } = string.Empty;
     public DateTime? PaidAtUtc { get; set; }
@@ -102,6 +105,13 @@ public class HospitalPaymentReconciliationSnapshot
     public decimal RefundedAmount { get; set; }
     public int MissingExternalTransactionCount { get; set; }
     public HospitalPaymentSnapshot[] RecentPayments { get; set; } = Array.Empty<HospitalPaymentSnapshot>();
+}
+
+public class HospitalPaymentReconciliationLookupQuery
+{
+    public Guid? DoctorProfileId { get; set; }
+    public string[] PaymentReferences { get; set; } = Array.Empty<string>();
+    public string[] ExternalTransactionIds { get; set; } = Array.Empty<string>();
 }
 
 public class HospitalBillingEncounterSnapshot
@@ -180,6 +190,7 @@ public class HospitalPaymentCreateCommand
     public Guid InvoiceId { get; set; }
     public string PaymentReference { get; set; } = string.Empty;
     public string PaymentMethod { get; set; } = string.Empty;
+    public string? GatewayProvider { get; set; }
     public decimal Amount { get; set; }
     public string PaymentStatus { get; set; } = string.Empty;
     public DateTime? PaidAtUtc { get; set; }
@@ -190,6 +201,7 @@ public class HospitalPaymentCreateCommand
 public class HospitalPaymentUpdateCommand
 {
     public Guid PaymentId { get; set; }
+    public string? GatewayProvider { get; set; }
     public string PaymentStatus { get; set; } = string.Empty;
     public DateTime? PaidAtUtc { get; set; }
     public Guid? ReceivedByUserId { get; set; }

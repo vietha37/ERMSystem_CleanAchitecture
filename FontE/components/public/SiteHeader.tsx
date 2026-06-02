@@ -27,12 +27,14 @@ export function SiteHeader() {
   const pathname = usePathname();
   const [role, setRole] = useState<UserRole | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
 
   useEffect(() => {
     const syncSession = async () => {
       const isValid = await authService.ensureValidSession();
       setRole(isValid ? authService.getRole() : null);
       setUsername(isValid ? authService.getUsername() : null);
+      setDisplayName(isValid ? authService.getDisplayName() : null);
     };
 
     void syncSession();
@@ -62,7 +64,7 @@ export function SiteHeader() {
           <div className="flex flex-wrap items-center gap-2">
             {isPatient && (
               <span className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-100">
-                Đang đăng nhập: {username ?? "Bệnh nhân"}
+                Đang đăng nhập: {displayName ?? username ?? "Bệnh nhân"}
               </span>
             )}
             {isInternalUser ? (

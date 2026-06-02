@@ -26,7 +26,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<RequestObservabilityOptions>(builder.Configuration.GetSection("Observability"));
 builder.Services.Configure<OpenTelemetryTracingOptions>(builder.Configuration.GetSection("OpenTelemetry"));
 builder.Services.Configure<OperationalAlertOptions>(builder.Configuration.GetSection("OperationalAlerts"));
-builder.Services.Configure<PaymentGatewayCallbackOptions>(builder.Configuration.GetSection("PaymentGateway"));
+builder.Services.Configure<HospitalPaymentGatewayOptions>(builder.Configuration.GetSection("PaymentGateway"));
 builder.Services.Configure<TwoFactorAuthOptions>(builder.Configuration.GetSection("Security:TwoFactor"));
 builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection("RabbitMQ"));
 builder.Services.Configure<OutboxPublisherOptions>(builder.Configuration.GetSection("OutboxPublisher"));
@@ -38,7 +38,7 @@ builder.Services.Configure<RevisitReminderOptions>(builder.Configuration.GetSect
 builder.Services.Configure<SatisfactionSurveyOptions>(builder.Configuration.GetSection("SatisfactionSurvey"));
 builder.Services.Configure<CustomerCareFollowUpOptions>(builder.Configuration.GetSection("CustomerCareFollowUp"));
 builder.Services.Configure<DistributedCacheRuntimeOptions>(builder.Configuration.GetSection("Redis"));
-builder.Services.Configure<LocalDocumentStorageOptions>(builder.Configuration.GetSection("LocalDocumentStorage"));
+builder.Services.Configure<HospitalDocumentStorageOptions>(builder.Configuration.GetSection("DocumentStorage"));
 builder.Services.AddSingleton<ApiMetricsCollector>();
 builder.Services.AddSingleton<IBusinessMetricsRecorder, BusinessMetricsRecorder>();
 builder.Services.AddSingleton<BackgroundWorkerHealthRegistry>();
@@ -46,7 +46,6 @@ builder.Services.AddSingleton<DashboardCacheMetricsRegistry>();
 builder.Services.AddSingleton<NotificationPipelineMetricsReader>();
 builder.Services.AddSingleton<OperationalAlertEvaluator>();
 builder.Services.AddSingleton<OperationalAlertWebhookNotifier>();
-builder.Services.AddSingleton<PaymentGatewayCallbackVerifier>();
 builder.Services.AddHttpClient("operational-alert-webhook", (serviceProvider, client) =>
 {
     var options = serviceProvider
@@ -99,22 +98,9 @@ if (openTelemetryTracingOptions.Enabled)
 }
 
 // ── Database ──────────────────────────────────────────────────────────────────
-builder.Services.AddDbContext<ERMSystem.Infrastructure.Data.ApplicationDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        sqlOptions =>
-        {
-            sqlOptions.CommandTimeout(30);
-            sqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 5,
-                maxRetryDelay: TimeSpan.FromSeconds(5),
-                errorNumbersToAdd: null);
-        }));
-
 builder.Services.AddDbContext<ERMSystem.Infrastructure.HospitalData.HospitalDbContext>(options =>
     options.UseSqlServer(
-        builder.Configuration.GetConnectionString("HospitalConnection")
-        ?? builder.Configuration.GetConnectionString("DefaultConnection"),
+        builder.Configuration.GetConnectionString("HospitalConnection"),
         sqlOptions =>
         {
             sqlOptions.CommandTimeout(30);
@@ -313,13 +299,14 @@ builder.Services.AddScoped<IHospitalAppointmentRepository, HospitalAppointmentRe
 builder.Services.AddScoped<IHospitalAppointmentService, HospitalAppointmentService>();
 builder.Services.AddScoped<IHospitalEncounterRepository, HospitalEncounterRepository>();
 builder.Services.AddScoped<IHospitalEncounterService, HospitalEncounterService>();
-builder.Services.AddSingleton<IHospitalDocumentStorageService, LocalHospitalDocumentStorageService>();
+builder.Services.AddSingleton<IHospitalDocumentStorageService, ConfigurableHospitalDocumentStorageService>();
 builder.Services.AddScoped<IHospitalPrescriptionRepository, HospitalPrescriptionRepository>();
 builder.Services.AddScoped<IHospitalPrescriptionService, HospitalPrescriptionService>();
 builder.Services.AddScoped<IHospitalClinicalOrderRepository, HospitalClinicalOrderRepository>();
 builder.Services.AddScoped<IHospitalClinicalOrderService, HospitalClinicalOrderService>();
 builder.Services.AddScoped<IHospitalBillingRepository, HospitalBillingRepository>();
 builder.Services.AddScoped<IHospitalBillingService, HospitalBillingService>();
+builder.Services.AddSingleton<IHospitalPaymentGatewayService, ConfigurableHospitalPaymentGatewayService>();
 builder.Services.AddScoped<IHospitalPatientPortalRepository, HospitalPatientPortalRepository>();
 builder.Services.AddScoped<IHospitalPatientPortalService, HospitalPatientPortalService>();
 builder.Services.AddScoped<IHospitalNotificationDeliveryRepository, HospitalNotificationDeliveryRepository>();

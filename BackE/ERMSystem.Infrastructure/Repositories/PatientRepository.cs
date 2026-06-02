@@ -1,26 +1,28 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
 using ERMSystem.Application.Interfaces;
 using ERMSystem.Domain.Entities;
-using ERMSystem.Infrastructure.Data;
+using ERMSystem.Infrastructure.HospitalData;
+using ERMSystem.Infrastructure.HospitalData.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace ERMSystem.Infrastructure.Repositories
 {
     public class PatientRepository : IPatientRepository
     {
-        private readonly ApplicationDbContext _context;
+        private readonly HospitalDbContext _context;
 
-        public PatientRepository(ApplicationDbContext context)
+        public PatientRepository(HospitalDbContext context)
         {
             _context = context;
         }
 
         public async Task<List<Patient>> GetAllAsync(CancellationToken ct = default)
-            => await _context.Patients.ToListAsync(ct);
+        {
+            var rows = await BuildPatientQuery()
+                .OrderBy(x => x.Patient.CreatedAtUtc)
+                .ToListAsync(ct);
+
+            return rows.Select(MapPatient).ToList();
+        }
 
         public async Task<(IEnumerable<Patient> Items, int TotalCount)> GetPagedAsync(
             int pageNumber,
@@ -28,53 +30,67 @@ namespace ERMSystem.Infrastructure.Repositories
             string? textSearch = null,
             CancellationToken ct = default)
         {
-            var query = _context.Patients.AsQueryable();
+            var query = BuildPatientQuery();
 
             if (!string.IsNullOrWhiteSpace(textSearch))
             {
                 var keyword = textSearch.Trim();
                 var pattern = $"%{keyword}%";
                 query = query.Where(p =>
-                    EF.Functions.Like(p.FullName, pattern) ||
-                    EF.Functions.Like(p.Phone, pattern) ||
-                    EF.Functions.Like(p.Address, pattern) ||
-                    EF.Functions.Like(p.Gender, pattern) ||
-                    (p.EmergencyContactName != null && EF.Functions.Like(p.EmergencyContactName, pattern)) ||
-                    (p.EmergencyContactPhone != null && EF.Functions.Like(p.EmergencyContactPhone, pattern)) ||
-                    (p.EmergencyContactRelationship != null && EF.Functions.Like(p.EmergencyContactRelationship, pattern)));
+                    EF.Functions.Like(p.Patient.FullName, pattern) ||
+                    (p.Patient.Phone != null && EF.Functions.Like(p.Patient.Phone, pattern)) ||
+                    (p.Patient.AddressLine1 != null && EF.Functions.Like(p.Patient.AddressLine1, pattern)) ||
+                    (p.Patient.AddressLine2 != null && EF.Functions.Like(p.Patient.AddressLine2, pattern)) ||
+                    (p.Patient.Ward != null && EF.Functions.Like(p.Patient.Ward, pattern)) ||
+                    (p.Patient.District != null && EF.Functions.Like(p.Patient.District, pattern)) ||
+                    (p.Patient.Province != null && EF.Functions.Like(p.Patient.Province, pattern)) ||
+                    EF.Functions.Like(p.Patient.Gender, pattern) ||
+                    (p.EmergencyContact != null && EF.Functions.Like(p.EmergencyContact.FullName, pattern)) ||
+                    (p.EmergencyContact != null && EF.Functions.Like(p.EmergencyContact.Phone, pattern)) ||
+                    (p.EmergencyContact != null && EF.Functions.Like(p.EmergencyContact.Relationship, pattern)));
             }
 
             var totalCount = await query.CountAsync(ct);
-            var items = await query
+            var rows = await query
+                .OrderBy(x => x.Patient.CreatedAtUtc)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync(ct);
-            return (items, totalCount);
+
+            return (rows.Select(MapPatient).ToList(), totalCount);
         }
 
-        public async Task<int> GetTotalCountAsync(CancellationToken ct = default)
-            => await _context.Patients.CountAsync(ct);
+        public Task<int> GetTotalCountAsync(CancellationToken ct = default)
+            => _context.Patients.CountAsync(x => x.DeletedAtUtc == null, ct);
 
-        public async Task<Dictionary<DateTime, int>> GetCreatedCountByDayAsync(
-            DateTime fromUtc,
-            CancellationToken ct = default)
+        public async Task<Dictionary<DateTime, int>> GetCreatedCountByDayAsync(DateTime fromUtc, CancellationToken ct = default)
         {
             return await _context.Patients
                 .AsNoTracking()
-                .Where(p => p.CreatedAt >= fromUtc)
-                .GroupBy(p => p.CreatedAt.Date)
+                .Where(p => p.DeletedAtUtc == null && p.CreatedAtUtc >= fromUtc)
+                .GroupBy(p => p.CreatedAtUtc.Date)
                 .Select(g => new { Date = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.Date, x => x.Count, ct);
         }
 
         public async Task<Patient?> GetByIdAsync(Guid id, CancellationToken ct = default)
-            => await _context.Patients.FindAsync(new object[] { id }, ct);
+        {
+            var row = await BuildPatientQuery()
+                .FirstOrDefaultAsync(x => x.Patient.Id == id, ct);
+
+            return row == null ? null : MapPatient(row);
+        }
 
         public async Task<Patient?> GetByAppUserIdAsync(Guid appUserId, CancellationToken ct = default)
-            => await _context.Patients.FirstOrDefaultAsync(p => p.AppUserId == appUserId, ct);
+        {
+            var row = await BuildPatientQuery()
+                .FirstOrDefaultAsync(x => x.AppUserId == appUserId, ct);
 
-        public async Task<int> GetAppointmentCountAsync(Guid patientId, CancellationToken ct = default)
-            => await _context.Appointments.CountAsync(a => a.PatientId == patientId, ct);
+            return row == null ? null : MapPatient(row);
+        }
+
+        public Task<int> GetAppointmentCountAsync(Guid patientId, CancellationToken ct = default)
+            => _context.Appointments.CountAsync(a => a.PatientId == patientId, ct);
 
         public async Task<IReadOnlyCollection<Patient>> GetPotentialDuplicateCandidatesAsync(
             Guid patientId,
@@ -84,19 +100,23 @@ namespace ERMSystem.Infrastructure.Repositories
             string? emergencyContactPhone,
             CancellationToken ct = default)
         {
-            var query = _context.Patients
-                .AsNoTracking()
-                .Where(p => p.Id != patientId);
+            var dob = DateOnly.FromDateTime(dateOfBirth);
 
-            query = query.Where(p =>
-                p.Phone == phone ||
-                (p.FullName == fullName && p.DateOfBirth == dateOfBirth) ||
-                (!string.IsNullOrWhiteSpace(emergencyContactPhone) && p.EmergencyContactPhone == emergencyContactPhone));
+            var query = BuildPatientQuery()
+                .Where(x => x.Patient.Id != patientId)
+                .Where(x =>
+                    x.Patient.Phone == phone ||
+                    (x.Patient.FullName == fullName && x.Patient.DateOfBirth == dob) ||
+                    (!string.IsNullOrWhiteSpace(emergencyContactPhone) &&
+                     x.EmergencyContact != null &&
+                     x.EmergencyContact.Phone == emergencyContactPhone));
 
-            return await query
-                .OrderBy(p => p.FullName)
-                .ThenBy(p => p.CreatedAt)
+            var rows = await query
+                .OrderBy(x => x.Patient.FullName)
+                .ThenBy(x => x.Patient.CreatedAtUtc)
                 .ToListAsync(ct);
+
+            return rows.Select(MapPatient).ToList();
         }
 
         public async Task<int> ReassignAppointmentsAsync(Guid sourcePatientId, Guid targetPatientId, CancellationToken ct = default)
@@ -108,34 +128,216 @@ namespace ERMSystem.Infrastructure.Repositories
             foreach (var appointment in appointments)
             {
                 appointment.PatientId = targetPatientId;
+                appointment.UpdatedAtUtc = DateTime.UtcNow;
             }
 
+            var encounters = await _context.Encounters
+                .Where(e => e.PatientId == sourcePatientId)
+                .ToListAsync(ct);
+
+            foreach (var encounter in encounters)
+            {
+                encounter.PatientId = targetPatientId;
+                encounter.UpdatedAtUtc = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync(ct);
             return appointments.Count;
         }
 
         public async Task AddAsync(Patient patient, CancellationToken ct = default)
         {
-            await _context.Patients.AddAsync(patient, ct);
+            var nowUtc = DateTime.UtcNow;
+            var entity = new HospitalPatientEntity
+            {
+                Id = patient.Id,
+                MedicalRecordNumber = $"MRN-{patient.Id.ToString("N")[..8].ToUpperInvariant()}",
+                FullName = patient.FullName.Trim(),
+                DateOfBirth = DateOnly.FromDateTime(patient.DateOfBirth),
+                Gender = patient.Gender.Trim(),
+                Phone = patient.Phone.Trim(),
+                AddressLine1 = patient.Address.Trim(),
+                CreatedAtUtc = patient.CreatedAt == default ? nowUtc : patient.CreatedAt,
+                UpdatedAtUtc = nowUtc
+            };
+
+            await _context.Patients.AddAsync(entity, ct);
+            AddOrUpdateEmergencyContact(entity.Id, patient);
+
+            if (patient.AppUserId.HasValue)
+            {
+                await UpsertPatientAccountAsync(entity.Id, patient.AppUserId.Value, nowUtc, ct);
+            }
+
             await _context.SaveChangesAsync(ct);
         }
 
         public async Task UpdateAsync(Patient patient, CancellationToken ct = default)
         {
-            _context.Patients.Update(patient);
+            var entity = await _context.Patients
+                .FirstOrDefaultAsync(x => x.Id == patient.Id && x.DeletedAtUtc == null, ct);
+            if (entity == null)
+            {
+                return;
+            }
+
+            entity.FullName = patient.FullName.Trim();
+            entity.DateOfBirth = DateOnly.FromDateTime(patient.DateOfBirth);
+            entity.Gender = patient.Gender.Trim();
+            entity.Phone = patient.Phone.Trim();
+            entity.AddressLine1 = patient.Address.Trim();
+            entity.UpdatedAtUtc = DateTime.UtcNow;
+
+            AddOrUpdateEmergencyContact(entity.Id, patient);
+
+            if (patient.AppUserId.HasValue)
+            {
+                await UpsertPatientAccountAsync(entity.Id, patient.AppUserId.Value, DateTime.UtcNow, ct);
+            }
+
             await _context.SaveChangesAsync(ct);
         }
 
         public async Task MergeAsync(Patient sourcePatient, Patient targetPatient, CancellationToken ct = default)
         {
-            _context.Patients.Update(targetPatient);
-            _context.Patients.Remove(sourcePatient);
+            await UpdateAsync(targetPatient, ct);
+
+            var sourceEntity = await _context.Patients
+                .Include(x => x.PatientAccount)
+                .Include(x => x.EmergencyContacts)
+                .FirstOrDefaultAsync(x => x.Id == sourcePatient.Id, ct);
+
+            if (sourceEntity == null)
+            {
+                return;
+            }
+
+            sourceEntity.DeletedAtUtc ??= DateTime.UtcNow;
+            sourceEntity.UpdatedAtUtc = DateTime.UtcNow;
+
+            if (sourceEntity.PatientAccount != null)
+            {
+                _context.PatientAccounts.Remove(sourceEntity.PatientAccount);
+            }
+
+            if (sourceEntity.EmergencyContacts.Count > 0)
+            {
+                _context.PatientEmergencyContacts.RemoveRange(sourceEntity.EmergencyContacts);
+            }
+
             await _context.SaveChangesAsync(ct);
         }
 
         public async Task DeleteAsync(Patient patient, CancellationToken ct = default)
         {
-            _context.Patients.Remove(patient);
+            var entity = await _context.Patients.FirstOrDefaultAsync(x => x.Id == patient.Id, ct);
+            if (entity == null)
+            {
+                return;
+            }
+
+            entity.DeletedAtUtc ??= DateTime.UtcNow;
+            entity.UpdatedAtUtc = DateTime.UtcNow;
             await _context.SaveChangesAsync(ct);
+        }
+
+        private IQueryable<PatientJoinRow> BuildPatientQuery()
+        {
+            return from patient in _context.Patients.AsNoTracking()
+                   where patient.DeletedAtUtc == null
+                   join patientAccount in _context.PatientAccounts.AsNoTracking()
+                       on patient.Id equals patientAccount.PatientId into patientAccountGroup
+                   from patientAccount in patientAccountGroup.DefaultIfEmpty()
+                   join emergencyContact in _context.PatientEmergencyContacts.AsNoTracking()
+                       on patient.Id equals emergencyContact.PatientId into emergencyContactGroup
+                   from emergencyContact in emergencyContactGroup
+                       .OrderBy(x => x.Id)
+                       .Take(1)
+                       .DefaultIfEmpty()
+                   select new PatientJoinRow
+                   {
+                       Patient = patient,
+                       AppUserId = patientAccount != null ? patientAccount.UserId : null,
+                       EmergencyContact = emergencyContact
+                   };
+        }
+
+        private static Patient MapPatient(PatientJoinRow row)
+        {
+            return new Patient
+            {
+                Id = row.Patient.Id,
+                AppUserId = row.AppUserId,
+                FullName = row.Patient.FullName,
+                DateOfBirth = row.Patient.DateOfBirth.ToDateTime(TimeOnly.MinValue),
+                Gender = row.Patient.Gender,
+                Phone = row.Patient.Phone ?? string.Empty,
+                Address = string.Join(", ", new[]
+                {
+                    row.Patient.AddressLine1,
+                    row.Patient.AddressLine2,
+                    row.Patient.Ward,
+                    row.Patient.District,
+                    row.Patient.Province
+                }.Where(value => !string.IsNullOrWhiteSpace(value))),
+                EmergencyContactName = row.EmergencyContact?.FullName,
+                EmergencyContactPhone = row.EmergencyContact?.Phone,
+                EmergencyContactRelationship = row.EmergencyContact?.Relationship,
+                CreatedAt = row.Patient.CreatedAtUtc
+            };
+        }
+
+        private void AddOrUpdateEmergencyContact(Guid patientId, Patient patient)
+        {
+            var existingContacts = _context.PatientEmergencyContacts.Where(x => x.PatientId == patientId);
+            _context.PatientEmergencyContacts.RemoveRange(existingContacts);
+
+            if (string.IsNullOrWhiteSpace(patient.EmergencyContactName) ||
+                string.IsNullOrWhiteSpace(patient.EmergencyContactPhone) ||
+                string.IsNullOrWhiteSpace(patient.EmergencyContactRelationship))
+            {
+                return;
+            }
+
+            _context.PatientEmergencyContacts.Add(new HospitalPatientEmergencyContactEntity
+            {
+                Id = Guid.NewGuid(),
+                PatientId = patientId,
+                FullName = patient.EmergencyContactName.Trim(),
+                Phone = patient.EmergencyContactPhone.Trim(),
+                Relationship = patient.EmergencyContactRelationship.Trim(),
+                Address = patient.Address.Trim()
+            });
+        }
+
+        private async Task UpsertPatientAccountAsync(Guid patientId, Guid userId, DateTime activatedAtUtc, CancellationToken ct)
+        {
+            var existingAccount = await _context.PatientAccounts
+                .FirstOrDefaultAsync(x => x.PatientId == patientId, ct);
+
+            if (existingAccount == null)
+            {
+                await _context.PatientAccounts.AddAsync(new HospitalPatientAccountEntity
+                {
+                    PatientId = patientId,
+                    UserId = userId,
+                    ActivatedAtUtc = activatedAtUtc,
+                    PortalStatus = "Active"
+                }, ct);
+
+                return;
+            }
+
+            existingAccount.UserId = userId;
+            existingAccount.ActivatedAtUtc = activatedAtUtc;
+            existingAccount.PortalStatus = "Active";
+        }
+
+        private sealed class PatientJoinRow
+        {
+            public HospitalPatientEntity Patient { get; init; } = null!;
+            public Guid? AppUserId { get; init; }
+            public HospitalPatientEmergencyContactEntity? EmergencyContact { get; init; }
         }
     }
 }

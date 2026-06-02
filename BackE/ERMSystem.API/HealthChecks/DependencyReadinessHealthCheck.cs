@@ -31,10 +31,9 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
         var data = new Dictionary<string, object>();
         var failures = new List<string>();
 
-        await CheckSqlAsync("appDb", _configuration.GetConnectionString("DefaultConnection"), data, failures, cancellationToken);
         await CheckSqlAsync(
             "hospitalDb",
-            _configuration.GetConnectionString("HospitalConnection") ?? _configuration.GetConnectionString("DefaultConnection"),
+            _configuration.GetConnectionString("HospitalConnection"),
             data,
             failures,
             cancellationToken);

@@ -54,6 +54,7 @@ namespace ERMSystem.API.Controllers
                 {
                     Id = u.Id,
                     Username = u.Username,
+                    Name = u.Name,
                     Role = u.Role
                 });
 
@@ -84,6 +85,7 @@ namespace ERMSystem.API.Controllers
             {
                 Id = Guid.NewGuid(),
                 Username = dto.Username.Trim(),
+                Name = dto.Name.Trim(),
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 Role = dto.Role
             };
@@ -95,6 +97,7 @@ namespace ERMSystem.API.Controllers
             {
                 Id = user.Id,
                 Username = user.Username,
+                Name = user.Name,
                 Role = user.Role
             };
 
@@ -128,6 +131,7 @@ namespace ERMSystem.API.Controllers
 
             var previousUsername = user.Username;
             user.Username = dto.Username.Trim();
+            user.Name = dto.Name.Trim();
 
             if (!string.IsNullOrWhiteSpace(dto.Role))
             {

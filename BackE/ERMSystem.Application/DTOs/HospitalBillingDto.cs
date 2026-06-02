@@ -61,6 +61,7 @@ public class HospitalPaymentDto
     public Guid PaymentId { get; set; }
     public string PaymentReference { get; set; } = string.Empty;
     public string PaymentMethod { get; set; } = string.Empty;
+    public string? GatewayProvider { get; set; }
     public decimal Amount { get; set; }
     public string PaymentStatus { get; set; } = string.Empty;
     public DateTime? PaidAtLocal { get; set; }
@@ -80,6 +81,7 @@ public class HospitalPaymentIntentDto
     public string PaymentStatus { get; set; } = string.Empty;
     public string? ExternalTransactionId { get; set; }
     public string CheckoutToken { get; set; } = string.Empty;
+    public string? CheckoutUrl { get; set; }
     public string InstructionText { get; set; } = string.Empty;
     public string CallbackMode { get; set; } = string.Empty;
     public DateTime CreatedAtLocal { get; set; }
@@ -98,6 +100,105 @@ public class HospitalPaymentReconciliationSummaryDto
     public decimal RefundedAmount { get; set; }
     public int MissingExternalTransactionCount { get; set; }
     public List<HospitalPaymentDto> RecentPayments { get; set; } = new();
+}
+
+public class HospitalPaymentReconciliationPreviewRequestDto
+{
+    [MaxLength(50)]
+    public string? GatewayProvider { get; set; }
+
+    [Required]
+    [MinLength(1)]
+    public List<HospitalPaymentReconciliationPartnerItemDto> Items { get; set; } = new();
+}
+
+public class HospitalPaymentReconciliationPartnerItemDto
+{
+    [MaxLength(100)]
+    public string? PartnerRecordId { get; set; }
+
+    [MaxLength(100)]
+    public string? PaymentReference { get; set; }
+
+    [MaxLength(150)]
+    public string? ExternalTransactionId { get; set; }
+
+    [Range(0.01, 999999999)]
+    public decimal Amount { get; set; }
+
+    [Required]
+    [MaxLength(50)]
+    public string GatewayStatus { get; set; } = string.Empty;
+
+    public DateTime? PaidAtUtc { get; set; }
+}
+
+public class HospitalPaymentReconciliationPreviewDto
+{
+    public string GatewayProvider { get; set; } = string.Empty;
+    public DateTime GeneratedAtLocal { get; set; }
+    public int TotalPartnerItems { get; set; }
+    public int MatchedItems { get; set; }
+    public int MissingLocalPayments { get; set; }
+    public int AmountMismatchItems { get; set; }
+    public int StatusMismatchItems { get; set; }
+    public List<HospitalPaymentReconciliationPreviewItemDto> Items { get; set; } = new();
+}
+
+public class HospitalPaymentReconciliationApplyRequestDto
+{
+    [MaxLength(50)]
+    public string? GatewayProvider { get; set; }
+
+    public bool PendingOnly { get; set; } = true;
+
+    [Required]
+    [MinLength(1)]
+    public List<HospitalPaymentReconciliationPartnerItemDto> Items { get; set; } = new();
+}
+
+public class HospitalPaymentReconciliationApplyResultDto
+{
+    public string GatewayProvider { get; set; } = string.Empty;
+    public DateTime AppliedAtLocal { get; set; }
+    public int TotalPartnerItems { get; set; }
+    public int AppliedCount { get; set; }
+    public int SkippedCount { get; set; }
+    public int ErrorCount { get; set; }
+    public List<HospitalPaymentReconciliationApplyItemResultDto> Items { get; set; } = new();
+}
+
+public class HospitalPaymentReconciliationApplyItemResultDto
+{
+    public string? PartnerRecordId { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? ExternalTransactionId { get; set; }
+    public Guid? LocalPaymentId { get; set; }
+    public Guid? LocalInvoiceId { get; set; }
+    public string ActionCode { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public string? FinalLocalPaymentStatus { get; set; }
+}
+
+public class HospitalPaymentReconciliationPreviewItemDto
+{
+    public string? PartnerRecordId { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? ExternalTransactionId { get; set; }
+    public decimal PartnerAmount { get; set; }
+    public string PartnerStatus { get; set; } = string.Empty;
+    public string NormalizedPartnerStatus { get; set; } = string.Empty;
+    public Guid? LocalPaymentId { get; set; }
+    public string? LocalPaymentReference { get; set; }
+    public string? LocalExternalTransactionId { get; set; }
+    public string? LocalGatewayProvider { get; set; }
+    public decimal? LocalAmount { get; set; }
+    public string? LocalPaymentStatus { get; set; }
+    public bool IsMatched { get; set; }
+    public bool IsAmountMismatch { get; set; }
+    public bool IsStatusMismatch { get; set; }
+    public string ResolutionCode { get; set; } = string.Empty;
+    public string ResolutionMessage { get; set; } = string.Empty;
 }
 
 public class HospitalInvoiceDetailDto : HospitalInvoiceSummaryDto

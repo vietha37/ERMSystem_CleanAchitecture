@@ -8,7 +8,8 @@ param(
     "appointments-worklist-smoke.ps1",
     "notification-deliveries-smoke.ps1",
     "encounters-worklist-smoke.ps1",
-    "billing-worklist-smoke.ps1"
+    "billing-worklist-smoke.ps1",
+    "billing-reconciliation-smoke.ps1"
   )
 )
 

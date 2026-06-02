@@ -46,29 +46,30 @@ DECLARE @PrescriptionItem3Id UNIQUEIDENTIFIER = '99999999-0000-0000-0000-0000000
 
 MERGE dbo.AppUsers AS target
 USING (VALUES
-    (@AdminUserId, 'admin.seed', @PasswordHash, 'Admin'),
-    (@DoctorUserId, 'doctor.seed', @PasswordHash, 'Doctor'),
-    (@ReceptionUserId, 'reception.seed', @PasswordHash, 'Receptionist'),
-    (@PatientUserId, 'patient.seed', @PasswordHash, 'Patient'),
-    (@NurseUserId, 'nurse.seed', @PasswordHash, 'Nurse'),
-    (@PharmacistUserId, 'pharmacist.seed', @PasswordHash, 'Pharmacist'),
-    (@LabTechUserId, 'labtech.seed', @PasswordHash, 'LabTech'),
-    (@CashierUserId, 'cashier.seed', @PasswordHash, 'Cashier')
-) AS source (Id, Username, PasswordHash, Role)
+    (@AdminUserId, 'admin00', N'Pham Hoang An', @PasswordHash, 'Admin'),
+    (@DoctorUserId, 'doctor00', N'Tran Anh Khoa', @PasswordHash, 'Doctor'),
+    (@ReceptionUserId, 'reception00', N'Le Thu Hang', @PasswordHash, 'Receptionist'),
+    (@PatientUserId, 'patient00', N'Nguyen Minh Anh', @PasswordHash, 'Patient'),
+    (@NurseUserId, 'nurse00', N'Nguyen Ha My', @PasswordHash, 'Nurse'),
+    (@PharmacistUserId, 'pharmacist00', N'Vo Thanh Tung', @PasswordHash, 'Pharmacist'),
+    (@LabTechUserId, 'labtech00', N'Pham Kien Minh', @PasswordHash, 'LabTech'),
+    (@CashierUserId, 'cashier00', N'Tran Thu Ha', @PasswordHash, 'Cashier')
+) AS source (Id, Username, Name, PasswordHash, Role)
 ON target.Id = source.Id
 WHEN MATCHED THEN
     UPDATE SET
         Username = source.Username,
+        Name = source.Name,
         PasswordHash = source.PasswordHash,
         Role = source.Role
 WHEN NOT MATCHED BY TARGET THEN
-    INSERT (Id, Username, PasswordHash, Role)
-    VALUES (source.Id, source.Username, source.PasswordHash, source.Role);
+    INSERT (Id, Username, Name, PasswordHash, Role)
+    VALUES (source.Id, source.Username, source.Name, source.PasswordHash, source.Role);
 
 MERGE dbo.Doctors AS target
 USING (VALUES
-    (@DoctorSeedId, N'Dr. Tran Anh Khoa', N'General Medicine'),
-    (@DoctorSupportId, N'Dr. Nguyen Bao Han', N'Cardiology')
+    (@DoctorSeedId, N'Tran Anh Khoa', N'General Medicine'),
+    (@DoctorSupportId, N'Nguyen Bao Han', N'Cardiology')
 ) AS source (Id, FullName, Specialty)
 ON target.Id = source.Id
 WHEN MATCHED THEN
@@ -191,8 +192,12 @@ WHEN NOT MATCHED BY TARGET THEN
     FROM Numbers
     WHERE NumberValue < 19
 )
-INSERT INTO dbo.AppUsers (Id, Username, PasswordHash, Role)
-SELECT NEWID(), CONCAT(seed.Prefix, RIGHT(CONCAT('00', CAST(n.NumberValue AS VARCHAR(2))), 2)), @PasswordHash, seed.RoleCode
+INSERT INTO dbo.AppUsers (Id, Username, Name, PasswordHash, Role)
+SELECT NEWID(),
+       CONCAT(seed.Prefix, RIGHT(CONCAT('00', CAST(n.NumberValue AS VARCHAR(2))), 2)),
+       CONCAT(seed.Prefix, RIGHT(CONCAT('00', CAST(n.NumberValue AS VARCHAR(2))), 2)),
+       @PasswordHash,
+       seed.RoleCode
 FROM Numbers n
 CROSS JOIN (VALUES
     ('admin', 'Admin'),
@@ -210,6 +215,66 @@ WHERE NOT EXISTS (
     WHERE existing.Username = CONCAT(seed.Prefix, RIGHT(CONCAT('00', CAST(n.NumberValue AS VARCHAR(2))), 2))
 )
 OPTION (MAXRECURSION 19);
+
+;WITH NumberedAppUsers AS
+(
+    SELECT au.Id,
+           au.Username,
+           au.Role,
+           TRY_CONVERT(INT, RIGHT(au.Username, 2)) AS NumberValue
+    FROM dbo.AppUsers au
+    WHERE au.Username LIKE '%[0-9][0-9]'
+      AND au.Role IN ('Admin', 'Doctor', 'Receptionist', 'Patient', 'Nurse', 'Pharmacist', 'LabTech', 'Cashier')
+)
+UPDATE au
+SET Name = CASE
+        WHEN nau.Role = 'Patient' THEN CONCAT(
+            CHOOSE(((nau.NumberValue + 2 - 1) % 10) + 1, N'Nguyen', N'Tran', N'Le', N'Pham', N'Hoang', N'Vo', N'Dang', N'Bui', N'Do', N'Phan'),
+            N' ',
+            CHOOSE(((nau.NumberValue + 5 - 1) % 10) + 1, N'Gia', N'Thanh', N'Minh', N'Thu', N'Ngoc', N'Anh', N'Duc', N'Huu', N'Bao', N'Quynh'),
+            N' ',
+            CHOOSE(((nau.NumberValue + 8 - 1) % 12) + 1, N'An', N'Binh', N'Chau', N'Dung', N'Hanh', N'Khanh', N'Lam', N'Mai', N'Nam', N'Phuc', N'Quang', N'Trang')
+        )
+        ELSE CONCAT(
+            CHOOSE(((nau.NumberValue + roleOffset.OffsetA - 1) % 10) + 1, N'Nguyen', N'Tran', N'Le', N'Pham', N'Hoang', N'Vo', N'Dang', N'Bui', N'Do', N'Phan'),
+            N' ',
+            CHOOSE(((nau.NumberValue + roleOffset.OffsetB - 1) % 10) + 1, N'Gia', N'Thanh', N'Minh', N'Thu', N'Ngoc', N'Anh', N'Duc', N'Huu', N'Bao', N'Quynh'),
+            N' ',
+            CHOOSE(((nau.NumberValue + roleOffset.OffsetC - 1) % 12) + 1, N'An', N'Binh', N'Chau', N'Dung', N'Hanh', N'Khanh', N'Lam', N'Mai', N'Nam', N'Phuc', N'Quang', N'Trang')
+        )
+    END
+FROM dbo.AppUsers au
+JOIN NumberedAppUsers nau ON nau.Id = au.Id
+CROSS APPLY
+(
+    SELECT CASE nau.Role
+            WHEN 'Admin' THEN 1
+            WHEN 'Doctor' THEN 2
+            WHEN 'Receptionist' THEN 3
+            WHEN 'Nurse' THEN 4
+            WHEN 'Pharmacist' THEN 5
+            WHEN 'LabTech' THEN 6
+            ELSE 7
+        END AS OffsetA,
+        CASE nau.Role
+            WHEN 'Admin' THEN 4
+            WHEN 'Doctor' THEN 5
+            WHEN 'Receptionist' THEN 6
+            WHEN 'Nurse' THEN 7
+            WHEN 'Pharmacist' THEN 8
+            WHEN 'LabTech' THEN 9
+            ELSE 10
+        END AS OffsetB,
+        CASE nau.Role
+            WHEN 'Admin' THEN 7
+            WHEN 'Doctor' THEN 8
+            WHEN 'Receptionist' THEN 9
+            WHEN 'Nurse' THEN 10
+            WHEN 'Pharmacist' THEN 11
+            WHEN 'LabTech' THEN 12
+            ELSE 13
+        END AS OffsetC
+) roleOffset;
 
 ;WITH Numbers AS
 (
@@ -282,4 +347,54 @@ WHERE NOT EXISTS (
     WHERE p.FullName = CONCAT(N'Legacy Patient ', RIGHT(CONCAT('000', CAST(n.NumberValue AS VARCHAR(3))), 3))
 )
 OPTION (MAXRECURSION 57);
+
+;WITH NumberedDoctors AS
+(
+    SELECT d.Id,
+           TRY_CONVERT(INT, RIGHT(d.FullName, 2)) AS NumberValue
+    FROM dbo.Doctors d
+    WHERE d.FullName LIKE N'Dr. Seed Doctor %'
+)
+UPDATE d
+SET FullName = CONCAT(
+        CHOOSE(((nd.NumberValue + 1 - 1) % 10) + 1, N'Nguyen', N'Tran', N'Le', N'Pham', N'Hoang', N'Vo', N'Dang', N'Bui', N'Do', N'Phan'),
+        N' ',
+        CHOOSE(((nd.NumberValue + 3 - 1) % 10) + 1, N'Gia', N'Thanh', N'Minh', N'Thu', N'Ngoc', N'Anh', N'Duc', N'Huu', N'Bao', N'Quynh'),
+        N' ',
+        CHOOSE(((nd.NumberValue + 5 - 1) % 12) + 1, N'An', N'Binh', N'Chau', N'Dung', N'Hanh', N'Khanh', N'Lam', N'Mai', N'Nam', N'Phuc', N'Quang', N'Trang')
+    ),
+    Specialty = CASE nd.NumberValue % 4
+        WHEN 1 THEN N'General Medicine'
+        WHEN 2 THEN N'Cardiology'
+        WHEN 3 THEN N'Pediatrics'
+        ELSE N'Obstetrics'
+    END
+FROM dbo.Doctors d
+JOIN NumberedDoctors nd ON nd.Id = d.Id;
+
+;WITH NumberedPatients AS
+(
+    SELECT p.Id,
+           TRY_CONVERT(INT, RIGHT(p.FullName, 3)) AS NumberValue
+    FROM dbo.Patients p
+    WHERE p.FullName LIKE N'Legacy Patient %'
+)
+UPDATE p
+SET FullName = CONCAT(
+        CHOOSE(((np.NumberValue + 2 - 1) % 10) + 1, N'Nguyen', N'Tran', N'Le', N'Pham', N'Hoang', N'Vo', N'Dang', N'Bui', N'Do', N'Phan'),
+        N' ',
+        CHOOSE(((np.NumberValue + 4 - 1) % 10) + 1, N'Gia', N'Thanh', N'Minh', N'Thu', N'Ngoc', N'Anh', N'Duc', N'Huu', N'Bao', N'Quynh'),
+        N' ',
+        CHOOSE(((np.NumberValue + 6 - 1) % 12) + 1, N'An', N'Binh', N'Chau', N'Dung', N'Hanh', N'Khanh', N'Lam', N'Mai', N'Nam', N'Phuc', N'Quang', N'Trang')
+    ),
+    Address = CONCAT(N'So ', 10 + np.NumberValue, N' Duong Tran Hung Dao, Quan ', ((np.NumberValue - 1) % 5) + 1, N', TP.HCM'),
+    EmergencyContactName = CONCAT(
+        CHOOSE(((np.NumberValue + 7 - 1) % 10) + 1, N'Nguyen', N'Tran', N'Le', N'Pham', N'Hoang', N'Vo', N'Dang', N'Bui', N'Do', N'Phan'),
+        N' ',
+        CHOOSE(((np.NumberValue + 8 - 1) % 10) + 1, N'Gia', N'Thanh', N'Minh', N'Thu', N'Ngoc', N'Anh', N'Duc', N'Huu', N'Bao', N'Quynh'),
+        N' ',
+        CHOOSE(((np.NumberValue + 9 - 1) % 12) + 1, N'An', N'Binh', N'Chau', N'Dung', N'Hanh', N'Khanh', N'Lam', N'Mai', N'Nam', N'Phuc', N'Quang', N'Trang')
+    )
+FROM dbo.Patients p
+JOIN NumberedPatients np ON np.Id = p.Id;
 GO

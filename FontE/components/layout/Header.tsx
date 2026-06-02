@@ -26,7 +26,7 @@ function computeUnreadCount(
 }
 
 export function Header() {
-  const { logout, role, username, isAuthenticated } = useAuth();
+  const { logout, role, username, displayName, isAuthenticated } = useAuth();
   const [notifications, setNotifications] = useState<AppointmentNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -147,7 +147,7 @@ export function Header() {
           Trung tâm điều hành
         </h2>
         <p className="text-sm font-medium text-gray-500">
-          {role ?? "Người dùng"}
+          {displayName ?? role ?? "Người dùng"}
           {username ? ` - ${username}` : ""}
         </p>
       </div>
@@ -216,11 +216,11 @@ export function Header() {
 
         <div className="flex cursor-pointer items-center gap-3 transition-opacity hover:opacity-80">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 font-bold text-white shadow-md ring-2 ring-blue-50">
-            {(role ?? "U").charAt(0)}
+            {(displayName ?? role ?? "U").charAt(0)}
           </div>
           <div className="hidden text-left md:block">
             <p className="text-sm font-bold leading-tight text-gray-800">
-              {role ?? "Người dùng"}
+              {displayName ?? role ?? "Người dùng"}
             </p>
             <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600">
               Đang hoạt động

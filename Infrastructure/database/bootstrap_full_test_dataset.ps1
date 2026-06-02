@@ -1,13 +1,11 @@
 param(
     [string]$ServerInstance = "VietHa\MSSQLSERVER01",
-    [string]$AppDatabaseName = "ERMSystemDb",
+    [string[]]$LegacyDatabaseNames = @("ERMSystemDb"),
     [string]$HospitalDatabaseName = "ERMSystemHospitalDb"
 )
 
 $ErrorActionPreference = "Stop"
 
-$appSchemaFile = Join-Path $PSScriptRoot "erm_app_schema.sql"
-$appSeedFile = Join-Path $PSScriptRoot "erm_app_full_test_seed.sql"
 $hospitalSchemaFile = Join-Path $PSScriptRoot "erm_private_hospital_schema.sql"
 $hospitalBaseSeedFile = Join-Path $PSScriptRoot "erm_private_hospital_catalog_seed.sql"
 $hospitalFullSeedFile = Join-Path $PSScriptRoot "erm_private_hospital_full_test_seed.sql"
@@ -25,7 +23,7 @@ function Invoke-SqlCmdFile {
     }
 }
 
-foreach ($path in @($appSchemaFile, $appSeedFile, $hospitalSchemaFile, $hospitalBaseSeedFile, $hospitalFullSeedFile)) {
+foreach ($path in @($hospitalSchemaFile, $hospitalBaseSeedFile, $hospitalFullSeedFile)) {
     if (-not (Test-Path $path)) {
         throw "Khong tim thay file can thiet: $path"
     }
@@ -35,32 +33,36 @@ if (-not (Get-Command sqlcmd -ErrorAction SilentlyContinue)) {
     throw "Khong tim thay sqlcmd trong PATH."
 }
 
-sqlcmd -b -S $ServerInstance -E -Q @"
-IF DB_ID(N'$AppDatabaseName') IS NOT NULL
-BEGIN
-    ALTER DATABASE [$AppDatabaseName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-    DROP DATABASE [$AppDatabaseName];
-END;
+$dropStatements = New-Object System.Collections.Generic.List[string]
+foreach ($legacyDatabaseName in $LegacyDatabaseNames) {
+    if ([string]::IsNullOrWhiteSpace($legacyDatabaseName)) {
+        continue
+    }
 
+    $dropStatements.Add(@"
+IF DB_ID(N'$legacyDatabaseName') IS NOT NULL
+BEGIN
+    ALTER DATABASE [$legacyDatabaseName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE [$legacyDatabaseName];
+END;
+"@)
+}
+
+$dropStatements.Add(@"
 IF DB_ID(N'$HospitalDatabaseName') IS NOT NULL
 BEGIN
     ALTER DATABASE [$HospitalDatabaseName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
     DROP DATABASE [$HospitalDatabaseName];
 END;
 
-CREATE DATABASE [$AppDatabaseName];
 CREATE DATABASE [$HospitalDatabaseName];
-"@
+"@)
+
+sqlcmd -b -S $ServerInstance -E -Q ($dropStatements -join [Environment]::NewLine)
 
 if ($LASTEXITCODE -ne 0) {
     throw "Khong the reset database."
 }
-
-Write-Host "Creating application schema..." -ForegroundColor Cyan
-Invoke-SqlCmdFile -DatabaseName $AppDatabaseName -InputFile $appSchemaFile
-
-Write-Host "Seeding application database..." -ForegroundColor Cyan
-Invoke-SqlCmdFile -DatabaseName $AppDatabaseName -InputFile $appSeedFile
 
 Write-Host "Creating hospital schema..." -ForegroundColor Cyan
 Invoke-SqlCmdFile -DatabaseName $HospitalDatabaseName -InputFile $hospitalSchemaFile
@@ -79,26 +81,9 @@ Invoke-SqlCmdFile -DatabaseName $HospitalDatabaseName -InputFile $hospitalFullSe
 Write-Host ""
 Write-Host "Seed credentials" -ForegroundColor Green
 Write-Host "  password: 123456"
-Write-Host "  users: admin.seed + admin01..19, doctor.seed + doctor01..19, reception.seed + reception01..19, patient.seed + patient01..19, nurse.seed + nurse01..19, pharmacist.seed + pharmacist01..19, labtech.seed + labtech01..19, cashier.seed + cashier01..19"
+Write-Host "  users: admin00..19, doctor00..19, reception00..19, patient00..19, nurse00..19, pharmacist00..19, labtech00..19, cashier00..19"
 Write-Host ""
 
-Write-Host "Application DB summary" -ForegroundColor Green
-sqlcmd -S $ServerInstance -E -d $AppDatabaseName -Q @"
-SET NOCOUNT ON;
-SELECT 'AppUsers' AS Metric, COUNT(*) AS Value FROM dbo.AppUsers
-UNION ALL
-SELECT 'Patients', COUNT(*) FROM dbo.Patients
-UNION ALL
-SELECT 'Doctors', COUNT(*) FROM dbo.Doctors
-UNION ALL
-SELECT 'Appointments', COUNT(*) FROM dbo.Appointments
-UNION ALL
-SELECT 'MedicalRecords', COUNT(*) FROM dbo.MedicalRecords
-UNION ALL
-SELECT 'Prescriptions', COUNT(*) FROM dbo.Prescriptions;
-"@
-
-Write-Host ""
 Write-Host "Hospital DB summary" -ForegroundColor Green
 sqlcmd -S $ServerInstance -E -d $HospitalDatabaseName -Q @"
 SET NOCOUNT ON;

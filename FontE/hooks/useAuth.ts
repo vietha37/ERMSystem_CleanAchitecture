@@ -12,6 +12,7 @@ export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [role, setRole] = useState<UserRole | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -20,6 +21,7 @@ export function useAuth() {
       setIsAuthenticated(authStatus);
       setRole(authStatus ? authService.getRole() : null);
       setUsername(authStatus ? authService.getUsername() : null);
+      setDisplayName(authStatus ? authService.getDisplayName() : null);
       setIsLoading(false);
     };
 
@@ -55,9 +57,11 @@ export function useAuth() {
 
       const nextRole = authService.getRole();
       const nextUsername = authService.getUsername();
+      const nextDisplayName = authService.getDisplayName();
       setIsAuthenticated(true);
       setRole(nextRole);
       setUsername(nextUsername);
+      setDisplayName(nextDisplayName);
       toast.success("Đăng nhập thành công.");
 
       if (remember) {
@@ -80,9 +84,11 @@ export function useAuth() {
       await authService.verifyMfaLogin({ mfaChallengeToken: challengeToken, code });
       const nextRole = authService.getRole();
       const nextUsername = authService.getUsername();
+      const nextDisplayName = authService.getDisplayName();
       setIsAuthenticated(true);
       setRole(nextRole);
       setUsername(nextUsername);
+      setDisplayName(nextDisplayName);
       toast.success("Đăng nhập xác thực hai bước thành công.");
 
       if (remember) {
@@ -105,9 +111,11 @@ export function useAuth() {
       await authService.registerPatient(payload);
       const nextRole = authService.getRole();
       const nextUsername = authService.getUsername();
+      const nextDisplayName = authService.getDisplayName();
       setIsAuthenticated(true);
       setRole(nextRole);
       setUsername(nextUsername);
+      setDisplayName(nextDisplayName);
       toast.success("Đã tạo tài khoản bệnh nhân.");
       router.push("/portal");
       return { success: true };
@@ -123,6 +131,7 @@ export function useAuth() {
     setIsAuthenticated(false);
     setRole(null);
     setUsername(null);
+    setDisplayName(null);
     toast.success("Đã đăng xuất.");
     router.push("/login");
   };
@@ -132,6 +141,7 @@ export function useAuth() {
     isLoading,
     role,
     username,
+    displayName,
     login,
     verifyMfaLogin,
     registerPatient,

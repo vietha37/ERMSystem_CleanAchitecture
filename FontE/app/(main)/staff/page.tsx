@@ -11,12 +11,14 @@ import { StaffUser, UpdateStaffUserPayload } from "@/services/types";
 
 type FormState = {
   username: string;
+  name: string;
   password: string;
   role: "Doctor" | "Receptionist";
 };
 
 const initialForm: FormState = {
   username: "",
+  name: "",
   password: "",
   role: "Doctor",
 };
@@ -83,6 +85,7 @@ export default function StaffPage() {
     setSelected(user);
     setForm({
       username: user.username,
+      name: user.name,
       password: "",
       role: user.role,
     });
@@ -97,6 +100,7 @@ export default function StaffPage() {
       if (mode === "create") {
         await staffUserService.create({
           username: form.username.trim(),
+          name: form.name.trim(),
           password: form.password,
           role: form.role,
         });
@@ -104,6 +108,7 @@ export default function StaffPage() {
       } else if (selected) {
         const payload: UpdateStaffUserPayload = {
           username: form.username.trim(),
+          name: form.name.trim(),
           role: form.role,
         };
         if (form.password.trim()) {
@@ -162,7 +167,7 @@ export default function StaffPage() {
         <div className="mb-6 flex flex-col justify-between gap-3 md:flex-row">
           <input
             type="text"
-            placeholder="Tìm theo tên đăng nhập..."
+            placeholder="Tìm theo họ tên hoặc tên đăng nhập..."
             className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 md:w-[360px]"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -202,6 +207,7 @@ export default function StaffPage() {
             <thead className="border-b border-gray-200 bg-gray-50">
               <tr>
                 <th className="p-4 text-xs font-bold uppercase tracking-wider text-gray-500">Tên đăng nhập</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-gray-500">Họ và tên</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wider text-gray-500">Vai trò</th>
                 <th className="p-4 text-right text-xs font-bold uppercase tracking-wider text-gray-500">Thao tác</th>
               </tr>
@@ -209,13 +215,13 @@ export default function StaffPage() {
             <tbody className="divide-y divide-gray-50">
               {isLoading ? (
                 <tr>
-                  <td colSpan={3} className="p-8 text-center text-gray-500">
+                  <td colSpan={4} className="p-8 text-center text-gray-500">
                     Đang tải...
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="p-8 text-center text-gray-500">
+                  <td colSpan={4} className="p-8 text-center text-gray-500">
                     Không tìm thấy tài khoản nào.
                   </td>
                 </tr>
@@ -223,6 +229,7 @@ export default function StaffPage() {
                 items.map((user) => (
                   <tr key={user.id} className="transition-colors hover:bg-blue-50/30">
                     <td className="p-4 font-semibold text-gray-800">{user.username}</td>
+                    <td className="p-4 text-gray-700">{user.name}</td>
                     <td className="p-4">
                       <span
                         className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
@@ -308,6 +315,20 @@ export default function StaffPage() {
               value={form.username}
               onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
               required
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-bold text-gray-700">
+              Họ và tên <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-gray-800 outline-none"
+              value={form.name}
+              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              required
+              minLength={3}
             />
           </div>
 

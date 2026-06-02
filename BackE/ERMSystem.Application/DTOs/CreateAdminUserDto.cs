@@ -13,6 +13,10 @@ namespace ERMSystem.Application.DTOs
         public string Password { get; set; } = string.Empty;
 
         [Required]
+        [MinLength(3)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
         [RegularExpression("^(Doctor|Receptionist)$",
             ErrorMessage = "Role must be Doctor or Receptionist.")]
         public string Role { get; set; } = string.Empty;

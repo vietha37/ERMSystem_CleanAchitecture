@@ -12,6 +12,7 @@ namespace ERMSystem.Infrastructure.Services;
 public class LocalHospitalDocumentStorageService : IHospitalDocumentStorageService
 {
     private static readonly Regex UnsafeFileNameCharsRegex = new(@"[^a-zA-Z0-9._-]+", RegexOptions.Compiled);
+    private static readonly string[] SupportedAccessModes = ["ProxyTicket", "DirectUrl"];
 
     private readonly LocalDocumentStorageOptions _options;
     private readonly string _rootPath;
@@ -117,12 +118,16 @@ public class LocalHospitalDocumentStorageService : IHospitalDocumentStorageServi
             },
             ct);
 
+        var accessMode = ResolveAccessMode();
+
         return new HospitalDocumentStorageAccessTicket
         {
             Provider = Provider,
-            AccessMode = "ProxyTicket",
+            AccessMode = accessMode,
             AccessToken = accessToken,
-            DownloadUrl = null,
+            DownloadUrl = accessMode == "DirectUrl"
+                ? BuildDirectDownloadUrl(accessToken)
+                : null,
             ExpiresAtUtc = expiresAtUtc
         };
     }
@@ -271,6 +276,37 @@ public class LocalHospitalDocumentStorageService : IHospitalDocumentStorageServi
 
     private static string BuildTicketKey(string accessToken)
         => $"document-storage:ticket:{accessToken}";
+
+    private string ResolveAccessMode()
+    {
+        var requestedAccessMode = string.IsNullOrWhiteSpace(_options.AccessMode)
+            ? "ProxyTicket"
+            : _options.AccessMode.Trim();
+
+        var matchedMode = SupportedAccessModes.FirstOrDefault(mode =>
+            string.Equals(mode, requestedAccessMode, StringComparison.OrdinalIgnoreCase));
+        return matchedMode ?? "ProxyTicket";
+    }
+
+    private string? BuildDirectDownloadUrl(string accessToken)
+    {
+        var publicBaseUrl = _options.PublicBaseUrl?.Trim();
+        if (string.IsNullOrWhiteSpace(publicBaseUrl))
+        {
+            return null;
+        }
+
+        if (!Uri.TryCreate(publicBaseUrl, UriKind.Absolute, out var baseUri))
+        {
+            return null;
+        }
+
+        var builder = new UriBuilder(new Uri(baseUri, "/api/hospital-encounters/attachments/download-by-ticket"))
+        {
+            Query = $"accessToken={Uri.EscapeDataString(accessToken)}"
+        };
+        return builder.Uri.ToString();
+    }
 
     private static string ExtractOriginalFileName(string storedFileName)
     {

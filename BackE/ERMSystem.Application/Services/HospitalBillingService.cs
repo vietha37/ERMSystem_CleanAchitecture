@@ -12,6 +12,7 @@ public class HospitalBillingService : IHospitalBillingService
 
     private readonly IHospitalBillingRepository _hospitalBillingRepository;
     private readonly IHospitalIdentityBridgeService _hospitalIdentityBridgeService;
+    private readonly IHospitalPaymentGatewayService _hospitalPaymentGatewayService;
     private readonly IBusinessMetricsRecorder _businessMetricsRecorder;
     private readonly IComplianceAuditRecorder _complianceAuditRecorder;
     private readonly IDashboardQueryCache _dashboardQueryCache;
@@ -20,6 +21,7 @@ public class HospitalBillingService : IHospitalBillingService
     public HospitalBillingService(
         IHospitalBillingRepository hospitalBillingRepository,
         IHospitalIdentityBridgeService hospitalIdentityBridgeService,
+        IHospitalPaymentGatewayService hospitalPaymentGatewayService,
         IBusinessMetricsRecorder businessMetricsRecorder,
         IComplianceAuditRecorder complianceAuditRecorder,
         IDashboardQueryCache dashboardQueryCache,
@@ -27,6 +29,7 @@ public class HospitalBillingService : IHospitalBillingService
     {
         _hospitalBillingRepository = hospitalBillingRepository;
         _hospitalIdentityBridgeService = hospitalIdentityBridgeService;
+        _hospitalPaymentGatewayService = hospitalPaymentGatewayService;
         _businessMetricsRecorder = businessMetricsRecorder;
         _complianceAuditRecorder = complianceAuditRecorder;
         _dashboardQueryCache = dashboardQueryCache;
@@ -191,12 +194,19 @@ public class HospitalBillingService : IHospitalBillingService
         var actorHospitalUserId = await _hospitalIdentityBridgeService.ResolveHospitalUserIdAsync(actorUserId, actorUsername, ct);
         var nowUtc = DateTime.UtcNow;
         var paymentId = Guid.NewGuid();
-        var gatewayProvider = NormalizeText(request.GatewayProvider) ?? "MockGateway";
         var paymentReference = string.IsNullOrWhiteSpace(request.PaymentReference)
             ? GeneratePaymentReference(nowUtc)
             : request.PaymentReference.Trim();
-        var externalTransactionId = NormalizeText(request.ExternalTransactionId)
-            ?? $"EXT-{Guid.NewGuid():N}";
+        var gatewayPreparation = _hospitalPaymentGatewayService.PreparePaymentIntent(new HospitalPaymentGatewayIntentRequest
+        {
+            InvoiceId = invoiceId,
+            InvoiceNumber = invoice.InvoiceNumber,
+            PaymentReference = paymentReference,
+            PaymentMethod = request.PaymentMethod.Trim(),
+            Amount = request.Amount,
+            RequestedProvider = request.GatewayProvider,
+            ExistingExternalTransactionId = request.ExternalTransactionId
+        });
 
         await _hospitalBillingRepository.AddPaymentAsync(new HospitalPaymentCreateCommand
         {
@@ -204,11 +214,12 @@ public class HospitalBillingService : IHospitalBillingService
             InvoiceId = invoiceId,
             PaymentReference = paymentReference,
             PaymentMethod = request.PaymentMethod.Trim(),
+            GatewayProvider = gatewayPreparation.ProviderName,
             Amount = request.Amount,
             PaymentStatus = "Pending",
             PaidAtUtc = null,
             ReceivedByUserId = actorHospitalUserId,
-            ExternalTransactionId = externalTransactionId
+            ExternalTransactionId = gatewayPreparation.ExternalTransactionId
         }, ct);
 
         await _hospitalBillingRepository.AddOutboxMessageAsync(new HospitalBillingOutboxCreateCommand
@@ -221,11 +232,11 @@ public class HospitalBillingService : IHospitalBillingService
             {
                 invoiceId,
                 invoice.InvoiceNumber,
-                gatewayProvider,
+                gatewayProvider = gatewayPreparation.ProviderName,
                 paymentReference,
                 paymentMethod = request.PaymentMethod.Trim(),
                 amount = request.Amount,
-                externalTransactionId,
+                externalTransactionId = gatewayPreparation.ExternalTransactionId,
                 createdAtUtc = nowUtc
             }, JsonOptions),
             Status = "Pending",
@@ -244,15 +255,16 @@ public class HospitalBillingService : IHospitalBillingService
             PaymentId = paymentId,
             InvoiceId = invoiceId,
             InvoiceNumber = invoice.InvoiceNumber,
-            GatewayProvider = gatewayProvider,
+            GatewayProvider = gatewayPreparation.ProviderName,
             PaymentReference = paymentReference,
             PaymentMethod = request.PaymentMethod.Trim(),
             Amount = request.Amount,
             PaymentStatus = "Pending",
-            ExternalTransactionId = externalTransactionId,
-            CheckoutToken = $"CHK-{Guid.NewGuid():N}",
-            InstructionText = $"Gateway {gatewayProvider} can callback co chu ky de xac nhan giao dich {paymentReference} cho hoa don {invoice.InvoiceNumber}.",
-            CallbackMode = "SignedWebhook",
+            ExternalTransactionId = gatewayPreparation.ExternalTransactionId,
+            CheckoutToken = gatewayPreparation.CheckoutToken,
+            CheckoutUrl = gatewayPreparation.CheckoutUrl,
+            InstructionText = gatewayPreparation.InstructionText,
+            CallbackMode = gatewayPreparation.CallbackMode,
             CreatedAtLocal = ConvertUtcToClinicLocal(nowUtc)
         };
     }
@@ -293,6 +305,9 @@ public class HospitalBillingService : IHospitalBillingService
                 ? GeneratePaymentReference(nowUtc)
                 : request.PaymentReference.Trim(),
             PaymentMethod = request.PaymentMethod.Trim(),
+            GatewayProvider = ResolveManualGatewayProvider(
+                request.PaymentMethod,
+                request.ExternalTransactionId),
             Amount = request.Amount,
             PaymentStatus = "Captured",
             PaidAtUtc = nowUtc,
@@ -359,6 +374,7 @@ public class HospitalBillingService : IHospitalBillingService
         Guid? actorUserId,
         string? actorUsername,
         bool isSimulation,
+        string? callbackSource,
         CancellationToken ct = default)
     {
         var invoice = await _hospitalBillingRepository.GetByIdAsync(request.InvoiceId, ct);
@@ -371,12 +387,13 @@ public class HospitalBillingService : IHospitalBillingService
             ?? throw new InvalidOperationException("Khong tim thay giao dich doi soat theo payment reference.");
 
         var gatewayStatus = request.GatewayStatus.Trim();
-        var normalizedGatewayStatus = NormalizeGatewayStatus(gatewayStatus);
+        var normalizedGatewayStatus = _hospitalPaymentGatewayService.NormalizeGatewayStatus(request.GatewayProvider, gatewayStatus);
         var gatewayProvider = NormalizeText(request.GatewayProvider) ?? "MockGateway";
         var gatewayEventId = NormalizeText(request.GatewayEventId)
             ?? throw new InvalidOperationException("Gateway event id khong hop le.");
         var gatewayTimestampUtc = request.GatewayTimestampUtc?.ToUniversalTime()
             ?? throw new InvalidOperationException("Gateway timestamp khong hop le.");
+        var callbackModeLabel = ResolveCallbackModeLabel(isSimulation, callbackSource);
 
         if (payment.PaymentStatus == "Refunded")
         {
@@ -397,7 +414,7 @@ public class HospitalBillingService : IHospitalBillingService
                     actorUsername ?? "gateway",
                     "InvoicePaymentCallbackDuplicate",
                     "Info",
-                    $"InvoiceId={request.InvoiceId}; InvoiceNumber={invoice.InvoiceNumber}; PaymentReference={payment.PaymentReference}; GatewayProvider={gatewayProvider}; GatewayEventId={gatewayEventId}; PaymentStatus={payment.PaymentStatus}; CallbackMode={(isSimulation ? "Simulation" : "Webhook")}; GatewayTimestampUtc={gatewayTimestampUtc:O}.",
+                    $"InvoiceId={request.InvoiceId}; InvoiceNumber={invoice.InvoiceNumber}; PaymentReference={payment.PaymentReference}; GatewayProvider={gatewayProvider}; GatewayEventId={gatewayEventId}; PaymentStatus={payment.PaymentStatus}; CallbackMode={callbackModeLabel}; GatewayTimestampUtc={gatewayTimestampUtc:O}.",
                     ct);
 
                 return MapDetail(invoice);
@@ -411,6 +428,7 @@ public class HospitalBillingService : IHospitalBillingService
         await _hospitalBillingRepository.UpdatePaymentAsync(new HospitalPaymentUpdateCommand
         {
             PaymentId = payment.PaymentId,
+            GatewayProvider = gatewayProvider,
             PaymentStatus = normalizedGatewayStatus,
             PaidAtUtc = normalizedGatewayStatus == "Captured" ? nowUtc : null,
             ReceivedByUserId = payment.ReceivedByUserId,
@@ -482,7 +500,7 @@ public class HospitalBillingService : IHospitalBillingService
         {
             ["gateway_status"] = normalizedGatewayStatus,
             ["gateway_provider"] = gatewayProvider,
-            ["callback_mode"] = isSimulation ? "simulation" : "webhook"
+            ["callback_mode"] = callbackModeLabel.ToLowerInvariant()
         });
 
         await _complianceAuditRecorder.RecordAsync(
@@ -490,7 +508,7 @@ public class HospitalBillingService : IHospitalBillingService
             actorUsername ?? "gateway",
             "InvoicePaymentCallbackProcessed",
             normalizedGatewayStatus == "Captured" ? "Info" : "Warning",
-            $"InvoiceId={request.InvoiceId}; InvoiceNumber={invoice.InvoiceNumber}; PaymentReference={payment.PaymentReference}; GatewayProvider={gatewayProvider}; GatewayEventId={gatewayEventId}; GatewayStatus={normalizedGatewayStatus}; CallbackMode={(isSimulation ? "Simulation" : "Webhook")}; GatewayTimestampUtc={gatewayTimestampUtc:O}.",
+            $"InvoiceId={request.InvoiceId}; InvoiceNumber={invoice.InvoiceNumber}; PaymentReference={payment.PaymentReference}; GatewayProvider={gatewayProvider}; GatewayEventId={gatewayEventId}; GatewayStatus={normalizedGatewayStatus}; CallbackMode={callbackModeLabel}; GatewayTimestampUtc={gatewayTimestampUtc:O}.",
             ct);
 
         var updated = await _hospitalBillingRepository.GetByIdAsync(request.InvoiceId, ct)
@@ -536,6 +554,15 @@ public class HospitalBillingService : IHospitalBillingService
                 ? GenerateRefundReference(nowUtc)
                 : request.PaymentReference.Trim(),
             PaymentMethod = request.PaymentMethod.Trim(),
+            GatewayProvider = ResolveManualGatewayProvider(
+                request.PaymentMethod,
+                request.ExternalTransactionId,
+                invoice.Payments
+                    .Where(x => !string.IsNullOrWhiteSpace(x.GatewayProvider) &&
+                                string.Equals(x.PaymentMethod, request.PaymentMethod.Trim(), StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(x => x.PaidAtUtc)
+                    .Select(x => x.GatewayProvider)
+                    .FirstOrDefault()),
             Amount = -request.Amount,
             PaymentStatus = "Refunded",
             PaidAtUtc = nowUtc,
@@ -630,12 +657,359 @@ public class HospitalBillingService : IHospitalBillingService
                 PaymentId = x.PaymentId,
                 PaymentReference = x.PaymentReference,
                 PaymentMethod = x.PaymentMethod,
+                GatewayProvider = x.GatewayProvider,
                 Amount = x.Amount,
                 PaymentStatus = x.PaymentStatus,
                 PaidAtLocal = x.PaidAtUtc.HasValue ? ConvertUtcToClinicLocal(x.PaidAtUtc.Value) : null,
                 ReceivedByUsername = x.ReceivedByUsername,
                 ExternalTransactionId = x.ExternalTransactionId
             }).ToList()
+        };
+    }
+
+    public async Task<HospitalPaymentReconciliationPreviewDto> PreviewReconciliationAsync(
+        HospitalPaymentReconciliationPreviewRequestDto request,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct = default)
+    {
+        var doctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        if (string.Equals(currentRole, "Doctor", StringComparison.OrdinalIgnoreCase) && !doctorProfileId.HasValue)
+        {
+            return new HospitalPaymentReconciliationPreviewDto
+            {
+                GatewayProvider = NormalizeText(request.GatewayProvider) ?? _hospitalPaymentGatewayService.GetDefaultProvider(),
+                GeneratedAtLocal = ConvertUtcToClinicLocal(DateTime.UtcNow),
+                TotalPartnerItems = request.Items.Count
+            };
+        }
+
+        var gatewayProvider = NormalizeText(request.GatewayProvider) ?? _hospitalPaymentGatewayService.GetDefaultProvider();
+        var paymentReferences = request.Items
+            .Select(x => NormalizeText(x.PaymentReference))
+            .Where(x => x is not null)
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var externalTransactionIds = request.Items
+            .Select(x => NormalizeText(x.ExternalTransactionId))
+            .Where(x => x is not null)
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var localPayments = await _hospitalBillingRepository.FindPaymentsForReconciliationAsync(
+            new HospitalPaymentReconciliationLookupQuery
+            {
+                DoctorProfileId = doctorProfileId,
+                PaymentReferences = paymentReferences,
+                ExternalTransactionIds = externalTransactionIds
+            },
+            ct);
+
+        var byExternalTransactionId = localPayments
+            .Where(x => !string.IsNullOrWhiteSpace(x.ExternalTransactionId))
+            .GroupBy(x => x.ExternalTransactionId!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(p => p.PaidAtUtc).First(), StringComparer.OrdinalIgnoreCase);
+        var byPaymentReference = localPayments
+            .GroupBy(x => x.PaymentReference, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(p => p.PaidAtUtc).First(), StringComparer.OrdinalIgnoreCase);
+
+        var previewItems = new List<HospitalPaymentReconciliationPreviewItemDto>(request.Items.Count);
+
+        foreach (var item in request.Items)
+        {
+            var normalizedReference = NormalizeText(item.PaymentReference);
+            var normalizedExternalTransactionId = NormalizeText(item.ExternalTransactionId);
+            var normalizedPartnerStatus = _hospitalPaymentGatewayService.NormalizeGatewayStatus(gatewayProvider, item.GatewayStatus);
+
+            HospitalPaymentRecordSnapshot? localPayment = null;
+            if (normalizedExternalTransactionId is not null)
+            {
+                byExternalTransactionId.TryGetValue(normalizedExternalTransactionId, out localPayment);
+            }
+
+            if (localPayment is null && normalizedReference is not null)
+            {
+                byPaymentReference.TryGetValue(normalizedReference, out localPayment);
+            }
+
+            if (localPayment is null)
+            {
+                previewItems.Add(new HospitalPaymentReconciliationPreviewItemDto
+                {
+                    PartnerRecordId = NormalizeText(item.PartnerRecordId),
+                    PaymentReference = normalizedReference,
+                    ExternalTransactionId = normalizedExternalTransactionId,
+                    PartnerAmount = item.Amount,
+                    PartnerStatus = item.GatewayStatus.Trim(),
+                    NormalizedPartnerStatus = normalizedPartnerStatus,
+                    ResolutionCode = "MISSING_LOCAL_PAYMENT",
+                    ResolutionMessage = "Khong tim thay giao dich noi bo khop payment reference hoac external transaction id."
+                });
+                continue;
+            }
+
+            var isAmountMismatch = localPayment.Amount != item.Amount;
+            var isStatusMismatch = !string.Equals(localPayment.PaymentStatus, normalizedPartnerStatus, StringComparison.OrdinalIgnoreCase);
+            var isMatched = !isAmountMismatch && !isStatusMismatch;
+
+            previewItems.Add(new HospitalPaymentReconciliationPreviewItemDto
+            {
+                PartnerRecordId = NormalizeText(item.PartnerRecordId),
+                PaymentReference = normalizedReference,
+                ExternalTransactionId = normalizedExternalTransactionId,
+                PartnerAmount = item.Amount,
+                PartnerStatus = item.GatewayStatus.Trim(),
+                NormalizedPartnerStatus = normalizedPartnerStatus,
+                LocalPaymentId = localPayment.PaymentId,
+                LocalPaymentReference = localPayment.PaymentReference,
+                LocalExternalTransactionId = localPayment.ExternalTransactionId,
+                LocalGatewayProvider = localPayment.GatewayProvider,
+                LocalAmount = localPayment.Amount,
+                LocalPaymentStatus = localPayment.PaymentStatus,
+                IsMatched = isMatched,
+                IsAmountMismatch = isAmountMismatch,
+                IsStatusMismatch = isStatusMismatch,
+                ResolutionCode = isMatched
+                    ? "MATCHED"
+                    : isAmountMismatch && isStatusMismatch
+                        ? "AMOUNT_AND_STATUS_MISMATCH"
+                        : isAmountMismatch
+                            ? "AMOUNT_MISMATCH"
+                            : "STATUS_MISMATCH",
+                ResolutionMessage = isMatched
+                    ? "Giao dich doi soat khop giua doi tac va he thong."
+                    : isAmountMismatch && isStatusMismatch
+                        ? "Lech ca so tien va trang thai giua doi tac va he thong."
+                        : isAmountMismatch
+                            ? "So tien doi tac va he thong khong khop."
+                            : "Trang thai doi tac va he thong khong khop."
+            });
+        }
+
+        return new HospitalPaymentReconciliationPreviewDto
+        {
+            GatewayProvider = gatewayProvider,
+            GeneratedAtLocal = ConvertUtcToClinicLocal(DateTime.UtcNow),
+            TotalPartnerItems = previewItems.Count,
+            MatchedItems = previewItems.Count(x => x.IsMatched),
+            MissingLocalPayments = previewItems.Count(x => x.ResolutionCode == "MISSING_LOCAL_PAYMENT"),
+            AmountMismatchItems = previewItems.Count(x => x.IsAmountMismatch),
+            StatusMismatchItems = previewItems.Count(x => x.IsStatusMismatch),
+            Items = previewItems
+        };
+    }
+
+    public async Task<HospitalPaymentReconciliationApplyResultDto> ApplyReconciliationAsync(
+        HospitalPaymentReconciliationApplyRequestDto request,
+        Guid? actorUserId,
+        string? actorUsername,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct = default)
+    {
+        var doctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
+        if (string.Equals(currentRole, "Doctor", StringComparison.OrdinalIgnoreCase) && !doctorProfileId.HasValue)
+        {
+            return new HospitalPaymentReconciliationApplyResultDto
+            {
+                GatewayProvider = NormalizeText(request.GatewayProvider) ?? _hospitalPaymentGatewayService.GetDefaultProvider(),
+                AppliedAtLocal = ConvertUtcToClinicLocal(DateTime.UtcNow),
+                TotalPartnerItems = request.Items.Count,
+                SkippedCount = request.Items.Count
+            };
+        }
+
+        var gatewayProvider = NormalizeText(request.GatewayProvider) ?? _hospitalPaymentGatewayService.GetDefaultProvider();
+        var paymentReferences = request.Items
+            .Select(x => NormalizeText(x.PaymentReference))
+            .Where(x => x is not null)
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var externalTransactionIds = request.Items
+            .Select(x => NormalizeText(x.ExternalTransactionId))
+            .Where(x => x is not null)
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var localPayments = await _hospitalBillingRepository.FindPaymentsForReconciliationAsync(
+            new HospitalPaymentReconciliationLookupQuery
+            {
+                DoctorProfileId = doctorProfileId,
+                PaymentReferences = paymentReferences,
+                ExternalTransactionIds = externalTransactionIds
+            },
+            ct);
+
+        var byExternalTransactionId = localPayments
+            .Where(x => !string.IsNullOrWhiteSpace(x.ExternalTransactionId))
+            .GroupBy(x => x.ExternalTransactionId!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(p => p.PaidAtUtc).First(), StringComparer.OrdinalIgnoreCase);
+        var byPaymentReference = localPayments
+            .GroupBy(x => x.PaymentReference, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.OrderByDescending(p => p.PaidAtUtc).First(), StringComparer.OrdinalIgnoreCase);
+
+        var seenPaymentIds = new HashSet<Guid>();
+        var results = new List<HospitalPaymentReconciliationApplyItemResultDto>(request.Items.Count);
+
+        foreach (var item in request.Items)
+        {
+            var normalizedReference = NormalizeText(item.PaymentReference);
+            var normalizedExternalTransactionId = NormalizeText(item.ExternalTransactionId);
+            var normalizedPartnerStatus = _hospitalPaymentGatewayService.NormalizeGatewayStatus(gatewayProvider, item.GatewayStatus);
+
+            HospitalPaymentRecordSnapshot? localPayment = null;
+            if (normalizedExternalTransactionId is not null)
+            {
+                byExternalTransactionId.TryGetValue(normalizedExternalTransactionId, out localPayment);
+            }
+
+            if (localPayment is null && normalizedReference is not null)
+            {
+                byPaymentReference.TryGetValue(normalizedReference, out localPayment);
+            }
+
+            if (localPayment is null)
+            {
+                results.Add(new HospitalPaymentReconciliationApplyItemResultDto
+                {
+                    PartnerRecordId = NormalizeText(item.PartnerRecordId),
+                    PaymentReference = normalizedReference,
+                    ExternalTransactionId = normalizedExternalTransactionId,
+                    ActionCode = "SKIPPED_MISSING_LOCAL_PAYMENT",
+                    Message = "Khong tim thay giao dich noi bo de ap doi soat."
+                });
+                continue;
+            }
+
+            if (!seenPaymentIds.Add(localPayment.PaymentId))
+            {
+                results.Add(new HospitalPaymentReconciliationApplyItemResultDto
+                {
+                    PartnerRecordId = NormalizeText(item.PartnerRecordId),
+                    PaymentReference = normalizedReference,
+                    ExternalTransactionId = normalizedExternalTransactionId,
+                    LocalPaymentId = localPayment.PaymentId,
+                    LocalInvoiceId = localPayment.InvoiceId,
+                    FinalLocalPaymentStatus = localPayment.PaymentStatus,
+                    ActionCode = "SKIPPED_DUPLICATE_INPUT",
+                    Message = "Giao dich noi bo nay da duoc xu ly boi mot dong doi soat truoc do trong cung request."
+                });
+                continue;
+            }
+
+            if (localPayment.Amount != item.Amount)
+            {
+                results.Add(new HospitalPaymentReconciliationApplyItemResultDto
+                {
+                    PartnerRecordId = NormalizeText(item.PartnerRecordId),
+                    PaymentReference = normalizedReference,
+                    ExternalTransactionId = normalizedExternalTransactionId,
+                    LocalPaymentId = localPayment.PaymentId,
+                    LocalInvoiceId = localPayment.InvoiceId,
+                    FinalLocalPaymentStatus = localPayment.PaymentStatus,
+                    ActionCode = "SKIPPED_AMOUNT_MISMATCH",
+                    Message = "So tien doi tac khong khop voi giao dich noi bo, khong ap doi soat."
+                });
+                continue;
+            }
+
+            if (request.PendingOnly && !string.Equals(localPayment.PaymentStatus, "Pending", StringComparison.OrdinalIgnoreCase))
+            {
+                results.Add(new HospitalPaymentReconciliationApplyItemResultDto
+                {
+                    PartnerRecordId = NormalizeText(item.PartnerRecordId),
+                    PaymentReference = normalizedReference,
+                    ExternalTransactionId = normalizedExternalTransactionId,
+                    LocalPaymentId = localPayment.PaymentId,
+                    LocalInvoiceId = localPayment.InvoiceId,
+                    FinalLocalPaymentStatus = localPayment.PaymentStatus,
+                    ActionCode = "SKIPPED_NOT_PENDING",
+                    Message = "Chi cho phep ap doi soat cho giao dich Pending trong request hien tai."
+                });
+                continue;
+            }
+
+            if (string.Equals(localPayment.PaymentStatus, normalizedPartnerStatus, StringComparison.OrdinalIgnoreCase))
+            {
+                results.Add(new HospitalPaymentReconciliationApplyItemResultDto
+                {
+                    PartnerRecordId = NormalizeText(item.PartnerRecordId),
+                    PaymentReference = normalizedReference,
+                    ExternalTransactionId = normalizedExternalTransactionId,
+                    LocalPaymentId = localPayment.PaymentId,
+                    LocalInvoiceId = localPayment.InvoiceId,
+                    FinalLocalPaymentStatus = localPayment.PaymentStatus,
+                    ActionCode = "SKIPPED_ALREADY_MATCHED",
+                    Message = "Trang thai giao dich noi bo da khop voi doi tac."
+                });
+                continue;
+            }
+
+            try
+            {
+                var callbackResult = await ConfirmPaymentCallbackAsync(
+                    new ConfirmHospitalPaymentCallbackDto
+                    {
+                        InvoiceId = localPayment.InvoiceId,
+                        GatewayProvider = gatewayProvider,
+                        GatewayEventId = NormalizeText(item.PartnerRecordId) ?? $"RECON-{Guid.NewGuid():N}",
+                        GatewayTimestampUtc = item.PaidAtUtc?.ToUniversalTime() ?? DateTime.UtcNow,
+                        PaymentReference = localPayment.PaymentReference,
+                        ExternalTransactionId = normalizedExternalTransactionId ?? localPayment.ExternalTransactionId,
+                        GatewayStatus = item.GatewayStatus,
+                        Amount = item.Amount
+                    },
+                    actorUserId,
+                    actorUsername,
+                    true,
+                    "ReconciliationApply",
+                    ct);
+
+                var finalLocalPaymentStatus = callbackResult?.Payments
+                    .FirstOrDefault(x => x.PaymentId == localPayment.PaymentId)?.PaymentStatus
+                    ?? normalizedPartnerStatus;
+
+                results.Add(new HospitalPaymentReconciliationApplyItemResultDto
+                {
+                    PartnerRecordId = NormalizeText(item.PartnerRecordId),
+                    PaymentReference = normalizedReference,
+                    ExternalTransactionId = normalizedExternalTransactionId,
+                    LocalPaymentId = localPayment.PaymentId,
+                    LocalInvoiceId = localPayment.InvoiceId,
+                    FinalLocalPaymentStatus = finalLocalPaymentStatus,
+                    ActionCode = "APPLIED",
+                    Message = "Da ap trang thai doi soat vao giao dich noi bo."
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                results.Add(new HospitalPaymentReconciliationApplyItemResultDto
+                {
+                    PartnerRecordId = NormalizeText(item.PartnerRecordId),
+                    PaymentReference = normalizedReference,
+                    ExternalTransactionId = normalizedExternalTransactionId,
+                    LocalPaymentId = localPayment.PaymentId,
+                    LocalInvoiceId = localPayment.InvoiceId,
+                    FinalLocalPaymentStatus = localPayment.PaymentStatus,
+                    ActionCode = "ERROR_APPLY_FAILED",
+                    Message = ex.Message
+                });
+            }
+        }
+
+        return new HospitalPaymentReconciliationApplyResultDto
+        {
+            GatewayProvider = gatewayProvider,
+            AppliedAtLocal = ConvertUtcToClinicLocal(DateTime.UtcNow),
+            TotalPartnerItems = results.Count,
+            AppliedCount = results.Count(x => x.ActionCode == "APPLIED"),
+            SkippedCount = results.Count(x => x.ActionCode.StartsWith("SKIPPED_", StringComparison.Ordinal)),
+            ErrorCount = results.Count(x => x.ActionCode.StartsWith("ERROR_", StringComparison.Ordinal)),
+            Items = results
         };
     }
 
@@ -733,6 +1107,7 @@ public class HospitalBillingService : IHospitalBillingService
                 PaymentId = x.PaymentId,
                 PaymentReference = x.PaymentReference,
                 PaymentMethod = x.PaymentMethod,
+                GatewayProvider = x.GatewayProvider,
                 Amount = x.Amount,
                 PaymentStatus = x.PaymentStatus,
                 PaidAtLocal = x.PaidAtUtc.HasValue ? ConvertUtcToClinicLocal(x.PaidAtUtc.Value) : null,
@@ -746,25 +1121,6 @@ public class HospitalBillingService : IHospitalBillingService
         => invoice.Payments
             .Where(x => x.PaymentStatus is "Captured" or "Refunded")
             .Sum(x => x.Amount);
-
-    private static string NormalizeGatewayStatus(string gatewayStatus)
-    {
-        if (string.Equals(gatewayStatus, "Captured", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(gatewayStatus, "Success", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(gatewayStatus, "Succeeded", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Captured";
-        }
-
-        if (string.Equals(gatewayStatus, "Failed", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(gatewayStatus, "Declined", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(gatewayStatus, "Cancelled", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Failed";
-        }
-
-        throw new InvalidOperationException("Gateway status khong hop le cho callback thanh toan.");
-    }
 
     private static string ResolveInvoiceStatus(decimal totalAmount, decimal netPaidAmount)
     {
@@ -795,6 +1151,32 @@ public class HospitalBillingService : IHospitalBillingService
 
     private static string GenerateRefundReference(DateTime nowUtc)
         => CompactCodeGenerator.Generate("RF", nowUtc);
+
+    private static string ResolveCallbackModeLabel(bool isSimulation, string? callbackSource)
+        => NormalizeText(callbackSource) ?? (isSimulation ? "Simulation" : "Webhook");
+
+    private static string? ResolveManualGatewayProvider(
+        string paymentMethod,
+        string? externalTransactionId,
+        string? fallbackProvider = null)
+    {
+        if (string.Equals(paymentMethod.Trim(), "Cash", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var normalizedExternalTransactionId = NormalizeText(externalTransactionId);
+        if (!string.IsNullOrWhiteSpace(normalizedExternalTransactionId))
+        {
+            var separatorIndex = normalizedExternalTransactionId.IndexOf('-', StringComparison.Ordinal);
+            if (separatorIndex > 0)
+            {
+                return normalizedExternalTransactionId[..separatorIndex];
+            }
+        }
+
+        return NormalizeText(fallbackProvider) ?? "ManualExternal";
+    }
 
     private static TimeZoneInfo ResolveClinicTimeZone()
     {

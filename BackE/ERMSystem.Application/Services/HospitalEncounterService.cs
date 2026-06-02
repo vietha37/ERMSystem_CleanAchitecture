@@ -862,7 +862,7 @@ public class HospitalEncounterService : IHospitalEncounterService
                     DocumentType = attachment.DocumentType,
                     FileName = attachment.FileName,
                     ContentType = attachment.ContentType,
-                    StorageProvider = _hospitalDocumentStorageService.Provider,
+                    StorageProvider = ResolveStorageProvider(attachment.DocumentUri),
                     DocumentUri = attachment.DocumentUri,
                     UploadedAtLocal = ConvertUtcToClinicLocal(attachment.UploadedAtUtc),
                     UploadedByUserId = attachment.UploadedByUserId,
@@ -870,6 +870,23 @@ public class HospitalEncounterService : IHospitalEncounterService
                 })
                 .ToList()
         };
+    }
+
+    private string ResolveStorageProvider(string? documentUri)
+    {
+        var normalized = documentUri?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return _hospitalDocumentStorageService.Provider;
+        }
+
+        var schemeSeparatorIndex = normalized.IndexOf("://", StringComparison.Ordinal);
+        if (schemeSeparatorIndex <= 0)
+        {
+            return _hospitalDocumentStorageService.Provider;
+        }
+
+        return normalized[..schemeSeparatorIndex];
     }
 
     private static string GetWorkflowEventLabel(string eventType)

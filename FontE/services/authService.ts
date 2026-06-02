@@ -21,6 +21,7 @@ type JwtPayload = {
   role?: UserRole;
   unique_name?: string;
   name?: string;
+  display_name?: string;
   sub?: string;
   [ROLE_CLAIM_URI]?: UserRole;
   [NAME_CLAIM_URI]?: string;
@@ -142,7 +143,21 @@ export const authService = {
       return null;
     }
 
-    return payload[NAME_CLAIM_URI] ?? payload.unique_name ?? payload.name ?? null;
+    return payload.unique_name ?? payload[NAME_CLAIM_URI] ?? payload.name ?? null;
+  },
+
+  getDisplayName: (): string | null => {
+    const token = authService.getToken();
+    if (!token) {
+      return null;
+    }
+
+    const payload = parseJwtPayload(token);
+    if (!payload) {
+      return null;
+    }
+
+    return payload.display_name ?? null;
   },
 
   isTokenExpired: (): boolean => {

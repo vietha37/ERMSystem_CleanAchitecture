@@ -67,9 +67,12 @@ namespace ERMSystem.Infrastructure.Services
 
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto)
         {
-            var userExists = await _userRepository.UsernameExistsAsync(registerDto.Username);
+            var normalizedUsername = registerDto.Username.Trim();
+            var normalizedName = NormalizeDisplayName(registerDto.Name, normalizedUsername);
+
+            var userExists = await _userRepository.UsernameExistsAsync(normalizedUsername);
             if (userExists)
-                throw new InvalidOperationException($"Username '{registerDto.Username}' is already taken.");
+                throw new InvalidOperationException($"Username '{normalizedUsername}' is already taken.");
 
             if (!Array.Exists(AppRole.Internal, r => r == registerDto.Role))
                 throw new ArgumentException($"Invalid role '{registerDto.Role}'. Must be Admin, Doctor, or Receptionist.");
@@ -77,7 +80,8 @@ namespace ERMSystem.Infrastructure.Services
             var user = new AppUser
             {
                 Id = Guid.NewGuid(),
-                Username = registerDto.Username,
+                Username = normalizedUsername,
+                Name = normalizedName,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password),
                 Role = registerDto.Role
             };
@@ -107,6 +111,7 @@ namespace ERMSystem.Infrastructure.Services
             {
                 Id = Guid.NewGuid(),
                 Username = normalizedUsername,
+                Name = registerDto.FullName.Trim(),
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(registerDto.Password),
                 Role = AppRole.Patient
             };
@@ -192,6 +197,7 @@ namespace ERMSystem.Infrastructure.Services
                 return new AuthResponseDto
                 {
                     Username = user.Username,
+                    Name = user.Name,
                     Role = user.Role,
                     RequiresTwoFactor = true,
                     IsMfaEnabled = true,
@@ -519,6 +525,7 @@ namespace ERMSystem.Infrastructure.Services
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
                 Username = user.Username,
+                Name = user.Name,
                 Role = user.Role,
                 ExpiresAt = expiresAt,
                 IsMfaEnabled = RequiresMfa(user)
@@ -557,6 +564,7 @@ namespace ERMSystem.Infrastructure.Services
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.UniqueName, user.Username),
                 new Claim(ClaimTypes.Name, user.Username),
+                new Claim("display_name", NormalizeDisplayName(user.Name, user.Username)),
                 new Claim(ClaimTypes.Role, user.Role)
             };
 
@@ -879,6 +887,12 @@ namespace ERMSystem.Infrastructure.Services
 
         private static bool IsInternalRole(string role)
             => Array.Exists(AppRole.Internal, candidate => candidate == role);
+
+        private static string NormalizeDisplayName(string? rawName, string fallbackUsername)
+        {
+            var normalized = rawName?.Trim();
+            return string.IsNullOrWhiteSpace(normalized) ? fallbackUsername.Trim() : normalized;
+        }
 
         private string UnprotectMfaSecret(string? protectedSecret)
         {

@@ -2,7 +2,6 @@ using System.Security.Claims;
 using ERMSystem.Application.DTOs;
 using ERMSystem.Application.Interfaces;
 using ERMSystem.Application.Authorization;
-using ERMSystem.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,14 +13,14 @@ namespace ERMSystem.API.Controllers;
 public class HospitalBillingController : ControllerBase
 {
     private readonly IHospitalBillingService _hospitalBillingService;
-    private readonly PaymentGatewayCallbackVerifier _paymentGatewayCallbackVerifier;
+    private readonly IHospitalPaymentGatewayService _hospitalPaymentGatewayService;
 
     public HospitalBillingController(
         IHospitalBillingService hospitalBillingService,
-        PaymentGatewayCallbackVerifier paymentGatewayCallbackVerifier)
+        IHospitalPaymentGatewayService hospitalPaymentGatewayService)
     {
         _hospitalBillingService = hospitalBillingService;
-        _paymentGatewayCallbackVerifier = paymentGatewayCallbackVerifier;
+        _hospitalPaymentGatewayService = hospitalPaymentGatewayService;
     }
 
     [HttpGet]
@@ -189,10 +188,23 @@ public class HospitalBillingController : ControllerBase
 
         try
         {
-            request.GatewayProvider ??= _paymentGatewayCallbackVerifier.GetDefaultProvider();
-            if (!_paymentGatewayCallbackVerifier.TryValidate(request, Request.Headers, out var failureReason))
+            var validation = _hospitalPaymentGatewayService.ValidateCallback(new HospitalPaymentGatewayCallbackValidationRequest
             {
-                return Unauthorized(new { message = failureReason });
+                InvoiceId = request.InvoiceId,
+                ProviderName = request.GatewayProvider,
+                PaymentReference = request.PaymentReference,
+                ExternalTransactionId = request.ExternalTransactionId,
+                GatewayStatus = request.GatewayStatus,
+                Amount = request.Amount,
+                GatewayEventId = request.GatewayEventId,
+                GatewayTimestampUtc = request.GatewayTimestampUtc,
+                Headers = Request.Headers.ToDictionary(x => x.Key, x => x.Value.ToString(), StringComparer.OrdinalIgnoreCase)
+            });
+
+            request.GatewayProvider = validation.ResolvedProviderName;
+            if (!validation.IsValid)
+            {
+                return Unauthorized(new { message = validation.FailureReason });
             }
 
             var result = await _hospitalBillingService.ConfirmPaymentCallbackAsync(
@@ -200,6 +212,7 @@ public class HospitalBillingController : ControllerBase
                 null,
                 "gateway-webhook",
                 false,
+                null,
                 ct);
             if (result == null)
             {
@@ -223,7 +236,7 @@ public class HospitalBillingController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        request.GatewayProvider ??= _paymentGatewayCallbackVerifier.GetDefaultProvider();
+        request.GatewayProvider ??= _hospitalPaymentGatewayService.GetDefaultProvider();
         request.GatewayEventId ??= $"SIM-{Guid.NewGuid():N}";
         request.GatewayTimestampUtc ??= DateTime.UtcNow;
 
@@ -234,6 +247,7 @@ public class HospitalBillingController : ControllerBase
                 ResolveActorUserId(),
                 ResolveActorUsername(),
                 true,
+                null,
                 ct);
             if (result == null)
             {
@@ -257,6 +271,56 @@ public class HospitalBillingController : ControllerBase
             ResolveCurrentUsername(),
             ct);
         return Ok(result);
+    }
+
+    [HttpPost("reconciliation/preview")]
+    [Authorize(Policy = AppPermissions.HospitalBilling.Read)]
+    public async Task<IActionResult> PreviewReconciliation([FromBody] HospitalPaymentReconciliationPreviewRequestDto request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        try
+        {
+            var result = await _hospitalBillingService.PreviewReconciliationAsync(
+                request,
+                ResolveCurrentRole(),
+                ResolveCurrentUsername(),
+                ct);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("reconciliation/apply")]
+    [Authorize(Policy = AppPermissions.HospitalBilling.CollectPayment)]
+    public async Task<IActionResult> ApplyReconciliation([FromBody] HospitalPaymentReconciliationApplyRequestDto request, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        try
+        {
+            var result = await _hospitalBillingService.ApplyReconciliationAsync(
+                request,
+                ResolveActorUserId(),
+                ResolveActorUsername(),
+                ResolveCurrentRole(),
+                ResolveCurrentUsername(),
+                ct);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     private Guid? ResolveActorUserId()

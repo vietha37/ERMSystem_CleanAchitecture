@@ -1,0 +1,23 @@
+namespace ERMSystem.Infrastructure.Services;
+
+public class HospitalPaymentGatewayOptions
+{
+    public string DefaultProvider { get; set; } = "MockGateway";
+    public Dictionary<string, HospitalPaymentGatewayProviderOptions> Providers { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+}
+
+public class HospitalPaymentGatewayProviderOptions
+{
+    public bool Enabled { get; set; } = true;
+    public string DisplayName { get; set; } = string.Empty;
+    public string CheckoutMode { get; set; } = "HostedUrl";
+    public string CallbackMode { get; set; } = "SignedWebhook";
+    public string CheckoutBaseUrl { get; set; } = string.Empty;
+    public string MerchantCode { get; set; } = string.Empty;
+    public bool RequireSignature { get; set; } = true;
+    public string SignatureHeaderName { get; set; } = "X-ERM-Gateway-Signature";
+    public string WebhookSecret { get; set; } = string.Empty;
+    public int TimestampToleranceMinutes { get; set; } = 10;
+    public List<string> SupportedPaymentMethods { get; set; } = new();
+    public Dictionary<string, string> StaticCheckoutParameters { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+}

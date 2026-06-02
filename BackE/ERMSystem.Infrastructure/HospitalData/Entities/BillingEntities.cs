@@ -95,6 +95,9 @@ public class HospitalPaymentEntity
     [MaxLength(50)]
     public string PaymentMethod { get; set; } = string.Empty;
 
+    [MaxLength(50)]
+    public string? GatewayProvider { get; set; }
+
     public decimal Amount { get; set; }
 
     [MaxLength(30)]

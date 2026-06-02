@@ -10,14 +10,14 @@ public class DocumentStorageCleanupService : BackgroundService
 {
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IHospitalDocumentStorageService _documentStorageService;
-    private readonly LocalDocumentStorageOptions _options;
+    private readonly HospitalDocumentStorageOptions _options;
     private readonly BackgroundWorkerHealthRegistry _workerHealthRegistry;
     private readonly ILogger<DocumentStorageCleanupService> _logger;
 
     public DocumentStorageCleanupService(
         IServiceScopeFactory serviceScopeFactory,
         IHospitalDocumentStorageService documentStorageService,
-        IOptions<LocalDocumentStorageOptions> options,
+        IOptions<HospitalDocumentStorageOptions> options,
         BackgroundWorkerHealthRegistry workerHealthRegistry,
         ILogger<DocumentStorageCleanupService> logger)
     {
@@ -30,7 +30,7 @@ public class DocumentStorageCleanupService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var intervalHours = Math.Max(1, _options.CleanupIntervalHours);
+        var intervalHours = Math.Max(1, ResolveCleanupIntervalHours());
         _logger.LogInformation("Khoi dong worker document storage cleanup.");
         _workerHealthRegistry.Report("document-storage-cleanup", "Starting", "Worker started.");
 
@@ -75,5 +75,20 @@ public class DocumentStorageCleanupService : BackgroundService
             "Healthy",
             $"Cleanup completed. deletedOrphanFiles={deletedCount}.",
             successAtUtc: DateTime.UtcNow);
+    }
+
+    private int ResolveCleanupIntervalHours()
+    {
+        var defaultProviderName = string.IsNullOrWhiteSpace(_options.DefaultProvider)
+            ? _options.Providers.Keys.FirstOrDefault()
+            : _options.DefaultProvider.Trim();
+        if (string.IsNullOrWhiteSpace(defaultProviderName))
+        {
+            return 24;
+        }
+
+        return _options.Providers.TryGetValue(defaultProviderName, out var provider)
+            ? provider.CleanupIntervalHours
+            : 24;
     }
 }

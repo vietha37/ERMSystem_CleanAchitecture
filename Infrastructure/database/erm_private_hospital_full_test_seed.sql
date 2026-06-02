@@ -243,14 +243,14 @@ END
 
 MERGE [identity].Users AS target
 USING (VALUES
-    (@AdminUserId, 'admin.seed', 'admin.seed@erm.local', @PasswordHash, 'Admin'),
-    (@DoctorUserId, 'doctor.seed', 'doctor.seed@erm.local', @PasswordHash, 'Doctor'),
-    (@ReceptionUserId, 'reception.seed', 'reception.seed@erm.local', @PasswordHash, 'Receptionist'),
-    (@PatientUserId, 'patient.seed', 'patient.seed@erm.local', @PasswordHash, 'Patient'),
-    (@NurseUserId, 'nurse.seed', 'nurse.seed@erm.local', @PasswordHash, 'Nurse'),
-    (@PharmacistUserId, 'pharmacist.seed', 'pharmacist.seed@erm.local', @PasswordHash, 'Pharmacist'),
-    (@LabTechUserId, 'labtech.seed', 'labtech.seed@erm.local', @PasswordHash, 'LabTech'),
-    (@CashierUserId, 'cashier.seed', 'cashier.seed@erm.local', @PasswordHash, 'Cashier')
+    (@AdminUserId, 'admin00', 'admin00@erm.local', @PasswordHash, 'Admin'),
+    (@DoctorUserId, 'doctor00', 'doctor00@erm.local', @PasswordHash, 'Doctor'),
+    (@ReceptionUserId, 'reception00', 'reception00@erm.local', @PasswordHash, 'Receptionist'),
+    (@PatientUserId, 'patient00', 'patient00@erm.local', @PasswordHash, 'Patient'),
+    (@NurseUserId, 'nurse00', 'nurse00@erm.local', @PasswordHash, 'Nurse'),
+    (@PharmacistUserId, 'pharmacist00', 'pharmacist00@erm.local', @PasswordHash, 'Pharmacist'),
+    (@LabTechUserId, 'labtech00', 'labtech00@erm.local', @PasswordHash, 'LabTech'),
+    (@CashierUserId, 'cashier00', 'cashier00@erm.local', @PasswordHash, 'Cashier')
 ) AS source (Id, Username, Email, PasswordHash, PrimaryRoleCode)
 ON target.Id = source.Id
 WHEN MATCHED THEN
@@ -287,13 +287,13 @@ WHEN NOT MATCHED BY TARGET THEN
 
 MERGE org.StaffProfiles AS target
 USING (VALUES
-    (@AdminStaffId, @AdminUserId, 'ADM001', N'Pham Hoang Admin', @OpdDepartmentId, '0908111001', 'admin.seed@erm.local', CAST('2023-01-10' AS DATE)),
-    (@DoctorStaffId, @DoctorUserId, 'BS100', N'BS Tran Anh Khoa', @OpdDepartmentId, '0908111002', 'doctor.seed@erm.local', CAST('2020-03-15' AS DATE)),
-    (@ReceptionStaffId, @ReceptionUserId, 'LT100', N'Le Thu Tiep Tan', @OpdDepartmentId, '0908111003', 'reception.seed@erm.local', CAST('2022-04-01' AS DATE)),
-    (@NurseStaffId, @NurseUserId, 'DD100', N'Nguyen Ha Dieu Duong', @OpdDepartmentId, '0908111004', 'nurse.seed@erm.local', CAST('2021-06-12' AS DATE)),
-    (@PharmacistStaffId, @PharmacistUserId, 'DS100', N'Vo Thanh Duoc', @PhaDepartmentId, '0908111005', 'pharmacist.seed@erm.local', CAST('2021-08-20' AS DATE)),
-    (@LabTechStaffId, @LabTechUserId, 'XN100', N'Pham Kien Xet Nghiem', @LabDepartmentId, '0908111006', 'labtech.seed@erm.local', CAST('2022-02-11' AS DATE)),
-    (@CashierStaffId, @CashierUserId, 'TN100', N'Tran Thu Ngan', @OpdDepartmentId, '0908111007', 'cashier.seed@erm.local', CAST('2022-10-05' AS DATE))
+    (@AdminStaffId, @AdminUserId, 'ADM001', N'Pham Hoang An', @OpdDepartmentId, '0908111001', 'admin00@erm.local', CAST('2023-01-10' AS DATE)),
+    (@DoctorStaffId, @DoctorUserId, 'BS100', N'Tran Anh Khoa', @OpdDepartmentId, '0908111002', 'doctor00@erm.local', CAST('2020-03-15' AS DATE)),
+    (@ReceptionStaffId, @ReceptionUserId, 'LT100', N'Le Thu Hang', @OpdDepartmentId, '0908111003', 'reception00@erm.local', CAST('2022-04-01' AS DATE)),
+    (@NurseStaffId, @NurseUserId, 'DD100', N'Nguyen Ha My', @OpdDepartmentId, '0908111004', 'nurse00@erm.local', CAST('2021-06-12' AS DATE)),
+    (@PharmacistStaffId, @PharmacistUserId, 'DS100', N'Vo Thanh Tung', @PhaDepartmentId, '0908111005', 'pharmacist00@erm.local', CAST('2021-08-20' AS DATE)),
+    (@LabTechStaffId, @LabTechUserId, 'XN100', N'Pham Kien Minh', @LabDepartmentId, '0908111006', 'labtech00@erm.local', CAST('2022-02-11' AS DATE)),
+    (@CashierStaffId, @CashierUserId, 'TN100', N'Tran Thu Ha', @OpdDepartmentId, '0908111007', 'cashier00@erm.local', CAST('2022-10-05' AS DATE))
 ) AS source (Id, UserId, StaffCode, FullName, DepartmentId, Phone, Email, HireDate)
 ON target.Id = source.Id
 WHEN MATCHED THEN
@@ -316,7 +316,7 @@ BEGIN
     SET StaffProfileId = @DoctorStaffId,
         SpecialtyId = @GeneralSpecialtyId,
         LicenseNumber = 'GEN-100',
-        Biography = N'Bac si noi tong quat phuc vu bo du lieu seed test.',
+        Biography = N'Bac si noi tong quat phuc vu bo du lieu kiem thu.',
         YearsOfExperience = 8,
         ConsultationFee = 250000,
         IsBookable = 1
@@ -325,7 +325,7 @@ END
 ELSE
 BEGIN
     INSERT INTO org.DoctorProfiles (Id, StaffProfileId, SpecialtyId, LicenseNumber, Biography, YearsOfExperience, ConsultationFee, IsBookable)
-    VALUES (@DoctorProfileId, @DoctorStaffId, @GeneralSpecialtyId, 'GEN-100', N'Bac si noi tong quat phuc vu bo du lieu seed test.', 8, 250000, 1);
+    VALUES (@DoctorProfileId, @DoctorStaffId, @GeneralSpecialtyId, 'GEN-100', N'Bac si noi tong quat phuc vu bo du lieu kiem thu.', 8, 250000, 1);
 END
 
 MERGE org.DoctorSchedules AS target
@@ -352,7 +352,7 @@ WHEN NOT MATCHED BY TARGET THEN
 
 MERGE patient.Patients AS target
 USING (VALUES
-    (@PortalPatientHospitalId, 'MRN-SEED-0001', N'Nguyen Minh Anh', CAST('1994-05-12' AS DATE), N'Female', '0909000001', 'patient.seed@erm.local', N'12 Nguyen Hue', NULL, N'Ben Nghe', N'Quan 1', N'TP.HCM', N'Viet Nam', '079123456789', N'Nhan vien van phong', N'Married'),
+    (@PortalPatientHospitalId, 'MRN-0001', N'Nguyen Minh Anh', CAST('1994-05-12' AS DATE), N'Female', '0909000001', 'patient00@erm.local', N'12 Nguyen Hue', NULL, N'Ben Nghe', N'Quan 1', N'TP.HCM', N'Viet Nam', '079123456789', N'Nhan vien van phong', N'Married'),
     (@SeniorPatientHospitalId, 'MRN-SEED-0002', N'Le Van Binh', CAST('1968-10-20' AS DATE), N'Male', '0909000002', 'binh.le@erm.local', N'88 Cach Mang Thang 8', NULL, N'Vo Thi Sau', N'Quan 3', N'TP.HCM', N'Viet Nam', '079987654321', N'Nghi huu', N'Married'),
     (@MaternityPatientHospitalId, 'MRN-SEED-0003', N'Pham Ngoc Lan', CAST('1991-03-03' AS DATE), N'Female', '0909000004', 'lan.pham@erm.local', N'150 Nguyen Thi Minh Khai', NULL, N'Ben Thanh', N'Quan 1', N'TP.HCM', N'Viet Nam', '079556677889', N'Ke toan', N'Married'),
     (@PediatricPatientHospitalId, 'MRN-SEED-0004', N'Tran Gia Han', CAST('2017-02-15' AS DATE), N'Female', '0909000003', 'han.tran@erm.local', N'26 Phan Xich Long', NULL, N'Ward 2', N'Phu Nhuan', N'TP.HCM', N'Viet Nam', NULL, N'Hoc sinh', N'Single')
@@ -416,7 +416,7 @@ WHEN NOT MATCHED BY TARGET THEN
 MERGE patient.PatientContacts AS target
 USING (VALUES
     ('34000000-0000-0000-0000-000000000001', @PortalPatientHospitalId, 'Phone', '0909000001', 1),
-    ('34000000-0000-0000-0000-000000000002', @PortalPatientHospitalId, 'Email', 'patient.seed@erm.local', 0),
+    ('34000000-0000-0000-0000-000000000002', @PortalPatientHospitalId, 'Email', 'patient00@erm.local', 0),
     ('34000000-0000-0000-0000-000000000003', @SeniorPatientHospitalId, 'Phone', '0909000002', 1),
     ('34000000-0000-0000-0000-000000000004', @MaternityPatientHospitalId, 'Phone', '0909000004', 1),
     ('34000000-0000-0000-0000-000000000005', @PediatricPatientHospitalId, 'Phone', '0909000003', 1)
@@ -476,13 +476,13 @@ BEGIN
         ConsentType = 'PortalAccess',
         GrantedAtUtc = DATEADD(DAY, -60, @NowUtc),
         RevokedAtUtc = NULL,
-        EvidenceUri = 'local://seed/consents/patient-seed-portal.pdf'
+        EvidenceUri = 'local://hoso/consents/patient-portal.pdf'
     WHERE Id = @PortalConsentId;
 END
 ELSE
 BEGIN
     INSERT INTO patient.PatientConsents (Id, PatientId, ConsentType, GrantedAtUtc, RevokedAtUtc, EvidenceUri)
-    VALUES (@PortalConsentId, @PortalPatientHospitalId, 'PortalAccess', DATEADD(DAY, -60, @NowUtc), NULL, 'local://seed/consents/patient-seed-portal.pdf');
+    VALUES (@PortalConsentId, @PortalPatientHospitalId, 'PortalAccess', DATEADD(DAY, -60, @NowUtc), NULL, 'local://hoso/consents/patient-portal.pdf');
 END
 
 MERGE notification.NotificationPreferences AS target
@@ -708,8 +708,8 @@ WHEN NOT MATCHED BY TARGET THEN
 
 MERGE emr.ClinicalDocuments AS target
 USING (VALUES
-    (@Document1Id, @EncounterFinalizedId, 'Ultrasound', 'finalized-ultrasound.pdf', 'local://seed/documents/finalized-ultrasound.pdf', 'application/pdf', @DoctorUserId, DATEADD(MINUTE, 41, @Yesterday1000Utc)),
-    (@Document2Id, @EncounterApprovedId, 'PrescriptionReview', 'approved-prescription.pdf', 'local://seed/documents/approved-prescription.pdf', 'application/pdf', @DoctorUserId, DATEADD(MINUTE, 34, @ThreeDaysAgo1400Utc))
+    (@Document1Id, @EncounterFinalizedId, 'Ultrasound', 'finalized-ultrasound.pdf', 'local://hoso/documents/finalized-ultrasound.pdf', 'application/pdf', @DoctorUserId, DATEADD(MINUTE, 41, @Yesterday1000Utc)),
+    (@Document2Id, @EncounterApprovedId, 'PrescriptionReview', 'approved-prescription.pdf', 'local://hoso/documents/approved-prescription.pdf', 'application/pdf', @DoctorUserId, DATEADD(MINUTE, 34, @ThreeDaysAgo1400Utc))
 ) AS source (Id, EncounterId, DocumentType, FileName, StorageUri, MimeType, UploadedByUserId, UploadedAtUtc)
 ON target.Id = source.Id
 WHEN MATCHED THEN
@@ -822,7 +822,7 @@ BEGIN
     SET ImagingOrderId = @ImagingOrderId,
         Findings = N'Khong co dich o bung, khong thay bat thuong cap tinh.',
         Impression = N'Hinh anh bung tong quat trong gioi han cho phep.',
-        ReportUri = 'local://seed/imaging/report-0001.pdf',
+        ReportUri = 'local://chan-doan-hinh-anh/report-0001.pdf',
         SignedByUserId = @DoctorUserId,
         SignedAtUtc = DATEADD(HOUR, 1, @Yesterday1000Utc)
     WHERE Id = @ImagingReportId;
@@ -830,7 +830,7 @@ END
 ELSE
 BEGIN
     INSERT INTO imaging.ImagingReports (Id, ImagingOrderId, Findings, Impression, ReportUri, SignedByUserId, SignedAtUtc)
-    VALUES (@ImagingReportId, @ImagingOrderId, N'Khong co dich o bung, khong thay bat thuong cap tinh.', N'Hinh anh bung tong quat trong gioi han cho phep.', 'local://seed/imaging/report-0001.pdf', @DoctorUserId, DATEADD(HOUR, 1, @Yesterday1000Utc));
+    VALUES (@ImagingReportId, @ImagingOrderId, N'Khong co dich o bung, khong thay bat thuong cap tinh.', N'Hinh anh bung tong quat trong gioi han cho phep.', 'local://chan-doan-hinh-anh/report-0001.pdf', @DoctorUserId, DATEADD(HOUR, 1, @Yesterday1000Utc));
 END
 
 MERGE pharmacy.Prescriptions AS target
@@ -1053,8 +1053,8 @@ WHEN NOT MATCHED BY TARGET THEN
 MERGE notification.NotificationDeliveries AS target
 USING (VALUES
     (@DeliveryQueuedId, @OutboxPendingId, 'Sms', '0909000001', 'Queued', NULL, 0, NULL, NULL, NULL),
-    (@DeliveryDeliveredId, @OutboxDeliveredId, 'App', 'patient.seed', 'Delivered', 'MSG-0002', 1, DATEADD(HOUR, -11, @NowUtc), DATEADD(HOUR, -11, @NowUtc), NULL),
-    (@DeliveryFailedId, @OutboxFailedId, 'Email', 'patient.seed@erm.local', 'Failed', 'MSG-0003', 2, DATEADD(HOUR, -7, @NowUtc), NULL, N'SMTP timeout')
+    (@DeliveryDeliveredId, @OutboxDeliveredId, 'App', 'portal-nguyen-minh-anh', 'Delivered', 'MSG-0002', 1, DATEADD(HOUR, -11, @NowUtc), DATEADD(HOUR, -11, @NowUtc), NULL),
+    (@DeliveryFailedId, @OutboxFailedId, 'Email', 'patient00@erm.local', 'Failed', 'MSG-0003', 2, DATEADD(HOUR, -7, @NowUtc), NULL, N'SMTP timeout')
 ) AS source (Id, OutboxMessageId, ChannelCode, Recipient, DeliveryStatus, ProviderMessageId, AttemptCount, LastAttemptAtUtc, DeliveredAtUtc, ErrorMessage)
 ON target.Id = source.Id
 WHEN MATCHED THEN
@@ -1074,8 +1074,8 @@ WHEN NOT MATCHED BY TARGET THEN
 
 MERGE [identity].SecurityEvents AS target
 USING (VALUES
-    (@SecurityEvent1Id, @AdminUserId, 'LoginSucceeded', 'Info', N'Admin seed account login success from local workstation.', '127.0.0.1', 'SeedRunner/1.0', DATEADD(DAY, -1, @NowUtc)),
-    (@SecurityEvent2Id, @PatientUserId, 'MfaChallengeIssued', 'Info', N'Patient seed account requested MFA challenge during portal test.', '127.0.0.1', 'SeedRunner/1.0', DATEADD(HOUR, -10, @NowUtc))
+    (@SecurityEvent1Id, @AdminUserId, 'LoginSucceeded', 'Info', N'Tai khoan quan tri dang nhap thanh cong tu may tram noi bo.', '127.0.0.1', 'PortalClient/1.0', DATEADD(DAY, -1, @NowUtc)),
+    (@SecurityEvent2Id, @PatientUserId, 'MfaChallengeIssued', 'Info', N'Tai khoan benh nhan yeu cau xac thuc MFA trong qua trinh dang nhap.', '127.0.0.1', 'PortalClient/1.0', DATEADD(HOUR, -10, @NowUtc))
 ) AS source (Id, UserId, EventType, Severity, Detail, IpAddress, UserAgent, OccurredAtUtc)
 ON target.Id = source.Id
 WHEN MATCHED THEN
@@ -1093,8 +1093,8 @@ WHEN NOT MATCHED BY TARGET THEN
 
 MERGE audit.AuditLogs AS target
 USING (VALUES
-    (@Audit1Id, @CashierUserId, 'Invoice', @InvoicePartialId, 'COLLECT_PAYMENT', N'{"status":"Issued"}', N'{"status":"PartiallyPaid","amount":200000}', 'seed-billing-001', DATEADD(MINUTE, 41, @Today0830Utc)),
-    (@Audit2Id, @DoctorUserId, 'Encounter', @EncounterApprovedId, 'APPROVE_MEDICAL_RECORD', N'{"status":"Finalized"}', N'{"status":"Approved"}', 'seed-emr-001', DATEADD(MINUTE, 50, @ThreeDaysAgo1400Utc))
+    (@Audit1Id, @CashierUserId, 'Invoice', @InvoicePartialId, 'COLLECT_PAYMENT', N'{"status":"Issued"}', N'{"status":"PartiallyPaid","amount":200000}', 'billing-001', DATEADD(MINUTE, 41, @Today0830Utc)),
+    (@Audit2Id, @DoctorUserId, 'Encounter', @EncounterApprovedId, 'APPROVE_MEDICAL_RECORD', N'{"status":"Finalized"}', N'{"status":"Approved"}', 'emr-001', DATEADD(MINUTE, 50, @ThreeDaysAgo1400Utc))
 ) AS source (Id, UserId, EntityType, EntityId, ActionCode, BeforeJson, AfterJson, CorrelationId, CreatedAtUtc)
 ON target.Id = source.Id
 WHEN MATCHED THEN
@@ -1219,13 +1219,13 @@ SELECT NEWID(),
        DATEADD(DAY, -120, @NowUtc)
 FROM Numbers n
 CROSS JOIN (VALUES
-    ('ADX', N'Admin Seed', 'admin', 'OPD', 1000),
-    ('BSX', N'Bac si Seed', 'doctor', 'OPD', 2000),
-    ('LTX', N'Le tan Seed', 'reception', 'OPD', 3000),
-    ('DDX', N'Dieu duong Seed', 'nurse', 'OPD', 4000),
-    ('DSX', N'Duoc si Seed', 'pharmacist', 'PHA', 5000),
-    ('XNX', N'Ky thuat vien XN Seed', 'labtech', 'LAB', 6000),
-    ('TNX', N'Thu ngan Seed', 'cashier', 'OPD', 7000)
+    ('ADX', N'Nguyen Gia An', 'admin', 'OPD', 1000),
+    ('BSX', N'Tran Minh Khang', 'doctor', 'OPD', 2000),
+    ('LTX', N'Le Thu Quynh', 'reception', 'OPD', 3000),
+    ('DDX', N'Pham Gia Han', 'nurse', 'OPD', 4000),
+    ('DSX', N'Vo Duc Huy', 'pharmacist', 'PHA', 5000),
+    ('XNX', N'Dang Bao Chau', 'labtech', 'LAB', 6000),
+    ('TNX', N'Bui Thanh Ha', 'cashier', 'OPD', 7000)
 ) seed (StaffPrefix, DisplayName, UsernamePrefix, DepartmentCode, PhoneSeed)
 JOIN [identity].Users u
     ON u.Username = CONCAT(seed.UsernamePrefix, RIGHT(CONCAT('00', CAST(n.NumberValue AS VARCHAR(2))), 2))
@@ -1251,7 +1251,7 @@ SELECT NEWID(),
        sp.Id,
        spec.Id,
        CONCAT('GEN-X-', RIGHT(CONCAT('000', CAST(n.NumberValue AS VARCHAR(3))), 3)),
-       N'Bac si seed bo sung cho tai khoan test.',
+       N'Bac si kham ngoai tru phuc vu kiem thu he thong.',
        4 + n.NumberValue,
        220000 + (n.NumberValue * 1000),
        1
@@ -1339,14 +1339,20 @@ INSERT INTO patient.Patients
 )
 SELECT NEWID(),
        CONCAT('MRN-BULK-', RIGHT(CONCAT('000', CAST(n.NumberValue AS VARCHAR(3))), 3)),
-       CONCAT(N'Benh nhan bulk ', RIGHT(CONCAT('000', CAST(n.NumberValue AS VARCHAR(3))), 3)),
+       CONCAT(
+            CHOOSE(((n.NumberValue + 2 - 1) % 10) + 1, N'Nguyen', N'Tran', N'Le', N'Pham', N'Hoang', N'Vo', N'Dang', N'Bui', N'Do', N'Phan'),
+            N' ',
+            CHOOSE(((n.NumberValue + 4 - 1) % 10) + 1, N'Gia', N'Thanh', N'Minh', N'Thu', N'Ngoc', N'Anh', N'Duc', N'Huu', N'Bao', N'Quynh'),
+            N' ',
+            CHOOSE(((n.NumberValue + 6 - 1) % 12) + 1, N'An', N'Binh', N'Chau', N'Dung', N'Hanh', N'Khanh', N'Lam', N'Mai', N'Nam', N'Phuc', N'Quang', N'Trang')
+       ),
        DATEADD(DAY, -1 * (7000 + n.NumberValue), CAST(@NowUtc AS DATE)),
        CASE WHEN n.NumberValue % 2 = 0 THEN N'Female' ELSE N'Male' END,
        CONCAT('0933', RIGHT(CONCAT('000000', CAST(n.NumberValue AS VARCHAR(6))), 6)),
        CONCAT('benhnhan', RIGHT(CONCAT('000', CAST(n.NumberValue AS VARCHAR(3))), 3), '@erm.local'),
-       CONCAT(N'So ', n.NumberValue, N' Seed Street'),
+       CONCAT(N'So ', 20 + n.NumberValue, N' Duong Le Loi'),
        NULL,
-       N'Ward Seed',
+       N'Phuong Ben Thanh',
        CASE WHEN n.NumberValue % 3 = 0 THEN N'Quan 1' ELSE N'Quan 3' END,
        N'TP.HCM',
        N'Viet Nam',
@@ -1385,4 +1391,79 @@ WHERE NOT EXISTS (
     WHERE pa.PatientId = p.Id
 )
 OPTION (MAXRECURSION 19);
+
+;WITH NumberedInternalUsers AS
+(
+    SELECT u.Id,
+           u.Username,
+           u.PrimaryRoleCode,
+           TRY_CONVERT(INT, RIGHT(u.Username, 2)) AS NumberValue
+    FROM [identity].Users u
+    WHERE u.Username LIKE '%[0-9][0-9]'
+      AND u.PrimaryRoleCode IN ('Admin', 'Doctor', 'Receptionist', 'Nurse', 'Pharmacist', 'LabTech', 'Cashier')
+)
+UPDATE sp
+SET FullName = CONCAT(
+        CHOOSE(((niu.NumberValue + roleOffset.OffsetA - 1) % 10) + 1, N'Nguyen', N'Tran', N'Le', N'Pham', N'Hoang', N'Vo', N'Dang', N'Bui', N'Do', N'Phan'),
+        N' ',
+        CHOOSE(((niu.NumberValue + roleOffset.OffsetB - 1) % 10) + 1, N'Gia', N'Thanh', N'Minh', N'Thu', N'Ngoc', N'Anh', N'Duc', N'Huu', N'Bao', N'Quynh'),
+        N' ',
+        CHOOSE(((niu.NumberValue + roleOffset.OffsetC - 1) % 12) + 1, N'An', N'Binh', N'Chau', N'Dung', N'Hanh', N'Khanh', N'Lam', N'Mai', N'Nam', N'Phuc', N'Quang', N'Trang')
+    ),
+    Email = CONCAT(niu.Username, '@erm.local')
+FROM org.StaffProfiles sp
+JOIN NumberedInternalUsers niu ON niu.Id = sp.UserId
+CROSS APPLY
+(
+    SELECT CASE niu.PrimaryRoleCode
+            WHEN 'Admin' THEN 1
+            WHEN 'Doctor' THEN 2
+            WHEN 'Receptionist' THEN 3
+            WHEN 'Nurse' THEN 4
+            WHEN 'Pharmacist' THEN 5
+            WHEN 'LabTech' THEN 6
+            ELSE 7
+        END AS OffsetA,
+        CASE niu.PrimaryRoleCode
+            WHEN 'Admin' THEN 4
+            WHEN 'Doctor' THEN 5
+            WHEN 'Receptionist' THEN 6
+            WHEN 'Nurse' THEN 7
+            WHEN 'Pharmacist' THEN 8
+            WHEN 'LabTech' THEN 9
+            ELSE 10
+        END AS OffsetB,
+        CASE niu.PrimaryRoleCode
+            WHEN 'Admin' THEN 7
+            WHEN 'Doctor' THEN 8
+            WHEN 'Receptionist' THEN 9
+            WHEN 'Nurse' THEN 10
+            WHEN 'Pharmacist' THEN 11
+            WHEN 'LabTech' THEN 12
+            ELSE 13
+        END AS OffsetC
+) roleOffset;
+
+;WITH NumberedPortalPatients AS
+(
+    SELECT p.Id,
+           u.Username,
+           TRY_CONVERT(INT, RIGHT(u.Username, 2)) AS NumberValue
+    FROM patient.PatientAccounts pa
+    JOIN patient.Patients p ON p.Id = pa.PatientId
+    JOIN [identity].Users u ON u.Id = pa.UserId
+    WHERE u.Username LIKE 'patient[0-9][0-9]'
+)
+UPDATE p
+SET FullName = CONCAT(
+        CHOOSE(((npp.NumberValue + 2 - 1) % 10) + 1, N'Nguyen', N'Tran', N'Le', N'Pham', N'Hoang', N'Vo', N'Dang', N'Bui', N'Do', N'Phan'),
+        N' ',
+        CHOOSE(((npp.NumberValue + 5 - 1) % 10) + 1, N'Gia', N'Thanh', N'Minh', N'Thu', N'Ngoc', N'Anh', N'Duc', N'Huu', N'Bao', N'Quynh'),
+        N' ',
+        CHOOSE(((npp.NumberValue + 8 - 1) % 12) + 1, N'An', N'Binh', N'Chau', N'Dung', N'Hanh', N'Khanh', N'Lam', N'Mai', N'Nam', N'Phuc', N'Quang', N'Trang')
+    ),
+    Email = CONCAT(npp.Username, '@erm.local'),
+    MedicalRecordNumber = CONCAT('MRN-', RIGHT(CONCAT('0000', CAST(100 + npp.NumberValue AS VARCHAR(4))), 4))
+FROM patient.Patients p
+JOIN NumberedPortalPatients npp ON npp.Id = p.Id;
 GO

@@ -21,7 +21,20 @@ public interface IHospitalBillingService
         Guid? actorUserId,
         string? actorUsername,
         bool isSimulation,
+        string? callbackSource,
         CancellationToken ct = default);
     Task<HospitalInvoiceDetailDto?> RefundPaymentAsync(Guid invoiceId, RefundHospitalPaymentDto request, Guid? actorUserId, string? actorUsername, CancellationToken ct = default);
     Task<HospitalPaymentReconciliationSummaryDto> GetReconciliationSummaryAsync(string currentRole, string? currentUsername, CancellationToken ct = default);
+    Task<HospitalPaymentReconciliationPreviewDto> PreviewReconciliationAsync(
+        HospitalPaymentReconciliationPreviewRequestDto request,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct = default);
+    Task<HospitalPaymentReconciliationApplyResultDto> ApplyReconciliationAsync(
+        HospitalPaymentReconciliationApplyRequestDto request,
+        Guid? actorUserId,
+        string? actorUsername,
+        string currentRole,
+        string? currentUsername,
+        CancellationToken ct = default);
 }

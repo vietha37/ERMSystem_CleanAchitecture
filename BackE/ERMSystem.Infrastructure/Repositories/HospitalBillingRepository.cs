@@ -353,6 +353,7 @@ public class HospitalBillingRepository : IHospitalBillingRepository
                 InvoiceId = x.InvoiceId,
                 PaymentReference = x.PaymentReference,
                 PaymentMethod = x.PaymentMethod,
+                GatewayProvider = x.GatewayProvider,
                 Amount = x.Amount,
                 PaymentStatus = x.PaymentStatus,
                 PaidAtUtc = x.PaidAtUtc,
@@ -361,6 +362,60 @@ public class HospitalBillingRepository : IHospitalBillingRepository
                 ExternalTransactionId = x.ExternalTransactionId
             })
             .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<HospitalPaymentRecordSnapshot[]> FindPaymentsForReconciliationAsync(
+        HospitalPaymentReconciliationLookupQuery query,
+        CancellationToken ct = default)
+    {
+        var paymentReferences = query.PaymentReferences
+            .Select(x => x.Trim())
+            .Where(x => x.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var externalTransactionIds = query.ExternalTransactionIds
+            .Select(x => x.Trim())
+            .Where(x => x.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (paymentReferences.Length == 0 && externalTransactionIds.Length == 0)
+        {
+            return Array.Empty<HospitalPaymentRecordSnapshot>();
+        }
+
+        var paymentsQuery = _hospitalDbContext.Payments
+            .AsNoTracking()
+            .Include(x => x.ReceivedByUser)
+            .AsQueryable();
+
+        if (query.DoctorProfileId.HasValue)
+        {
+            paymentsQuery = paymentsQuery.Where(x => x.Invoice.Encounter != null && x.Invoice.Encounter.DoctorProfileId == query.DoctorProfileId.Value);
+        }
+
+        paymentsQuery = paymentsQuery.Where(x =>
+            (paymentReferences.Length > 0 && paymentReferences.Contains(x.PaymentReference)) ||
+            (externalTransactionIds.Length > 0 && x.ExternalTransactionId != null && externalTransactionIds.Contains(x.ExternalTransactionId)));
+
+        return await paymentsQuery
+            .OrderByDescending(x => x.PaidAtUtc)
+            .ThenByDescending(x => x.Id)
+            .Select(x => new HospitalPaymentRecordSnapshot
+            {
+                PaymentId = x.Id,
+                InvoiceId = x.InvoiceId,
+                PaymentReference = x.PaymentReference,
+                PaymentMethod = x.PaymentMethod,
+                GatewayProvider = x.GatewayProvider,
+                Amount = x.Amount,
+                PaymentStatus = x.PaymentStatus,
+                PaidAtUtc = x.PaidAtUtc,
+                ReceivedByUserId = x.ReceivedByUserId,
+                ReceivedByUsername = x.ReceivedByUser != null ? x.ReceivedByUser.Username : null,
+                ExternalTransactionId = x.ExternalTransactionId
+            })
+            .ToArrayAsync(ct);
     }
 
     public async Task<HospitalPaymentReconciliationSnapshot> GetReconciliationSnapshotAsync(Guid? doctorProfileId, CancellationToken ct = default)
@@ -417,6 +472,7 @@ public class HospitalBillingRepository : IHospitalBillingRepository
                 PaymentId = x.Id,
                 PaymentReference = x.PaymentReference,
                 PaymentMethod = x.PaymentMethod,
+                GatewayProvider = x.GatewayProvider,
                 Amount = x.Amount,
                 PaymentStatus = x.PaymentStatus,
                 PaidAtUtc = x.PaidAtUtc,
@@ -473,6 +529,7 @@ public class HospitalBillingRepository : IHospitalBillingRepository
             InvoiceId = command.InvoiceId,
             PaymentReference = command.PaymentReference,
             PaymentMethod = command.PaymentMethod,
+            GatewayProvider = command.GatewayProvider,
             Amount = command.Amount,
             PaymentStatus = command.PaymentStatus,
             PaidAtUtc = command.PaidAtUtc,
@@ -489,6 +546,7 @@ public class HospitalBillingRepository : IHospitalBillingRepository
             .FirstOrDefaultAsync(x => x.Id == command.PaymentId, ct)
             ?? throw new KeyNotFoundException("Khong tim thay giao dich thanh toan.");
 
+        payment.GatewayProvider = command.GatewayProvider;
         payment.PaymentStatus = command.PaymentStatus;
         payment.PaidAtUtc = command.PaidAtUtc;
         payment.ReceivedByUserId = command.ReceivedByUserId;
@@ -604,6 +662,7 @@ public class HospitalBillingRepository : IHospitalBillingRepository
                     PaymentId = x.Id,
                     PaymentReference = x.PaymentReference,
                     PaymentMethod = x.PaymentMethod,
+                    GatewayProvider = x.GatewayProvider,
                     Amount = x.Amount,
                     PaymentStatus = x.PaymentStatus,
                     PaidAtUtc = x.PaidAtUtc,
@@ -628,4 +687,5 @@ public class HospitalBillingRepository : IHospitalBillingRepository
 
     private static DateTime ConvertUtcToClinicLocal(DateTime utcDateTime)
         => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), ResolveClinicTimeZone());
+
 }

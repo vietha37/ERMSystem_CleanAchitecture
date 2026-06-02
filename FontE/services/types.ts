@@ -952,6 +952,7 @@ export type AuthResponse = {
   accessToken: string;
   refreshToken: string;
   username: string;
+  name: string;
   role: string;
   expiresAt: string;
   requiresTwoFactor?: boolean;
@@ -1006,17 +1007,20 @@ export type UpdateDoctorPayload = CreateDoctorPayload;
 export type StaffUser = {
   id: Id;
   username: string;
+  name: string;
   role: Exclude<UserRole, "Admin" | "Patient">;
 };
 
 export type CreateStaffUserPayload = {
   username: string;
+  name: string;
   password: string;
   role: Exclude<UserRole, "Admin" | "Patient">;
 };
 
 export type UpdateStaffUserPayload = {
   username: string;
+  name: string;
   role: Exclude<UserRole, "Admin" | "Patient">;
   password?: string;
 };
