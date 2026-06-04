@@ -625,9 +625,11 @@ public class HospitalEncounterService : IHospitalEncounterService
 
     public async Task<HospitalStoredAttachmentContentDto?> GetAttachmentContentByTicketAsync(
         string accessToken,
+        long? expiresUnixSeconds = null,
+        string? signature = null,
         CancellationToken ct = default)
     {
-        var storedDocument = await _hospitalDocumentStorageService.OpenReadByTicketAsync(accessToken, ct);
+        var storedDocument = await _hospitalDocumentStorageService.OpenReadByTicketAsync(accessToken, expiresUnixSeconds, signature, ct);
         if (storedDocument == null)
         {
             return null;

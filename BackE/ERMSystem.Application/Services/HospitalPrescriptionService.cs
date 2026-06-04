@@ -70,6 +70,41 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
             ["prednisone", "prednisolone", "dexamethasone", "methylprednisolone", "hydrocortisone"],
             "Canh bao theo benh canh chuyen hoa: corticosteroid co the lam tang duong huyet, can theo doi glucose sat.")
     ];
+    private static readonly MedicationContextRule[] ContraindicationContextRules =
+    [
+        new(
+            "g6pd-oxidative-drug-risk",
+            "critical",
+            "contraindication-context",
+            ["g6pd", "glucose 6 phosphate", "thieu men g6pd"],
+            ["primaquine", "dapsone", "nitrofurantoin", "sulfamethoxazole", "co-trimoxazole", "trimethoprim sulfamethoxazole"],
+            "Canh bao nguy co tan mau: ho so co benh canh thieu men G6PD va don co thuoc oxy hoa can tranh hoac danh gia rat chat.",
+            "Can xac minh tien su G6PD, can nhac thuoc thay the va theo doi dau hieu tan mau neu bat buoc dung."),
+        new(
+            "myasthenia-fluoroquinolone-macrolide-risk",
+            "critical",
+            "contraindication-context",
+            ["nhuoc co", "myasthenia", "myasthenia gravis"],
+            ["ciprofloxacin", "levofloxacin", "moxifloxacin", "azithromycin", "clarithromycin", "erythromycin"],
+            "Canh bao benh nhan nhuoc co: fluoroquinolone/macrolide co the lam nang yeu co hoac kho tho.",
+            "Can can nhac khang sinh thay the va hoi chan neu khong co lua chon khac."),
+        new(
+            "gout-trigger-medication-risk",
+            "warning",
+            "diagnosis-context",
+            ["gout", "thong phong", "tang acid uric", "hyperuricemia"],
+            ["hydrochlorothiazide", "furosemide", "torsemide", "aspirin"],
+            "Canh bao benh gout/tang acid uric: mot so thuoc trong don co the lam kho kiem soat acid uric hoac khoi phat con gout.",
+            "Can doi chieu chi dinh, can nhac lua chon thay the va theo doi trieu chung gout."),
+        new(
+            "liver-disease-hepatotoxic-medication-risk",
+            "warning",
+            "hepatic-risk",
+            ["suy gan", "xơ gan", "xo gan", "viem gan", "hepatitis", "cirrhosis", "liver failure"],
+            ["paracetamol", "acetaminophen", "isoniazid", "methotrexate", "valproate", "valproic acid", "simvastatin", "atorvastatin"],
+            "Canh bao theo benh canh gan: don co thuoc can danh gia lai lieu va doc tinh gan khi co suy/benh gan.",
+            "Can doi chieu men gan, tong lieu hang ngay va can nhac theo doi LFT neu tiep tuc dung.")
+    ];
     private static readonly PrescriptionInteractionRule[] AdvancedInteractionRules =
     [
         new(
@@ -561,6 +596,7 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
             .ToArray();
 
         AddRenalLabWarnings(warnings, normalizedItems, prescription.LabResults);
+        AddElectrolyteAndCoagulationLabWarnings(warnings, normalizedItems, prescription.LabResults);
         AddPregnancyContextWarnings(warnings, normalizedItems, normalizedDiagnoses, prescription.PatientGender);
 
         var duplicateGenericGroups = normalizedItems
@@ -666,6 +702,34 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
                 Category = "diagnosis-context",
                 Message = $"{rule.WarningMessage} Thuoc lien quan: {medicineNames}.",
                 Recommendation = "Can doi chieu chan doan hien tai va muc tieu dieu tri truoc khi giu phac do.",
+                RelatedMedicines = matches.Select(x => x.Source.MedicineName).ToList()
+            });
+        }
+
+        foreach (var rule in ContraindicationContextRules)
+        {
+            if (!normalizedDiagnoses.Any(diagnosis => rule.ContextMatchers.Any(matcher => diagnosis.Contains(NormalizeMedicationDescriptor(matcher), StringComparison.Ordinal))))
+            {
+                continue;
+            }
+
+            var matches = normalizedItems
+                .Where(item => rule.MedicineMatchers.Any(item.ContainsToken))
+                .GroupBy(item => item.MedicineId)
+                .Select(group => group.First())
+                .ToArray();
+            if (matches.Length == 0)
+            {
+                continue;
+            }
+
+            AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+            {
+                Code = rule.Code,
+                Severity = rule.Severity,
+                Category = rule.Category,
+                Message = $"{rule.WarningMessage} Thuoc lien quan: {string.Join(", ", matches.Select(x => x.Source.MedicineName))}.",
+                Recommendation = rule.Recommendation,
                 RelatedMedicines = matches.Select(x => x.Source.MedicineName).ToList()
             });
         }
@@ -913,6 +977,95 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
             Recommendation = "Can xac nhan tuoi thai/tinh trang mang thai, doi chieu chong chi dinh va can nhac thuoc thay the an toan hon neu phu hop.",
             RelatedMedicines = pregnancyRiskItems.Select(x => x.Source.MedicineName).ToList()
         });
+    }
+
+    private static void AddElectrolyteAndCoagulationLabWarnings(
+        ICollection<HospitalPrescriptionWarningDto> warnings,
+        IReadOnlyCollection<NormalizedPrescriptionItemSnapshot> normalizedItems,
+        IReadOnlyCollection<HospitalPrescriptionLabResultSnapshot> labResults)
+    {
+        var potassiumRaisingItems = normalizedItems
+            .Where(item => TherapeuticClassRules.First(x => x.ClassName == "ACEi/ARB").Matchers.Any(item.ContainsToken)
+                           || item.ContainsToken("spironolactone")
+                           || item.ContainsToken("potassium chloride")
+                           || item.ContainsToken("kali clorid"))
+            .GroupBy(x => x.MedicineId)
+            .Select(group => group.First())
+            .ToArray();
+        var latestPotassium = FindLatestNumericLab(
+            labResults,
+            static lab => IsAnalyte(lab, ["potassium", "kali", "k+"]));
+        if (potassiumRaisingItems.Length > 0 &&
+            latestPotassium.HasValue &&
+            (latestPotassium.Value.Value >= 5.3m || IsHighAbnormalFlag(latestPotassium.Value.AbnormalFlag)))
+        {
+            AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+            {
+                Code = "electrolyte-potassium-high-medication-risk",
+                Severity = latestPotassium.Value.Value >= 6m ? "critical" : "warning",
+                Category = "electrolyte-risk",
+                Message = $"Canh bao tang kali mau: kali gan nhat {latestPotassium.Value.Value:0.##} {latestPotassium.Value.Unit ?? string.Empty}; don co thuoc co the lam tang kali them.",
+                Recommendation = "Can danh gia lai bo sung kali/spironolactone/ACEi/ARB, theo doi dien tim va lap lai dien giai neu can.",
+                RelatedMedicines = potassiumRaisingItems.Select(x => x.Source.MedicineName).ToList()
+            });
+        }
+
+        var sodiumLoweringItems = normalizedItems
+            .Where(item => item.ContainsToken("hydrochlorothiazide")
+                           || item.ContainsToken("furosemide")
+                           || item.ContainsToken("sertraline")
+                           || item.ContainsToken("fluoxetine")
+                           || item.ContainsToken("paroxetine")
+                           || item.ContainsToken("escitalopram")
+                           || item.ContainsToken("carbamazepine"))
+            .GroupBy(x => x.MedicineId)
+            .Select(group => group.First())
+            .ToArray();
+        var latestSodium = FindLatestNumericLab(
+            labResults,
+            static lab => IsAnalyte(lab, ["sodium", "natri", "na+"]));
+        if (sodiumLoweringItems.Length > 0 &&
+            latestSodium.HasValue &&
+            latestSodium.Value.Value < 135)
+        {
+            AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+            {
+                Code = "electrolyte-sodium-low-medication-risk",
+                Severity = latestSodium.Value.Value < 125 ? "critical" : "warning",
+                Category = "electrolyte-risk",
+                Message = $"Canh bao ha natri mau: natri gan nhat {latestSodium.Value.Value:0.##} {latestSodium.Value.Unit ?? string.Empty}; mot so thuoc trong don co the lam nang ha natri.",
+                Recommendation = "Can danh gia nguy co te nga/lan lu, can nhac dieu chinh thuoc va lap lai dien giai sau dieu tri.",
+                RelatedMedicines = sodiumLoweringItems.Select(x => x.Source.MedicineName).ToList()
+            });
+        }
+
+        var anticoagulantItems = normalizedItems
+            .Where(item => item.ContainsToken("warfarin")
+                           || item.ContainsToken("rivaroxaban")
+                           || item.ContainsToken("apixaban")
+                           || item.ContainsToken("dabigatran")
+                           || item.ContainsToken("heparin")
+                           || item.ContainsToken("enoxaparin"))
+            .GroupBy(x => x.MedicineId)
+            .Select(group => group.First())
+            .ToArray();
+        var latestInr = FindLatestNumericLab(
+            labResults,
+            static lab => IsAnalyte(lab, ["inr", "international normalized ratio"]));
+        if (anticoagulantItems.Length > 0 &&
+            latestInr.HasValue &&
+            latestInr.Value.Value > 3)
+        {
+            AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+            {
+                Code = "coagulation-inr-high-anticoagulant-risk",
+                Severity = latestInr.Value.Value >= 4.5m ? "critical" : "warning",
+                Category = "coagulation-risk",
+                Message = $"Canh bao nguy co xuat huyet: INR gan nhat {latestInr.Value.Value:0.##}; don co thuoc chong dong can duoc danh gia lai.",
+                Recommendation = "Can doi chieu muc tieu INR, lieu chong dong, dau hieu xuat huyet va ke hoach theo doi tiep theo.",
+                RelatedMedicines = anticoagulantItems.Select(x => x.Source.MedicineName).ToList()
+            });
+        }
     }
 
     private static void AddUniqueWarning(ICollection<HospitalPrescriptionWarningDto> warnings, HospitalPrescriptionWarningDto warning)
@@ -1171,6 +1324,15 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
         string[] DiagnosisMatchers,
         string[] MedicineMatchers,
         string WarningMessage);
+
+    private readonly record struct MedicationContextRule(
+        string Code,
+        string Severity,
+        string Category,
+        string[] ContextMatchers,
+        string[] MedicineMatchers,
+        string WarningMessage,
+        string Recommendation);
 
     private readonly record struct LatestNumericLab(
         decimal Value,

@@ -206,6 +206,12 @@ public class ConfigurableHospitalPaymentGatewayService : IHospitalPaymentGateway
                 $"Payment gateway provider '{providerName}' yeu cau chu ky callback nhung chua cau hinh WebhookSecret.");
         }
 
+        if (providerOptions.SignCheckoutParameters && string.IsNullOrWhiteSpace(providerOptions.WebhookSecret))
+        {
+            throw new InvalidOperationException(
+                $"Payment gateway provider '{providerName}' bat ky checkout nhung chua cau hinh WebhookSecret.");
+        }
+
         return (providerName, providerOptions);
     }
 
@@ -249,9 +255,41 @@ public class ConfigurableHospitalPaymentGatewayService : IHospitalPaymentGateway
             ["checkoutToken"] = checkoutToken
         };
 
+        var providerType = Normalize(providerOptions.ProviderType);
+        if (providerType is not null)
+        {
+            queryValues["providerType"] = providerType;
+        }
+
+        if (string.Equals(providerType, "VNPay", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(providerOptions.MerchantCode) ||
+                string.IsNullOrWhiteSpace(providerOptions.ReturnUrl))
+            {
+                throw new InvalidOperationException("VNPay gateway requires MerchantCode and ReturnUrl.");
+            }
+
+            queryValues["vnp_TmnCode"] = providerOptions.MerchantCode.Trim();
+            queryValues["vnp_TxnRef"] = request.PaymentReference;
+            queryValues["vnp_OrderInfo"] = $"Thanh toan hoa don {request.InvoiceNumber}";
+            queryValues["vnp_Amount"] = (request.Amount * 100m).ToString("0", CultureInfo.InvariantCulture);
+            queryValues["vnp_CreateDate"] = DateTime.UtcNow.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+            queryValues["vnp_ReturnUrl"] = providerOptions.ReturnUrl.Trim();
+        }
+
         if (!string.IsNullOrWhiteSpace(providerOptions.MerchantCode))
         {
             queryValues["merchantCode"] = providerOptions.MerchantCode.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(providerOptions.ReturnUrl))
+        {
+            queryValues["returnUrl"] = providerOptions.ReturnUrl.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(providerOptions.IpnUrl))
+        {
+            queryValues["ipnUrl"] = providerOptions.IpnUrl.Trim();
         }
 
         foreach (var pair in providerOptions.StaticCheckoutParameters)
@@ -260,6 +298,12 @@ public class ConfigurableHospitalPaymentGatewayService : IHospitalPaymentGateway
             {
                 queryValues[pair.Key.Trim()] = pair.Value.Trim();
             }
+        }
+
+        if (providerOptions.SignCheckoutParameters)
+        {
+            var signatureParameterName = Normalize(providerOptions.CheckoutSignatureParameterName) ?? "signature";
+            queryValues[signatureParameterName] = ComputeCheckoutSignature(providerOptions.WebhookSecret, queryValues);
         }
 
         var separator = baseUrl.Contains('?', StringComparison.Ordinal) ? "&" : "?";
@@ -315,6 +359,18 @@ public class ConfigurableHospitalPaymentGatewayService : IHospitalPaymentGateway
 
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(webhookSecret ?? string.Empty));
         return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
+    }
+
+    private static string ComputeCheckoutSignature(
+        string? webhookSecret,
+        IReadOnlyDictionary<string, string> queryValues)
+    {
+        var canonicalPayload = string.Join("&", queryValues
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => $"{pair.Key}={pair.Value}"));
+
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(webhookSecret ?? string.Empty));
+        return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(canonicalPayload))).ToLowerInvariant();
     }
 
     private static bool FixedTimeEquals(string left, string right)

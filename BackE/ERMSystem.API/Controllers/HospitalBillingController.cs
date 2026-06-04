@@ -227,6 +227,34 @@ public class HospitalBillingController : ControllerBase
         }
     }
 
+    [HttpGet("payment-return")]
+    [AllowAnonymous]
+    public IActionResult PaymentReturn([FromQuery] PaymentGatewayReturnQuery query)
+    {
+        var provider = NormalizeQueryValue(query.GatewayProvider)
+                       ?? NormalizeQueryValue(query.VnpGatewayProvider)
+                       ?? _hospitalPaymentGatewayService.GetDefaultProvider();
+        var paymentReference = NormalizeQueryValue(query.PaymentReference)
+                               ?? NormalizeQueryValue(query.VnpTxnRef);
+        var externalTransactionId = NormalizeQueryValue(query.ExternalTransactionId)
+                                    ?? NormalizeQueryValue(query.VnpTransactionNo);
+        var gatewayStatus = NormalizeQueryValue(query.GatewayStatus)
+                            ?? NormalizeQueryValue(query.VnpResponseCode)
+                            ?? NormalizeQueryValue(query.VnpTransactionStatus);
+
+        return Ok(new
+        {
+            message = "Payment return received. Final payment state is confirmed by signed gateway webhook/IPN.",
+            provider,
+            query.InvoiceId,
+            paymentReference,
+            externalTransactionId,
+            gatewayStatus,
+            amount = query.Amount ?? query.VnpAmount,
+            isAuthoritative = false
+        });
+    }
+
     [HttpPost("payment-callbacks/simulate")]
     [Authorize(Policy = AppPermissions.HospitalBilling.CollectPayment)]
     public async Task<IActionResult> SimulatePaymentCallback([FromBody] ConfirmHospitalPaymentCallbackDto request, CancellationToken ct)
@@ -343,4 +371,38 @@ public class HospitalBillingController : ControllerBase
 
     private string? ResolveCurrentUsername()
         => ResolveActorUsername();
+
+    private static string? NormalizeQueryValue(string? value)
+    {
+        var normalized = value?.Trim();
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+}
+
+public class PaymentGatewayReturnQuery
+{
+    public Guid? InvoiceId { get; set; }
+    public string? GatewayProvider { get; set; }
+    public string? PaymentReference { get; set; }
+    public string? ExternalTransactionId { get; set; }
+    public string? GatewayStatus { get; set; }
+    public decimal? Amount { get; set; }
+
+    [FromQuery(Name = "vnp_GatewayProvider")]
+    public string? VnpGatewayProvider { get; set; }
+
+    [FromQuery(Name = "vnp_TxnRef")]
+    public string? VnpTxnRef { get; set; }
+
+    [FromQuery(Name = "vnp_TransactionNo")]
+    public string? VnpTransactionNo { get; set; }
+
+    [FromQuery(Name = "vnp_ResponseCode")]
+    public string? VnpResponseCode { get; set; }
+
+    [FromQuery(Name = "vnp_TransactionStatus")]
+    public string? VnpTransactionStatus { get; set; }
+
+    [FromQuery(Name = "vnp_Amount")]
+    public decimal? VnpAmount { get; set; }
 }

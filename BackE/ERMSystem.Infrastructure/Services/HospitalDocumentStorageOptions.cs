@@ -13,6 +13,8 @@ public class HospitalDocumentStorageProviderOptions
     public bool Enabled { get; set; } = true;
     public string AccessMode { get; set; } = "ProxyTicket";
     public string? PublicBaseUrl { get; set; }
+    public bool RequireSignedDirectUrls { get; set; } = false;
+    public string DirectUrlSigningSecret { get; set; } = string.Empty;
     public string RootPath { get; set; } = "App_Data/ObjectStorage";
     public int DownloadTicketExpiryMinutes { get; set; } = 5;
     public int CleanupIntervalHours { get; set; } = 24;

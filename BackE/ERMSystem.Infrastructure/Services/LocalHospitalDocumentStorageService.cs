@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using ERMSystem.Application.Interfaces;
 using Microsoft.Extensions.Caching.Distributed;
@@ -126,7 +128,7 @@ public class LocalHospitalDocumentStorageService : IHospitalDocumentStorageServi
             AccessMode = accessMode,
             AccessToken = accessToken,
             DownloadUrl = accessMode == "DirectUrl"
-                ? BuildDirectDownloadUrl(accessToken)
+                ? BuildDirectDownloadUrl(accessToken, expiresAtUtc)
                 : null,
             ExpiresAtUtc = expiresAtUtc
         };
@@ -174,8 +176,15 @@ public class LocalHospitalDocumentStorageService : IHospitalDocumentStorageServi
 
     public async Task<HospitalDocumentStorageReadResult?> OpenReadByTicketAsync(
         string accessToken,
+        long? expiresUnixSeconds = null,
+        string? signature = null,
         CancellationToken ct = default)
     {
+        if (!ValidateDirectUrlSignatureIfRequired(accessToken, expiresUnixSeconds, signature))
+        {
+            return null;
+        }
+
         var rawPayload = await _distributedCache.GetStringAsync(BuildTicketKey(accessToken.Trim()), ct);
         if (string.IsNullOrWhiteSpace(rawPayload))
         {
@@ -288,7 +297,7 @@ public class LocalHospitalDocumentStorageService : IHospitalDocumentStorageServi
         return matchedMode ?? "ProxyTicket";
     }
 
-    private string? BuildDirectDownloadUrl(string accessToken)
+    private string? BuildDirectDownloadUrl(string accessToken, DateTime expiresAtUtc)
     {
         var publicBaseUrl = _options.PublicBaseUrl?.Trim();
         if (string.IsNullOrWhiteSpace(publicBaseUrl))
@@ -301,11 +310,65 @@ public class LocalHospitalDocumentStorageService : IHospitalDocumentStorageServi
             return null;
         }
 
+        var expiresUnixSeconds = new DateTimeOffset(expiresAtUtc).ToUnixTimeSeconds();
+        var query = $"accessToken={Uri.EscapeDataString(accessToken)}&expires={expiresUnixSeconds.ToString(CultureInfo.InvariantCulture)}";
+        var signature = BuildDirectUrlSignature(accessToken, expiresUnixSeconds);
+        if (!string.IsNullOrWhiteSpace(signature))
+        {
+            query += $"&signature={Uri.EscapeDataString(signature)}";
+        }
+
         var builder = new UriBuilder(new Uri(baseUri, "/api/hospital-encounters/attachments/download-by-ticket"))
         {
-            Query = $"accessToken={Uri.EscapeDataString(accessToken)}"
+            Query = query
         };
         return builder.Uri.ToString();
+    }
+
+    private bool ValidateDirectUrlSignatureIfRequired(
+        string accessToken,
+        long? expiresUnixSeconds,
+        string? signature)
+    {
+        if (!_options.RequireSignedDirectUrls)
+        {
+            return true;
+        }
+
+        if (expiresUnixSeconds is null || string.IsNullOrWhiteSpace(signature))
+        {
+            return false;
+        }
+
+        var expiresAtUtc = DateTimeOffset.FromUnixTimeSeconds(expiresUnixSeconds.Value);
+        if (expiresAtUtc < DateTimeOffset.UtcNow)
+        {
+            return false;
+        }
+
+        var expectedSignature = BuildDirectUrlSignature(accessToken, expiresUnixSeconds.Value);
+        return !string.IsNullOrWhiteSpace(expectedSignature) &&
+               FixedTimeEquals(expectedSignature, signature.Trim());
+    }
+
+    private string? BuildDirectUrlSignature(string accessToken, long expiresUnixSeconds)
+    {
+        if (string.IsNullOrWhiteSpace(_options.DirectUrlSigningSecret))
+        {
+            return null;
+        }
+
+        var payload = $"{Provider}|{accessToken.Trim()}|{expiresUnixSeconds.ToString(CultureInfo.InvariantCulture)}";
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_options.DirectUrlSigningSecret));
+        return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
+    }
+
+    private static bool FixedTimeEquals(string left, string right)
+    {
+        var leftBytes = Encoding.UTF8.GetBytes(left);
+        var rightBytes = Encoding.UTF8.GetBytes(right);
+        return leftBytes.Length == rightBytes.Length &&
+               CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
     }
 
     private static string ExtractOriginalFileName(string storedFileName)

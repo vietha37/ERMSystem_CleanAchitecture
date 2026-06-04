@@ -76,5 +76,7 @@ public interface IHospitalEncounterService
 
     Task<HospitalStoredAttachmentContentDto?> GetAttachmentContentByTicketAsync(
         string accessToken,
+        long? expiresUnixSeconds = null,
+        string? signature = null,
         CancellationToken ct = default);
 }

@@ -291,6 +291,8 @@ public class HospitalEncountersController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> DownloadAttachmentByTicket(
         [FromQuery] string accessToken,
+        [FromQuery] long? expires,
+        [FromQuery] string? signature,
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(accessToken))
@@ -298,7 +300,7 @@ public class HospitalEncountersController : ControllerBase
             return BadRequest(new { message = "Access token cua tai lieu khong hop le." });
         }
 
-        var content = await _hospitalEncounterService.GetAttachmentContentByTicketAsync(accessToken, ct);
+        var content = await _hospitalEncounterService.GetAttachmentContentByTicketAsync(accessToken, expires, signature, ct);
         if (content == null)
         {
             return NotFound(new { message = "Download ticket khong hop le hoac da het han." });

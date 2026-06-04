@@ -64,6 +64,16 @@ builder.Services.AddSingleton<NotificationPipelineMetricsReader>();
 builder.Services.AddSingleton<OperationalAlertEvaluator>();
 builder.Services.AddSingleton<OperationalAlertWebhookNotifier>();
 
+var paymentGatewayOptions =
+    builder.Configuration.GetSection("PaymentGateway").Get<HospitalPaymentGatewayOptions>()
+    ?? new HospitalPaymentGatewayOptions();
+ValidatePaymentGatewayOptions(paymentGatewayOptions);
+
+var documentStorageOptions =
+    builder.Configuration.GetSection("DocumentStorage").Get<HospitalDocumentStorageOptions>()
+    ?? new HospitalDocumentStorageOptions();
+ValidateDocumentStorageOptions(documentStorageOptions);
+
 var operationalAlertOptions =
     builder.Configuration.GetSection("OperationalAlerts").Get<OperationalAlertOptions>()
     ?? new OperationalAlertOptions();
@@ -585,6 +595,226 @@ static string FormatAgeSeconds(DateTime nowUtc, DateTime? value)
 
     return Math.Max(0, Math.Round((nowUtc - value.Value).TotalSeconds, 0))
         .ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
+static void ValidatePaymentGatewayOptions(HospitalPaymentGatewayOptions options)
+{
+    if (options.Providers.Count == 0)
+    {
+        throw new InvalidOperationException("PaymentGateway:Providers must contain at least one provider.");
+    }
+
+    var defaultProvider = string.IsNullOrWhiteSpace(options.DefaultProvider)
+        ? options.Providers.Keys.FirstOrDefault()
+        : options.DefaultProvider.Trim();
+
+    if (string.IsNullOrWhiteSpace(defaultProvider) ||
+        !options.Providers.ContainsKey(defaultProvider))
+    {
+        throw new InvalidOperationException("PaymentGateway:DefaultProvider must match a configured provider.");
+    }
+
+    foreach (var pair in options.Providers)
+    {
+        var providerName = pair.Key?.Trim();
+        var provider = pair.Value;
+        if (string.IsNullOrWhiteSpace(providerName))
+        {
+            throw new InvalidOperationException("PaymentGateway provider name must not be empty.");
+        }
+
+        if (provider is null)
+        {
+            throw new InvalidOperationException($"PaymentGateway:Providers:{providerName} must not be null.");
+        }
+
+        if (!provider.Enabled)
+        {
+            continue;
+        }
+
+        if (string.IsNullOrWhiteSpace(provider.ProviderType))
+        {
+            throw new InvalidOperationException($"PaymentGateway:Providers:{providerName}:ProviderType must not be empty.");
+        }
+
+        if (string.Equals(provider.ProviderType.Trim(), "VNPay", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(provider.MerchantCode))
+            {
+                throw new InvalidOperationException($"PaymentGateway:Providers:{providerName}:MerchantCode must be configured for VNPay providers.");
+            }
+
+            if (string.IsNullOrWhiteSpace(provider.CheckoutBaseUrl))
+            {
+                throw new InvalidOperationException($"PaymentGateway:Providers:{providerName}:CheckoutBaseUrl must be configured for VNPay providers.");
+            }
+
+            if (string.IsNullOrWhiteSpace(provider.ReturnUrl))
+            {
+                throw new InvalidOperationException($"PaymentGateway:Providers:{providerName}:ReturnUrl must be configured for VNPay providers.");
+            }
+
+            if (string.IsNullOrWhiteSpace(provider.IpnUrl))
+            {
+                throw new InvalidOperationException($"PaymentGateway:Providers:{providerName}:IpnUrl must be configured for VNPay providers.");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(provider.CheckoutBaseUrl) &&
+            !IsAbsoluteHttpUrl(provider.CheckoutBaseUrl))
+        {
+            throw new InvalidOperationException($"PaymentGateway:Providers:{providerName}:CheckoutBaseUrl must be an absolute http/https URL.");
+        }
+
+        ValidateOptionalPaymentGatewayUrl(providerName, "ReturnUrl", provider.ReturnUrl);
+        ValidateOptionalPaymentGatewayUrl(providerName, "IpnUrl", provider.IpnUrl);
+
+        if (provider.TimestampToleranceMinutes <= 0)
+        {
+            throw new InvalidOperationException($"PaymentGateway:Providers:{providerName}:TimestampToleranceMinutes must be greater than 0.");
+        }
+
+        if (provider.RequireSignature)
+        {
+            if (string.IsNullOrWhiteSpace(provider.SignatureHeaderName))
+            {
+                throw new InvalidOperationException($"PaymentGateway:Providers:{providerName}:SignatureHeaderName must not be empty when RequireSignature=true.");
+            }
+
+            if (string.IsNullOrWhiteSpace(provider.WebhookSecret))
+            {
+                throw new InvalidOperationException($"PaymentGateway:Providers:{providerName}:WebhookSecret must be configured when RequireSignature=true.");
+            }
+        }
+
+        if (provider.SignCheckoutParameters)
+        {
+            if (string.IsNullOrWhiteSpace(provider.WebhookSecret))
+            {
+                throw new InvalidOperationException($"PaymentGateway:Providers:{providerName}:WebhookSecret must be configured when SignCheckoutParameters=true.");
+            }
+
+            if (string.IsNullOrWhiteSpace(provider.CheckoutSignatureParameterName))
+            {
+                throw new InvalidOperationException($"PaymentGateway:Providers:{providerName}:CheckoutSignatureParameterName must not be empty when SignCheckoutParameters=true.");
+            }
+        }
+
+        foreach (var mappedStatus in provider.StatusMappings.Values)
+        {
+            if (!string.Equals(mappedStatus, "Captured", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(mappedStatus, "Failed", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"PaymentGateway:Providers:{providerName}:StatusMappings values must map to Captured or Failed.");
+            }
+        }
+
+        if (provider.SupportedPaymentMethods.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new InvalidOperationException($"PaymentGateway:Providers:{providerName}:SupportedPaymentMethods must not contain empty values.");
+        }
+    }
+}
+
+static void ValidateOptionalPaymentGatewayUrl(string providerName, string optionName, string? value)
+{
+    if (!string.IsNullOrWhiteSpace(value) && !IsAbsoluteHttpUrl(value))
+    {
+        throw new InvalidOperationException($"PaymentGateway:Providers:{providerName}:{optionName} must be an absolute http/https URL.");
+    }
+}
+
+static bool IsAbsoluteHttpUrl(string value)
+    => Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri) &&
+       uri.Scheme is "http" or "https";
+
+static void ValidateDocumentStorageOptions(HospitalDocumentStorageOptions options)
+{
+    if (options.Providers.Count == 0)
+    {
+        throw new InvalidOperationException("DocumentStorage:Providers must contain at least one provider.");
+    }
+
+    var defaultProvider = string.IsNullOrWhiteSpace(options.DefaultProvider)
+        ? options.Providers.Keys.FirstOrDefault()
+        : options.DefaultProvider.Trim();
+
+    if (string.IsNullOrWhiteSpace(defaultProvider) ||
+        !options.Providers.ContainsKey(defaultProvider))
+    {
+        throw new InvalidOperationException("DocumentStorage:DefaultProvider must match a configured provider.");
+    }
+
+    foreach (var pair in options.Providers)
+    {
+        var providerName = pair.Key?.Trim();
+        var provider = pair.Value;
+        if (string.IsNullOrWhiteSpace(providerName))
+        {
+            throw new InvalidOperationException("DocumentStorage provider name must not be empty.");
+        }
+
+        if (provider is null)
+        {
+            throw new InvalidOperationException($"DocumentStorage:Providers:{providerName} must not be null.");
+        }
+
+        if (!provider.Enabled)
+        {
+            continue;
+        }
+
+        if (string.IsNullOrWhiteSpace(provider.Type))
+        {
+            throw new InvalidOperationException($"DocumentStorage:Providers:{providerName}:Type must not be empty.");
+        }
+
+        var accessMode = string.IsNullOrWhiteSpace(provider.AccessMode)
+            ? "ProxyTicket"
+            : provider.AccessMode.Trim();
+
+        if (accessMode is not ("ProxyTicket" or "DirectUrl"))
+        {
+            throw new InvalidOperationException($"DocumentStorage:Providers:{providerName}:AccessMode must be ProxyTicket or DirectUrl.");
+        }
+
+        if (string.Equals(accessMode, "DirectUrl", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(provider.PublicBaseUrl) ||
+                !IsAbsoluteHttpUrl(provider.PublicBaseUrl))
+            {
+                throw new InvalidOperationException($"DocumentStorage:Providers:{providerName}:PublicBaseUrl must be an absolute http/https URL when AccessMode=DirectUrl.");
+            }
+
+            if (provider.RequireSignedDirectUrls &&
+                string.IsNullOrWhiteSpace(provider.DirectUrlSigningSecret))
+            {
+                throw new InvalidOperationException($"DocumentStorage:Providers:{providerName}:DirectUrlSigningSecret must be configured when RequireSignedDirectUrls=true.");
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(provider.RootPath))
+        {
+            throw new InvalidOperationException($"DocumentStorage:Providers:{providerName}:RootPath must not be empty.");
+        }
+
+        if (provider.DownloadTicketExpiryMinutes <= 0 ||
+            provider.CleanupIntervalHours <= 0 ||
+            provider.OrphanFileRetentionDays <= 0 ||
+            provider.MaxFileSizeBytes <= 0)
+        {
+            throw new InvalidOperationException($"DocumentStorage:Providers:{providerName} numeric limits must be greater than 0.");
+        }
+
+        if (provider.AllowedExtensions.Length == 0 ||
+            provider.AllowedExtensions.Any(extension =>
+                string.IsNullOrWhiteSpace(extension) || !extension.Trim().StartsWith(".", StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException($"DocumentStorage:Providers:{providerName}:AllowedExtensions must contain dot-prefixed extensions.");
+        }
+    }
 }
 
 static void ValidateOpenTelemetryTracingOptions(OpenTelemetryTracingOptions options)

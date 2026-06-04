@@ -29,6 +29,8 @@ public interface IHospitalDocumentStorageService
 
     Task<HospitalDocumentStorageReadResult?> OpenReadByTicketAsync(
         string accessToken,
+        long? expiresUnixSeconds = null,
+        string? signature = null,
         CancellationToken ct = default);
 
     Task<int> CleanupOrphanedFilesAsync(

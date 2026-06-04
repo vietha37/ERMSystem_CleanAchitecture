@@ -75,12 +75,14 @@ public class ConfigurableHospitalDocumentStorageService : IHospitalDocumentStora
 
     public async Task<HospitalDocumentStorageReadResult?> OpenReadByTicketAsync(
         string accessToken,
+        long? expiresUnixSeconds = null,
+        string? signature = null,
         CancellationToken ct = default)
     {
         foreach (var provider in GetEnabledProviders())
         {
             var backend = GetLocalBackend(provider);
-            var result = await backend.OpenReadByTicketAsync(accessToken, ct);
+            var result = await backend.OpenReadByTicketAsync(accessToken, expiresUnixSeconds, signature, ct);
             if (result != null)
             {
                 return result;
@@ -196,6 +198,14 @@ public class ConfigurableHospitalDocumentStorageService : IHospitalDocumentStora
                 $"Document storage provider '{providerName}' dung DirectUrl nhung chua cau hinh PublicBaseUrl.");
         }
 
+        if (string.Equals(accessMode, "DirectUrl", StringComparison.OrdinalIgnoreCase) &&
+            providerOptions.RequireSignedDirectUrls &&
+            string.IsNullOrWhiteSpace(providerOptions.DirectUrlSigningSecret))
+        {
+            throw new InvalidOperationException(
+                $"Document storage provider '{providerName}' bat signed DirectUrl nhung chua cau hinh DirectUrlSigningSecret.");
+        }
+
         if (!string.IsNullOrWhiteSpace(providerOptions.PublicBaseUrl) &&
             (!Uri.TryCreate(providerOptions.PublicBaseUrl.Trim(), UriKind.Absolute, out var publicBaseUri) ||
              publicBaseUri.Scheme is not ("http" or "https")))
@@ -242,6 +252,8 @@ public class ConfigurableHospitalDocumentStorageService : IHospitalDocumentStora
             Provider = provider.ProviderName,
             AccessMode = provider.Options.AccessMode,
             PublicBaseUrl = provider.Options.PublicBaseUrl,
+            RequireSignedDirectUrls = provider.Options.RequireSignedDirectUrls,
+            DirectUrlSigningSecret = provider.Options.DirectUrlSigningSecret,
             RootPath = provider.Options.RootPath,
             DownloadTicketExpiryMinutes = provider.Options.DownloadTicketExpiryMinutes,
             CleanupIntervalHours = provider.Options.CleanupIntervalHours,
