@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { ErrorState } from "@/components/ui/DataState";
 import { authService } from "@/services/authService";
 import { getApiErrorMessage } from "@/services/error";
 import { MfaSetupResponse, MfaStatus } from "@/services/types";
@@ -18,6 +19,7 @@ export default function SecurityPage() {
   const [enableCode, setEnableCode] = useState("");
   const [disableCode, setDisableCode] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [statusError, setStatusError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadStatus = useCallback(async () => {
@@ -25,7 +27,9 @@ export default function SecurityPage() {
     try {
       const nextStatus = await authService.getMfaStatus();
       setStatus(nextStatus);
+      setStatusError(null);
     } catch (error) {
+      setStatusError(getApiErrorMessage(error, "Không thể tải trạng thái bảo mật."));
       toast.error(getApiErrorMessage(error, "Không thể tải trạng thái bảo mật."));
     } finally {
       setIsLoading(false);
@@ -98,6 +102,13 @@ export default function SecurityPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-400">Trạng thái</p>
           {isLoading ? (
             <p className="mt-4 text-sm text-gray-500">Đang tải trạng thái...</p>
+          ) : statusError ? (
+            <ErrorState
+              title="Không thể tải trạng thái bảo mật"
+              description={statusError}
+              actionLabel="Tải lại"
+              onAction={() => void loadStatus()}
+            />
           ) : (
             <>
               <div className="mt-4 inline-flex rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-sm font-semibold text-cyan-700">

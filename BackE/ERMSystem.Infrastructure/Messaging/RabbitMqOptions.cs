@@ -2,6 +2,7 @@ namespace ERMSystem.Infrastructure.Messaging;
 
 public class RabbitMqOptions
 {
+    public bool Enabled { get; set; } = true;
     public string Host { get; set; } = "localhost";
     public int Port { get; set; } = 5672;
     public string Username { get; set; } = "guest";

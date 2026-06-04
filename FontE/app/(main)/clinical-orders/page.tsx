@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/DataState";
 import { Modal } from "@/components/ui/Modal";
 import { formatDateTimeValue } from "@/lib/dateFormatting";
 import { getApiErrorMessage } from "@/services/error";
@@ -105,6 +106,7 @@ export default function ClinicalOrdersPage() {
   const [catalog, setCatalog] = useState<HospitalClinicalOrderCatalogItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -181,8 +183,11 @@ export default function ClinicalOrdersPage() {
         setTotalCount(worklist.totalCount);
         setEligibleEncounters(encounterData);
         setCatalog(catalogData);
+        setListError(null);
       } catch (error: unknown) {
-        toast.error(getApiErrorMessage(error, "Không thể tải dữ liệu chỉ định cận lâm sàng."));
+        const message = getApiErrorMessage(error, "Không thể tải dữ liệu chỉ định cận lâm sàng.");
+        setListError(message);
+        toast.error(message);
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
@@ -508,14 +513,19 @@ export default function ClinicalOrdersPage() {
         </div>
 
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center p-16">
-            <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-violet-100 border-t-violet-600" />
-            <p className="text-sm font-medium text-slate-500">Đang tải danh sách chỉ định...</p>
-          </div>
+          <LoadingState title="Đang tải danh sách chỉ định..." tone="violet" />
+        ) : listError ? (
+          <ErrorState
+            title="Không thể tải danh sách chỉ định"
+            description={listError}
+            onAction={() => void fetchData(true)}
+          />
         ) : orders.length === 0 ? (
-          <div className="p-16 text-center text-sm text-slate-500">
-            Chưa có chỉ định nào khớp bộ lọc hiện tại.
-          </div>
+          <EmptyState
+            title="Chưa có chỉ định nào khớp bộ lọc hiện tại."
+            description="Thử đổi phân loại, trạng thái hoặc từ khóa để mở rộng danh sách chỉ định."
+            tone="violet"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-[1280px] w-full border-collapse text-left">

@@ -63,18 +63,21 @@ builder.Services.AddSingleton<DashboardCacheMetricsRegistry>();
 builder.Services.AddSingleton<NotificationPipelineMetricsReader>();
 builder.Services.AddSingleton<OperationalAlertEvaluator>();
 builder.Services.AddSingleton<OperationalAlertWebhookNotifier>();
+
+var operationalAlertOptions =
+    builder.Configuration.GetSection("OperationalAlerts").Get<OperationalAlertOptions>()
+    ?? new OperationalAlertOptions();
+ValidateOperationalAlertOptions(operationalAlertOptions);
+
 builder.Services.AddHttpClient("operational-alert-webhook", (serviceProvider, client) =>
 {
-    var options = serviceProvider
-        .GetRequiredService<Microsoft.Extensions.Options.IOptions<OperationalAlertOptions>>()
-        .Value;
-
-    client.Timeout = TimeSpan.FromSeconds(Math.Max(1, options.Webhook.TimeoutSeconds));
+    client.Timeout = TimeSpan.FromSeconds(Math.Max(1, operationalAlertOptions.Webhook.TimeoutSeconds));
 });
 
 var openTelemetryTracingOptions =
     builder.Configuration.GetSection("OpenTelemetry").Get<OpenTelemetryTracingOptions>()
     ?? new OpenTelemetryTracingOptions();
+ValidateOpenTelemetryTracingOptions(openTelemetryTracingOptions);
 
 if (openTelemetryTracingOptions.Enabled)
 {
@@ -582,4 +585,97 @@ static string FormatAgeSeconds(DateTime nowUtc, DateTime? value)
 
     return Math.Max(0, Math.Round((nowUtc - value.Value).TotalSeconds, 0))
         .ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
+static void ValidateOpenTelemetryTracingOptions(OpenTelemetryTracingOptions options)
+{
+    if (!options.Enabled)
+    {
+        return;
+    }
+
+    if (!options.UseConsoleExporter && string.IsNullOrWhiteSpace(options.OtlpEndpoint))
+    {
+        throw new InvalidOperationException(
+            "OpenTelemetry is enabled but no exporter is configured. Set OpenTelemetry:UseConsoleExporter=true or OpenTelemetry:OtlpEndpoint.");
+    }
+
+    if (!string.IsNullOrWhiteSpace(options.OtlpEndpoint) &&
+        (!Uri.TryCreate(options.OtlpEndpoint.Trim(), UriKind.Absolute, out var otlpEndpoint) ||
+         otlpEndpoint.Scheme is not ("http" or "https")))
+    {
+        throw new InvalidOperationException("OpenTelemetry:OtlpEndpoint must be an absolute http/https URL.");
+    }
+}
+
+static void ValidateOperationalAlertOptions(OperationalAlertOptions options)
+{
+    if (options.DispatchIntervalSeconds <= 0)
+    {
+        throw new InvalidOperationException("OperationalAlerts:DispatchIntervalSeconds must be greater than 0.");
+    }
+
+    if (options.RepeatIntervalMinutes <= 0)
+    {
+        throw new InvalidOperationException("OperationalAlerts:RepeatIntervalMinutes must be greater than 0.");
+    }
+
+    if (options.Webhook.TimeoutSeconds <= 0)
+    {
+        throw new InvalidOperationException("OperationalAlerts:Webhook:TimeoutSeconds must be greater than 0.");
+    }
+
+    ValidateThresholdPair(
+        options.PendingOutboxWarningThreshold,
+        options.PendingOutboxCriticalThreshold,
+        "OperationalAlerts pending outbox thresholds");
+    ValidateThresholdPair(
+        options.QueuedDeliveryWarningThreshold,
+        options.QueuedDeliveryCriticalThreshold,
+        "OperationalAlerts queued delivery thresholds");
+    ValidateThresholdPair(
+        options.StaleQueuedWarningThreshold,
+        options.StaleQueuedCriticalThreshold,
+        "OperationalAlerts stale queued thresholds");
+    ValidateThresholdPair(
+        options.OldestQueuedWarningMinutes,
+        options.OldestQueuedCriticalMinutes,
+        "OperationalAlerts oldest queued thresholds");
+    ValidateThresholdPair(
+        options.WorkerStaleWarningMinutes,
+        options.WorkerStaleCriticalMinutes,
+        "OperationalAlerts worker stale thresholds");
+
+    if (options.CacheMinimumSamples < 0)
+    {
+        throw new InvalidOperationException("OperationalAlerts:CacheMinimumSamples must not be negative.");
+    }
+
+    if (options.CacheHitRatioCriticalPercent is < 0 or > 100 ||
+        options.CacheHitRatioWarningPercent is < 0 or > 100 ||
+        options.CacheHitRatioCriticalPercent > options.CacheHitRatioWarningPercent)
+    {
+        throw new InvalidOperationException(
+            "OperationalAlerts cache hit ratio thresholds must be between 0 and 100, with critical <= warning.");
+    }
+
+    if (!options.DispatchEnabled || !options.Webhook.Enabled)
+    {
+        return;
+    }
+
+    if (!Uri.TryCreate(options.Webhook.Url.Trim(), UriKind.Absolute, out var webhookUri) ||
+        webhookUri.Scheme is not ("http" or "https"))
+    {
+        throw new InvalidOperationException(
+            "Operational alert webhook dispatch is enabled but OperationalAlerts:Webhook:Url is not a valid absolute http/https URL.");
+    }
+}
+
+static void ValidateThresholdPair(int warning, int critical, string label)
+{
+    if (warning < 0 || critical < 0 || critical < warning)
+    {
+        throw new InvalidOperationException($"{label} must be non-negative and critical >= warning.");
+    }
 }

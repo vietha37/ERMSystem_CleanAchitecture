@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ErrorState } from "@/components/ui/DataState";
 import { Modal } from "@/components/ui/Modal";
 import { getApiErrorMessage } from "@/services/error";
 import { staffUserService } from "@/services/staffUserService";
@@ -26,6 +27,7 @@ const initialForm: FormState = {
 export default function StaffPage() {
   const [items, setItems] = useState<StaffUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [pageNumber, setPageNumber] = useState(1);
@@ -58,7 +60,9 @@ export default function StaffPage() {
       setItems(data.items);
       setTotalCount(data.totalCount);
       setTotalPages(data.totalPages || 1);
+      setListError(null);
     } catch (error) {
+      setListError(getApiErrorMessage(error, "Không thể tải danh sách tài khoản."));
       setItems([]);
       setTotalCount(0);
       setTotalPages(1);
@@ -217,6 +221,16 @@ export default function StaffPage() {
                 <tr>
                   <td colSpan={4} className="p-8 text-center text-gray-500">
                     Đang tải...
+                  </td>
+                </tr>
+              ) : listError ? (
+                <tr>
+                  <td colSpan={4}>
+                    <ErrorState
+                      title="Không thể tải danh sách tài khoản"
+                      description={listError}
+                      onAction={() => void fetchData()}
+                    />
                   </td>
                 </tr>
               ) : items.length === 0 ? (

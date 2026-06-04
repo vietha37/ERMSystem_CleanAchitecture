@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ErrorState } from "@/components/ui/DataState";
 import { Modal } from "@/components/ui/Modal";
 import { formatDateTimeValue, formatDateValue } from "@/lib/dateFormatting";
 import { patientService } from "@/services/patientService";
@@ -51,6 +52,7 @@ export default function PatientsPage() {
 
   const [patients, setPatients] = useState<PatientViewModel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -200,6 +202,7 @@ export default function PatientsPage() {
         setPatients(pagedPatients);
         setTotalItems(filteredPatients.length);
         setTotalPages(Math.max(1, Math.ceil(filteredPatients.length / pageSize)));
+        setListError(null);
         return;
       }
 
@@ -212,7 +215,9 @@ export default function PatientsPage() {
       setPatients(mapped);
       setTotalPages(Math.max(1, Math.ceil((data.totalCount || 0) / pageSize)));
       setTotalItems(data.totalCount || 0);
+      setListError(null);
     } catch (error: unknown) {
+      setListError(getApiErrorMessage(error, "Không thể tải danh sách bệnh nhân."));
       toast.error(getApiErrorMessage(error, "Không thể tải danh sách bệnh nhân."));
       setPatients([]);
       setTotalPages(1);
@@ -551,6 +556,16 @@ export default function PatientsPage() {
                       </td>
                     </tr>
                   ))
+                ) : listError ? (
+                  <tr>
+                    <td colSpan={8}>
+                      <ErrorState
+                        title="Không thể tải danh sách bệnh nhân"
+                        description={listError}
+                        onAction={() => void fetchPatients()}
+                      />
+                    </td>
+                  </tr>
                 ) : patients.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="p-16 text-center text-gray-500">

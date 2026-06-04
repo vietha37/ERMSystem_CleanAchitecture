@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/DataState";
 import { Modal } from "@/components/ui/Modal";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDateTimeValue } from "@/lib/dateFormatting";
@@ -100,6 +101,7 @@ export default function PrescriptionsPage() {
   const [medicines, setMedicines] = useState<HospitalMedicineCatalog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -154,8 +156,11 @@ export default function PrescriptionsPage() {
         setTotalCount(worklist.totalCount);
         setEligibleEncounters(encounters);
         setMedicines(catalog);
+        setListError(null);
       } catch (error: unknown) {
-        toast.error(getApiErrorMessage(error, "Không thể tải dữ liệu đơn thuốc."));
+        const message = getApiErrorMessage(error, "Không thể tải dữ liệu đơn thuốc.");
+        setListError(message);
+        toast.error(message);
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
@@ -366,14 +371,19 @@ export default function PrescriptionsPage() {
         </div>
 
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center p-16">
-            <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cyan-100 border-t-cyan-600" />
-            <p className="text-sm font-medium text-slate-500">Đang tải đơn thuốc...</p>
-          </div>
+          <LoadingState title="Đang tải đơn thuốc..." tone="cyan" />
+        ) : listError ? (
+          <ErrorState
+            title="Không thể tải dữ liệu đơn thuốc"
+            description={listError}
+            onAction={() => void fetchData(true)}
+          />
         ) : prescriptions.length === 0 ? (
-          <div className="p-16 text-center text-sm text-slate-500">
-            Chưa có đơn thuốc nào khớp bộ lọc hiện tại.
-          </div>
+          <EmptyState
+            title="Chưa có đơn thuốc nào khớp bộ lọc hiện tại."
+            description="Thử đổi trạng thái, từ khóa hoặc phát hành đơn thuốc mới từ hồ sơ khám đủ điều kiện."
+            tone="cyan"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-[1260px] w-full border-collapse text-left">

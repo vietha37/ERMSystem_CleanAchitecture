@@ -43,6 +43,22 @@ public class HospitalNotificationConsumerService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (!_rabbitMqOptions.Enabled)
+        {
+            _logger.LogInformation("RabbitMQ is disabled. Hospital notification consumer worker will stay idle.");
+            _workerHealthRegistry.Report("hospital-notification-consumer", "Disabled", "RabbitMQ disabled by configuration.");
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                // Normal shutdown while the worker is disabled.
+            }
+
+            return;
+        }
+
         _logger.LogInformation("Khoi dong worker consume notification tu RabbitMQ.");
         _workerHealthRegistry.Report("hospital-notification-consumer", "Starting", "Worker started.");
 

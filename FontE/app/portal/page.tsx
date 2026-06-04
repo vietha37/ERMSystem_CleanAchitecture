@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import ProtectedLayout from "@/components/layout/ProtectedLayout";
+import { ErrorState } from "@/components/ui/DataState";
 import { useAuth } from "@/hooks/useAuth";
 import { authService } from "@/services/authService";
 import { formatDateTimeValue, formatDateValue } from "@/lib/dateFormatting";
@@ -155,6 +156,7 @@ export default function PatientPortalPage() {
   const [visitHistory, setVisitHistory] = useState<HospitalPatientVisitHistoryResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isVisitHistoryLoading, setIsVisitHistoryLoading] = useState(true);
+  const [portalError, setPortalError] = useState<string | null>(null);
   const [visitHistoryPage, setVisitHistoryPage] = useState(1);
 
   const visitHistoryPageSize = 5;
@@ -172,7 +174,9 @@ export default function PatientPortalPage() {
 
         setOverview(overviewData);
         setVisitHistory(visitHistoryData);
+        setPortalError(null);
       } catch (error: unknown) {
+        setPortalError(getApiErrorMessage(error, "Không thể tải cổng thông tin bệnh nhân."));
         toast.error(getApiErrorMessage(error, "Không thể tải cổng thông tin bệnh nhân."));
       } finally {
         setIsLoading(false);
@@ -206,6 +210,16 @@ export default function PatientPortalPage() {
     <ProtectedLayout>
       <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(6,182,212,0.16),_transparent_24%),linear-gradient(180deg,_#eff8ff_0%,_#ffffff_100%)] px-4 py-8 md:px-6">
         <div className="mx-auto max-w-7xl space-y-6">
+          {portalError && !isLoading && (
+            <section className="rounded-[2rem] border border-rose-100 bg-white/90 shadow-sm">
+              <ErrorState
+                title="Không thể tải cổng thông tin bệnh nhân"
+                description={portalError}
+                onAction={() => window.location.reload()}
+              />
+            </section>
+          )}
+
           <section className="sticky top-4 z-30 rounded-[1.75rem] border border-white/70 bg-white/86 px-5 py-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>

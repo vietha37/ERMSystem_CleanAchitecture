@@ -5,12 +5,24 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
 
   redis:
     image: redis:7-alpine
     container_name: ermsystem-redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
 
   api:
     build:
@@ -18,20 +30,30 @@ services:
       dockerfile: BackE/ERMSystem.API/Dockerfile
     container_name: ermsystem-api
     depends_on:
-      - rabbitmq
-      - redis
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: ${ERM_DB_CONNECTION_STRING:-Server=host.docker.internal;Database=ERMSystemDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True;Encrypt=False}
       ConnectionStrings__HospitalConnection: ${ERM_HOSPITAL_DB_CONNECTION_STRING:-Server=host.docker.internal;Database=ERMSystemHospitalDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True;Encrypt=False}
       Redis__Enabled: "true"
+      Redis__AllowInMemoryFallback: "false"
       Redis__ConnectionString: redis:6379
+      RabbitMQ__Enabled: "true"
       RabbitMQ__Host: rabbitmq
       RabbitMQ__Port: 5672
       RabbitMQ__Username: guest
       RabbitMQ__Password: guest
     ports:
       - "5219:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
   frontend:
     build:
@@ -39,8 +61,15 @@ services:
       dockerfile: FontE/Dockerfile
     container_name: ermsystem-frontend
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     environment:
       NEXT_PUBLIC_API_URL: http://api:8080/api
     ports:
       - "3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s

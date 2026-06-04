@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/DataState";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDateTimeValue } from "@/lib/dateFormatting";
 import { getApiErrorMessage } from "@/services/error";
@@ -52,6 +53,7 @@ export default function DoctorWorklistPage() {
   const [worklist, setWorklist] = useState<HospitalDoctorWorklistResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
 
   const canSelectDoctor = role === "Admin" || role === "Receptionist";
 
@@ -82,8 +84,11 @@ export default function DoctorWorklistPage() {
 
         setDoctors(doctorData);
         setWorklist(worklistData);
+        setListError(null);
       } catch (error: unknown) {
-        toast.error(getApiErrorMessage(error, "Không thể tải danh sách công việc bác sĩ."));
+        const message = getApiErrorMessage(error, "Không thể tải danh sách công việc bác sĩ.");
+        setListError(message);
+        toast.error(message);
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
@@ -212,16 +217,19 @@ export default function DoctorWorklistPage() {
 
       <Card className="overflow-hidden border border-slate-100 p-0 shadow-sm">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center p-16">
-            <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
-            <p className="text-sm font-medium text-slate-500">
-              Đang tải công việc bác sĩ...
-            </p>
-          </div>
+          <LoadingState title="Đang tải công việc bác sĩ..." tone="blue" />
+        ) : listError ? (
+          <ErrorState
+            title="Không thể tải công việc bác sĩ"
+            description={listError}
+            onAction={() => void fetchPageData(true)}
+          />
         ) : items.length === 0 ? (
-          <div className="p-16 text-center text-sm text-slate-500">
-            Không có ca khám nào cho bộ lọc hiện tại.
-          </div>
+          <EmptyState
+            title="Không có ca khám nào cho bộ lọc hiện tại."
+            description="Thử đổi ngày làm việc hoặc bộ lọc bác sĩ để xem thêm ca khám."
+            tone="blue"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-[1240px] w-full border-collapse text-left">

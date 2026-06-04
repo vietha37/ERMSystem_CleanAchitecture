@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/DataState";
 import { formatDateTimeValue } from "@/lib/dateFormatting";
 import { getApiErrorMessage } from "@/services/error";
 import { hospitalNotificationDeliveryService } from "@/services/hospitalNotificationDeliveryService";
@@ -62,6 +63,7 @@ export default function NotificationsPage() {
     useState<HospitalCrmEngagementSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -94,8 +96,11 @@ export default function NotificationsPage() {
         setTotalCount(response.totalCount);
         setSummary(summaryResponse);
         setEngagementSummary(engagementResponse);
+        setListError(null);
       } catch (error: unknown) {
-        toast.error(getApiErrorMessage(error, "Không thể tải danh sách gửi thông báo."));
+        const message = getApiErrorMessage(error, "Không thể tải danh sách gửi thông báo.");
+        setListError(message);
+        toast.error(message);
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
@@ -499,21 +504,19 @@ export default function NotificationsPage() {
         </div>
 
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center p-16">
-            <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-cyan-100 border-t-cyan-600" />
-            <p className="text-sm font-medium text-slate-500">
-              Đang tải dữ liệu notification...
-            </p>
-          </div>
+          <LoadingState title="Đang tải dữ liệu notification..." tone="cyan" />
+        ) : listError ? (
+          <ErrorState
+            title="Không thể tải hàng đợi gửi"
+            description={listError}
+            onAction={() => void fetchDeliveries(true)}
+          />
         ) : deliveries.length === 0 ? (
-          <div className="p-16 text-center">
-            <p className="text-base font-semibold text-slate-700">
-              Không có delivery nào khớp bộ lọc hiện tại.
-            </p>
-            <p className="mt-2 text-sm text-slate-500">
-              Thử đổi trạng thái lọc hoặc chờ worker tạo thêm dữ liệu.
-            </p>
-          </div>
+          <EmptyState
+            title="Không có delivery nào khớp bộ lọc hiện tại."
+            description="Thử đổi trạng thái lọc hoặc chờ worker tạo thêm dữ liệu."
+            tone="cyan"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-[1200px] w-full border-collapse text-left">

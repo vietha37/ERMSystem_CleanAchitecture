@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/DataState";
 import { Modal } from "@/components/ui/Modal";
 import { formatDateTimeValue } from "@/lib/dateFormatting";
 import { getApiErrorMessage } from "@/services/error";
@@ -186,6 +187,7 @@ export default function MedicalRecordsPage() {
   >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [isSigningEncounter, setIsSigningEncounter] = useState(false);
@@ -242,8 +244,11 @@ export default function MedicalRecordsPage() {
         setEncounters(worklist.items);
         setTotalCount(worklist.totalCount);
         setEligibleAppointments(appointments);
+        setListError(null);
       } catch (error: unknown) {
-        toast.error(getApiErrorMessage(error, "Không thể tải dữ liệu hồ sơ khám."));
+        const message = getApiErrorMessage(error, "Không thể tải dữ liệu hồ sơ khám.");
+        setListError(message);
+        toast.error(message);
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
@@ -536,14 +541,19 @@ export default function MedicalRecordsPage() {
         </div>
 
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center p-16">
-            <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-emerald-100 border-t-emerald-600" />
-            <p className="text-sm font-medium text-slate-500">Đang tải hồ sơ khám...</p>
-          </div>
+          <LoadingState title="Đang tải hồ sơ khám..." tone="emerald" />
+        ) : listError ? (
+          <ErrorState
+            title="Không thể tải hồ sơ khám"
+            description={listError}
+            onAction={() => void fetchData(true)}
+          />
         ) : encounters.length === 0 ? (
-          <div className="p-16 text-center text-sm text-slate-500">
-            Chưa có hồ sơ khám nào khớp bộ lọc hiện tại.
-          </div>
+          <EmptyState
+            title="Chưa có hồ sơ khám nào khớp bộ lọc hiện tại."
+            description="Thử đổi ngày, trạng thái hoặc từ khóa để tìm thêm hồ sơ khám."
+            tone="emerald"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-[1260px] w-full border-collapse text-left">

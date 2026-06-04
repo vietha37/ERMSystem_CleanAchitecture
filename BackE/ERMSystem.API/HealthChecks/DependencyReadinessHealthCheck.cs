@@ -1,7 +1,9 @@
 using System.Net.Sockets;
+using ERMSystem.Infrastructure.Messaging;
 using ERMSystem.Infrastructure.Services;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 
 namespace ERMSystem.API.HealthChecks;
 
@@ -11,17 +13,20 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
     private readonly ILogger<DependencyReadinessHealthCheck> _logger;
     private readonly BackgroundWorkerHealthRegistry _workerHealthRegistry;
     private readonly DistributedCacheRuntimeInfo _distributedCacheRuntimeInfo;
+    private readonly RabbitMqOptions _rabbitMqOptions;
 
     public DependencyReadinessHealthCheck(
         IConfiguration configuration,
         ILogger<DependencyReadinessHealthCheck> logger,
         BackgroundWorkerHealthRegistry workerHealthRegistry,
-        DistributedCacheRuntimeInfo distributedCacheRuntimeInfo)
+        DistributedCacheRuntimeInfo distributedCacheRuntimeInfo,
+        IOptions<RabbitMqOptions> rabbitMqOptions)
     {
         _configuration = configuration;
         _logger = logger;
         _workerHealthRegistry = workerHealthRegistry;
         _distributedCacheRuntimeInfo = distributedCacheRuntimeInfo;
+        _rabbitMqOptions = rabbitMqOptions.Value;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -54,13 +59,20 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
             data["redis"] = "skipped";
         }
 
-        await CheckTcpAsync(
-            "rabbitMq",
-            $"{_configuration["RabbitMQ:Host"]}:{_configuration["RabbitMQ:Port"]}",
-            5672,
-            data,
-            failures,
-            cancellationToken);
+        if (_rabbitMqOptions.Enabled)
+        {
+            await CheckTcpAsync(
+                "rabbitMq",
+                $"{_rabbitMqOptions.Host}:{_rabbitMqOptions.Port}",
+                5672,
+                data,
+                failures,
+                cancellationToken);
+        }
+        else
+        {
+            data["rabbitMq"] = "skipped";
+        }
 
         CheckWorkers(data, failures);
 
@@ -177,16 +189,20 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
     {
         var workerSnapshots = _workerHealthRegistry.GetAll();
         var nowUtc = DateTime.UtcNow;
-        var requiredWorkers = new[]
+        var requiredWorkers = new List<string>
         {
-            "hospital-outbox-publisher",
-            "hospital-notification-consumer",
             "hospital-notification-dispatch",
             "retention-cleanup",
             "revisit-reminder-campaign",
             "satisfaction-survey-campaign",
             "customer-care-follow-up-campaign"
         };
+
+        if (_rabbitMqOptions.Enabled)
+        {
+            requiredWorkers.Insert(0, "hospital-notification-consumer");
+            requiredWorkers.Insert(0, "hospital-outbox-publisher");
+        }
 
         var workerData = new Dictionary<string, object>();
         foreach (var workerName in requiredWorkers)

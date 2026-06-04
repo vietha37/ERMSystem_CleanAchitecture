@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
+import { ErrorState } from "@/components/ui/DataState";
 import { dashboardService } from "@/services/dashboardService";
 import { DashboardStats, DashboardTrendPoint, DashboardTrends } from "@/services/types";
 import { getApiErrorMessage } from "@/services/error";
@@ -287,6 +288,8 @@ export default function DashboardPage() {
   const [toDate, setToDate] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isTrendsLoading, setIsTrendsLoading] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [trendsError, setTrendsError] = useState<string | null>(null);
 
   useEffect(() => {
     const range = getDefaultRange("daily");
@@ -300,7 +303,9 @@ export default function DashboardPage() {
       try {
         const result = await dashboardService.getStats();
         setStats(result);
+        setStatsError(null);
       } catch (error: unknown) {
+        setStatsError(getApiErrorMessage(error, "Không thể tải thống kê tổng quan."));
         toast.error(getApiErrorMessage(error, "Không thể tải thống kê tổng quan."));
         setStats(null);
       } finally {
@@ -312,10 +317,6 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!fromDate || !toDate) {
-      return;
-    }
-
     const range = getDefaultRange(period);
     setFromDate(range.from);
     setToDate(range.to);
@@ -337,7 +338,9 @@ export default function DashboardPage() {
           toDate,
         });
         setTrends(result);
+        setTrendsError(null);
       } catch (error: unknown) {
+        setTrendsError(getApiErrorMessage(error, "Không thể tải dữ liệu biểu đồ."));
         toast.error(getApiErrorMessage(error, "Không thể tải dữ liệu biểu đồ."));
         setTrends(null);
       } finally {
@@ -454,6 +457,18 @@ export default function DashboardPage() {
       <div className="flex min-h-[60vh] flex-col items-center justify-center">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600" />
         <p className="mt-4 font-medium tracking-wide text-slate-500">Đang tải bảng điều hành...</p>
+      </div>
+    );
+  }
+
+  if (statsError) {
+    return (
+      <div className="mx-auto max-w-3xl pt-12">
+        <ErrorState
+          title="Không thể tải bảng điều hành"
+          description={statsError}
+          onAction={() => window.location.reload()}
+        />
       </div>
     );
   }
@@ -616,6 +631,14 @@ export default function DashboardPage() {
             {isTrendsLoading ? (
               <Card className="flex h-[390px] items-center justify-center rounded-3xl border border-slate-100 bg-white text-slate-500">
                 Đang tải biểu đồ...
+              </Card>
+            ) : trendsError ? (
+              <Card className="h-[390px] rounded-3xl border border-slate-100 bg-white">
+                <ErrorState
+                  title="Không thể tải biểu đồ"
+                  description={trendsError}
+                  onAction={() => window.location.reload()}
+                />
               </Card>
             ) : trendPoints.length > 0 ? (
               <MainTrendChart points={trendPoints} />
