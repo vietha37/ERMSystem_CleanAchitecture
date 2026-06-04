@@ -560,6 +560,9 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .ToArray();
 
+        AddRenalLabWarnings(warnings, normalizedItems, prescription.LabResults);
+        AddPregnancyContextWarnings(warnings, normalizedItems, normalizedDiagnoses, prescription.PatientGender);
+
         var duplicateGenericGroups = normalizedItems
             .Where(x => !string.IsNullOrWhiteSpace(x.Source.GenericName))
             .GroupBy(x => x.Source.GenericName!.Trim(), StringComparer.OrdinalIgnoreCase)
@@ -827,6 +830,91 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
         return warnings;
     }
 
+    private static void AddRenalLabWarnings(
+        ICollection<HospitalPrescriptionWarningDto> warnings,
+        IReadOnlyCollection<NormalizedPrescriptionItemSnapshot> normalizedItems,
+        IReadOnlyCollection<HospitalPrescriptionLabResultSnapshot> labResults)
+    {
+        var renalRiskItems = normalizedItems
+            .Where(IsRenalRiskMedicine)
+            .GroupBy(x => x.MedicineId)
+            .Select(group => group.First())
+            .ToArray();
+        if (renalRiskItems.Length == 0)
+        {
+            return;
+        }
+
+        var latestEgfr = FindLatestNumericLab(
+            labResults,
+            static lab => IsAnalyte(lab, ["egfr", "estimated glomerular", "muc loc cau than"]));
+        var latestCreatinine = FindLatestNumericLab(
+            labResults,
+            static lab => IsAnalyte(lab, ["creatinine", "creatinin", "creat", "cre"]));
+
+        if (latestEgfr.HasValue && latestEgfr.Value.Value < 60)
+        {
+            var severity = latestEgfr.Value.Value < 30 ? "critical" : "warning";
+            AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+            {
+                Code = $"renal-lab-egfr:{severity}",
+                Severity = severity,
+                Category = "renal-lab-risk",
+                Message = $"Canh bao theo xet nghiem than: eGFR gan nhat {latestEgfr.Value.Value:0.##} {latestEgfr.Value.Unit ?? "mL/phut/1.73m2"}; cac thuoc trong don co the can hieu chinh lieu hoac tranh dung khi suy giam chuc nang than.",
+                Recommendation = "Can doi chieu muc loc cau than voi lieu dung, can nhac giam lieu/thay the va hen theo doi creatinine, dien giai neu tiep tuc dung.",
+                RelatedMedicines = renalRiskItems.Select(x => x.Source.MedicineName).ToList()
+            });
+            return;
+        }
+
+        if (latestCreatinine.HasValue &&
+            (latestCreatinine.Value.Value > 1.3m ||
+             IsHighAbnormalFlag(latestCreatinine.Value.AbnormalFlag)))
+        {
+            AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+            {
+                Code = "renal-lab-creatinine-high",
+                Severity = "warning",
+                Category = "renal-lab-risk",
+                Message = $"Canh bao theo xet nghiem than: creatinine gan nhat {latestCreatinine.Value.Value:0.##} {latestCreatinine.Value.Unit ?? string.Empty}; cac thuoc trong don co the can danh gia lai theo chuc nang than.",
+                Recommendation = "Can tinh/eGFR neu chua co, doi chieu voi lieu dung va theo doi lai chuc nang than sau dieu tri.",
+                RelatedMedicines = renalRiskItems.Select(x => x.Source.MedicineName).ToList()
+            });
+        }
+    }
+
+    private static void AddPregnancyContextWarnings(
+        ICollection<HospitalPrescriptionWarningDto> warnings,
+        IReadOnlyCollection<NormalizedPrescriptionItemSnapshot> normalizedItems,
+        IReadOnlyCollection<string> normalizedDiagnoses,
+        string patientGender)
+    {
+        if (!IsFemaleGender(patientGender) || !HasPregnancyContext(normalizedDiagnoses))
+        {
+            return;
+        }
+
+        var pregnancyRiskItems = normalizedItems
+            .Where(IsPregnancyRiskMedicine)
+            .GroupBy(x => x.MedicineId)
+            .Select(group => group.First())
+            .ToArray();
+        if (pregnancyRiskItems.Length == 0)
+        {
+            return;
+        }
+
+        AddUniqueWarning(warnings, new HospitalPrescriptionWarningDto
+        {
+            Code = "pregnancy-context-medication-risk",
+            Severity = "critical",
+            Category = "pregnancy-risk",
+            Message = $"Canh bao thai ky: ho so co dau hieu mang thai va don co thuoc can danh gia nguy co thai ky ({string.Join(", ", pregnancyRiskItems.Select(x => x.Source.MedicineName))}).",
+            Recommendation = "Can xac nhan tuoi thai/tinh trang mang thai, doi chieu chong chi dinh va can nhac thuoc thay the an toan hon neu phu hop.",
+            RelatedMedicines = pregnancyRiskItems.Select(x => x.Source.MedicineName).ToList()
+        });
+    }
+
     private static void AddUniqueWarning(ICollection<HospitalPrescriptionWarningDto> warnings, HospitalPrescriptionWarningDto warning)
     {
         if (warnings.Any(x => string.Equals(x.Code, warning.Code, StringComparison.OrdinalIgnoreCase)))
@@ -915,6 +1003,84 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
            || item.ContainsToken("dexamethasone")
            || item.ContainsToken("methylprednisolone")
            || item.ContainsToken("hydrocortisone");
+
+    private static bool IsRenalRiskMedicine(NormalizedPrescriptionItemSnapshot item)
+        => TherapeuticClassRules.First(x => x.ClassName == "NSAID").Matchers.Any(item.ContainsToken)
+           || TherapeuticClassRules.First(x => x.ClassName == "ACEi/ARB").Matchers.Any(item.ContainsToken)
+           || item.ContainsToken("metformin")
+           || item.ContainsToken("gabapentin")
+           || item.ContainsToken("pregabalin")
+           || item.ContainsToken("spironolactone")
+           || item.ContainsToken("potassium chloride")
+           || item.ContainsToken("kali clorid")
+           || item.ContainsToken("furosemide")
+           || item.ContainsToken("torsemide")
+           || item.ContainsToken("hydrochlorothiazide")
+           || item.ContainsToken("rivaroxaban")
+           || item.ContainsToken("dabigatran")
+           || item.ContainsToken("enoxaparin");
+
+    private static bool IsPregnancyRiskMedicine(NormalizedPrescriptionItemSnapshot item)
+        => TherapeuticClassRules.First(x => x.ClassName == "ACEi/ARB").Matchers.Any(item.ContainsToken)
+           || item.ContainsToken("warfarin")
+           || item.ContainsToken("isotretinoin")
+           || item.ContainsToken("methotrexate")
+           || item.ContainsToken("misoprostol")
+           || item.ContainsToken("valproate")
+           || item.ContainsToken("valproic acid")
+           || item.ContainsToken("doxycycline")
+           || item.ContainsToken("tetracycline")
+           || item.ContainsToken("levofloxacin")
+           || item.ContainsToken("moxifloxacin");
+
+    private static LatestNumericLab? FindLatestNumericLab(
+        IReadOnlyCollection<HospitalPrescriptionLabResultSnapshot> labResults,
+        Func<HospitalPrescriptionLabResultSnapshot, bool> predicate)
+    {
+        foreach (var lab in labResults
+                     .Where(predicate)
+                     .OrderByDescending(x => x.VerifiedAtUtc ?? DateTime.MinValue))
+        {
+            if (TryExtractPositiveNumber(lab.ResultValue ?? string.Empty, out var value))
+            {
+                return new LatestNumericLab(value, lab.Unit, lab.AbnormalFlag);
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsAnalyte(HospitalPrescriptionLabResultSnapshot lab, string[] matchers)
+    {
+        var code = NormalizeMedicationDescriptor(lab.AnalyteCode);
+        var name = NormalizeMedicationDescriptor(lab.AnalyteName);
+        return matchers
+            .Select(NormalizeMedicationDescriptor)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Any(matcher =>
+                code.Equals(matcher, StringComparison.Ordinal) ||
+                name.Contains(matcher, StringComparison.Ordinal));
+    }
+
+    private static bool IsHighAbnormalFlag(string? abnormalFlag)
+    {
+        var normalized = NormalizeMedicationDescriptor(abnormalFlag);
+        return normalized is "h" or "high" or "hi" or "cao" or "abnormal high";
+    }
+
+    private static bool IsFemaleGender(string patientGender)
+    {
+        var normalized = NormalizeMedicationDescriptor(patientGender);
+        return normalized is "female" or "f" or "nu" or "n";
+    }
+
+    private static bool HasPregnancyContext(IReadOnlyCollection<string> normalizedDiagnoses)
+        => normalizedDiagnoses.Any(diagnosis =>
+            diagnosis.Contains("pregnan", StringComparison.Ordinal) ||
+            diagnosis.Contains("pregnancy", StringComparison.Ordinal) ||
+            diagnosis.Contains("thai", StringComparison.Ordinal) ||
+            diagnosis.Contains("mang thai", StringComparison.Ordinal) ||
+            diagnosis.Contains("co thai", StringComparison.Ordinal));
 
     private static string NormalizeMedicationDescriptor(string? value)
     {
@@ -1005,6 +1171,11 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
         string[] DiagnosisMatchers,
         string[] MedicineMatchers,
         string WarningMessage);
+
+    private readonly record struct LatestNumericLab(
+        decimal Value,
+        string? Unit,
+        string? AbnormalFlag);
 
     private readonly record struct NormalizedPrescriptionItemSnapshot(
         HospitalPrescriptionItemSnapshot Source,

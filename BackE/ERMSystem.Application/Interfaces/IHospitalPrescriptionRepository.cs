@@ -58,8 +58,20 @@ public class HospitalPrescriptionAggregateSnapshot
     public string[] DiagnosisNames { get; set; } = Array.Empty<string>();
     public DateTime CreatedAtUtc { get; set; }
     public string? Notes { get; set; }
+    public HospitalPrescriptionLabResultSnapshot[] LabResults { get; set; } = Array.Empty<HospitalPrescriptionLabResultSnapshot>();
     public HospitalPrescriptionDispensingSnapshot[] DispensingHistory { get; set; } = Array.Empty<HospitalPrescriptionDispensingSnapshot>();
     public HospitalPrescriptionItemSnapshot[] Items { get; set; } = Array.Empty<HospitalPrescriptionItemSnapshot>();
+}
+
+public class HospitalPrescriptionLabResultSnapshot
+{
+    public string? AnalyteCode { get; set; }
+    public string AnalyteName { get; set; } = string.Empty;
+    public string? ResultValue { get; set; }
+    public string? Unit { get; set; }
+    public string? ReferenceRange { get; set; }
+    public string? AbnormalFlag { get; set; }
+    public DateTime? VerifiedAtUtc { get; set; }
 }
 
 public class HospitalPrescriptionDispensingSnapshot

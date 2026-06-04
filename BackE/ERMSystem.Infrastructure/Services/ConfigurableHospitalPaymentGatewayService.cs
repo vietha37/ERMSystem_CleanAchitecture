@@ -108,7 +108,9 @@ public class ConfigurableHospitalPaymentGatewayService : IHospitalPaymentGateway
                 eventId,
                 timestampUtc);
 
-            if (!FixedTimeEquals(expectedSignature, providedSignature.Trim()))
+            var normalizedProvidedSignature = NormalizeSignature(providedSignature);
+            if (normalizedProvidedSignature is null ||
+                !FixedTimeEquals(expectedSignature, normalizedProvidedSignature))
             {
                 return Invalid(providerName, "Gateway signature is invalid.");
             }
@@ -132,9 +134,14 @@ public class ConfigurableHospitalPaymentGatewayService : IHospitalPaymentGateway
 
     public string NormalizeGatewayStatus(string? providerName, string gatewayStatus)
     {
-        var (resolvedProviderName, _) = ResolveProvider(providerName);
+        var (resolvedProviderName, providerOptions) = ResolveProvider(providerName);
         var normalizedStatus = Normalize(gatewayStatus)
             ?? throw new InvalidOperationException("Gateway status khong hop le cho callback thanh toan.");
+
+        if (providerOptions.StatusMappings.TryGetValue(normalizedStatus, out var mappedStatus))
+        {
+            return NormalizeCanonicalPaymentStatus(resolvedProviderName, gatewayStatus, mappedStatus);
+        }
 
         if (string.Equals(normalizedStatus, "Captured", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(normalizedStatus, "Success", StringComparison.OrdinalIgnoreCase) ||
@@ -157,6 +164,29 @@ public class ConfigurableHospitalPaymentGatewayService : IHospitalPaymentGateway
         throw new InvalidOperationException($"Gateway status '{gatewayStatus}' khong hop le cho provider {resolvedProviderName}.");
     }
 
+    private static string NormalizeCanonicalPaymentStatus(
+        string providerName,
+        string originalGatewayStatus,
+        string? mappedStatus)
+    {
+        var normalizedMappedStatus = Normalize(mappedStatus)
+            ?? throw new InvalidOperationException(
+                $"Gateway status '{originalGatewayStatus}' cua provider {providerName} map toi trang thai rong.");
+
+        if (string.Equals(normalizedMappedStatus, "Captured", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Captured";
+        }
+
+        if (string.Equals(normalizedMappedStatus, "Failed", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Failed";
+        }
+
+        throw new InvalidOperationException(
+            $"Gateway status '{originalGatewayStatus}' cua provider {providerName} map toi trang thai noi bo khong hop le '{mappedStatus}'.");
+    }
+
     private (string ProviderName, HospitalPaymentGatewayProviderOptions Options) ResolveProvider(string? requestedProvider)
     {
         var providerName = Normalize(requestedProvider) ?? GetDefaultProvider();
@@ -168,6 +198,12 @@ public class ConfigurableHospitalPaymentGatewayService : IHospitalPaymentGateway
         if (!providerOptions.Enabled)
         {
             throw new InvalidOperationException($"Payment gateway provider '{providerName}' dang bi tat.");
+        }
+
+        if (providerOptions.RequireSignature && string.IsNullOrWhiteSpace(providerOptions.WebhookSecret))
+        {
+            throw new InvalidOperationException(
+                $"Payment gateway provider '{providerName}' yeu cau chu ky callback nhung chua cau hinh WebhookSecret.");
         }
 
         return (providerName, providerOptions);
@@ -287,6 +323,25 @@ public class ConfigurableHospitalPaymentGatewayService : IHospitalPaymentGateway
         var rightBytes = Encoding.UTF8.GetBytes(right);
         return leftBytes.Length == rightBytes.Length &&
                CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
+    }
+
+    private static string? NormalizeSignature(string? value)
+    {
+        var normalized = Normalize(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        const string sha256Prefix = "sha256=";
+        if (normalized.StartsWith(sha256Prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized[sha256Prefix.Length..].Trim();
+        }
+
+        return normalized.Length == 64 && normalized.All(Uri.IsHexDigit)
+            ? normalized.ToLowerInvariant()
+            : null;
     }
 
     private static string? Normalize(string? value)

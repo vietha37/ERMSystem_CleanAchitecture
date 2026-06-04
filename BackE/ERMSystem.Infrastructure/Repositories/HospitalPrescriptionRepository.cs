@@ -165,6 +165,23 @@ public class HospitalPrescriptionRepository : IHospitalPrescriptionRepository
             .OrderByDescending(d => d.DispensedAtUtc)
             .ThenByDescending(d => d.Id)
             .FirstOrDefault();
+        var labResults = await _hospitalDbContext.LabResultItems
+            .AsNoTracking()
+            .Where(x => x.LabOrder.OrderHeader.EncounterId == encounter.Id && x.VerifiedAtUtc.HasValue)
+            .OrderByDescending(x => x.VerifiedAtUtc)
+            .ThenBy(x => x.AnalyteName)
+            .Take(50)
+            .Select(x => new HospitalPrescriptionLabResultSnapshot
+            {
+                AnalyteCode = x.AnalyteCode,
+                AnalyteName = x.AnalyteName,
+                ResultValue = x.ResultValue,
+                Unit = x.Unit,
+                ReferenceRange = x.ReferenceRange,
+                AbnormalFlag = x.AbnormalFlag,
+                VerifiedAtUtc = x.VerifiedAtUtc
+            })
+            .ToArrayAsync(ct);
 
         return new HospitalPrescriptionAggregateSnapshot
         {
@@ -200,6 +217,7 @@ public class HospitalPrescriptionRepository : IHospitalPrescriptionRepository
                 .ToArray(),
             CreatedAtUtc = entity.CreatedAtUtc,
             Notes = entity.Notes,
+            LabResults = labResults,
             DispensingHistory = entity.Dispensings
                 .OrderByDescending(x => x.DispensedAtUtc)
                 .ThenByDescending(x => x.Id)

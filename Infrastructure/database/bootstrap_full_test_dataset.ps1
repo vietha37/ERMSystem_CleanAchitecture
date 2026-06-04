@@ -1,5 +1,5 @@
 param(
-    [string]$ServerInstance = "VietHa\MSSQLSERVER01",
+    [string]$ServerInstance = "localhost\MSSQLSERVER01",
     [string[]]$LegacyDatabaseNames = @("ERMSystemDb"),
     [string]$HospitalDatabaseName = "ERMSystemHospitalDb"
 )

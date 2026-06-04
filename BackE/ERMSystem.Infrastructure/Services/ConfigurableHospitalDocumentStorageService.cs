@@ -8,6 +8,7 @@ namespace ERMSystem.Infrastructure.Services;
 public class ConfigurableHospitalDocumentStorageService : IHospitalDocumentStorageService
 {
     private const string LocalProviderType = "Local";
+    private static readonly string[] SupportedAccessModes = ["ProxyTicket", "DirectUrl"];
 
     private readonly HospitalDocumentStorageOptions _options;
     private readonly IDistributedCache _distributedCache;
@@ -148,6 +149,7 @@ public class ConfigurableHospitalDocumentStorageService : IHospitalDocumentStora
 
     private ResolvedDocumentStorageProvider ResolveProvider(string providerName)
     {
+        providerName = NormalizeProviderName(providerName);
         if (!_options.Providers.TryGetValue(providerName, out var providerOptions))
         {
             throw new InvalidOperationException($"Khong tim thay document storage provider '{providerName}'.");
@@ -164,7 +166,68 @@ public class ConfigurableHospitalDocumentStorageService : IHospitalDocumentStora
                 $"Document storage provider '{providerName}' co type '{providerOptions.Type}' chua duoc ho tro.");
         }
 
+        ValidateProviderConfiguration(providerName, providerOptions);
+
         return new ResolvedDocumentStorageProvider(providerName, providerOptions);
+    }
+
+    private static void ValidateProviderConfiguration(
+        string providerName,
+        HospitalDocumentStorageProviderOptions providerOptions)
+    {
+        if (string.IsNullOrWhiteSpace(providerOptions.Type))
+        {
+            throw new InvalidOperationException($"Document storage provider '{providerName}' chua cau hinh Type.");
+        }
+
+        var accessMode = string.IsNullOrWhiteSpace(providerOptions.AccessMode)
+            ? "ProxyTicket"
+            : providerOptions.AccessMode.Trim();
+        if (!SupportedAccessModes.Any(mode => string.Equals(mode, accessMode, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException(
+                $"Document storage provider '{providerName}' co AccessMode '{providerOptions.AccessMode}' khong duoc ho tro.");
+        }
+
+        if (string.Equals(accessMode, "DirectUrl", StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(providerOptions.PublicBaseUrl))
+        {
+            throw new InvalidOperationException(
+                $"Document storage provider '{providerName}' dung DirectUrl nhung chua cau hinh PublicBaseUrl.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(providerOptions.PublicBaseUrl) &&
+            (!Uri.TryCreate(providerOptions.PublicBaseUrl.Trim(), UriKind.Absolute, out var publicBaseUri) ||
+             publicBaseUri.Scheme is not ("http" or "https")))
+        {
+            throw new InvalidOperationException(
+                $"Document storage provider '{providerName}' co PublicBaseUrl khong hop le.");
+        }
+
+        if (string.IsNullOrWhiteSpace(providerOptions.RootPath))
+        {
+            throw new InvalidOperationException($"Document storage provider '{providerName}' chua cau hinh RootPath.");
+        }
+
+        if (providerOptions.MaxFileSizeBytes <= 0)
+        {
+            throw new InvalidOperationException(
+                $"Document storage provider '{providerName}' phai cau hinh MaxFileSizeBytes lon hon 0.");
+        }
+
+        if (providerOptions.DownloadTicketExpiryMinutes <= 0)
+        {
+            throw new InvalidOperationException(
+                $"Document storage provider '{providerName}' phai cau hinh DownloadTicketExpiryMinutes lon hon 0.");
+        }
+
+        if (providerOptions.AllowedExtensions.Length == 0 ||
+            providerOptions.AllowedExtensions.Any(extension =>
+                string.IsNullOrWhiteSpace(extension) || !extension.Trim().StartsWith(".", StringComparison.Ordinal)))
+        {
+            throw new InvalidOperationException(
+                $"Document storage provider '{providerName}' phai cau hinh AllowedExtensions hop le.");
+        }
     }
 
     private LocalHospitalDocumentStorageService GetLocalBackend(ResolvedDocumentStorageProvider provider)
@@ -220,6 +283,20 @@ public class ConfigurableHospitalDocumentStorageService : IHospitalDocumentStora
 
     private static string BuildStorageUri(string providerName, string relativeStorageUri)
         => $"{providerName}://{relativeStorageUri.TrimStart('/')}";
+
+    private static string NormalizeProviderName(string providerName)
+    {
+        var normalized = providerName?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalized) ||
+            normalized.Contains("://", StringComparison.Ordinal) ||
+            normalized.Contains('/') ||
+            normalized.Contains('\\'))
+        {
+            throw new InvalidOperationException("Ten document storage provider khong hop le.");
+        }
+
+        return normalized;
+    }
 
     private sealed record ResolvedDocumentStorageProvider(
         string ProviderName,

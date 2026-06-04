@@ -6,6 +6,7 @@ using ERMSystem.API.Services;
 using ERMSystem.Infrastructure.Repositories;
 using ERMSystem.Infrastructure.Services;
 using ERMSystem.Infrastructure.Messaging;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
@@ -17,11 +18,27 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
+using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"));
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+if (OperatingSystem.IsWindows() && !builder.Environment.IsDevelopment())
+{
+    builder.Logging.AddEventLog();
+}
+
+var dataProtectionKeyPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys");
+Directory.CreateDirectory(dataProtectionKeyPath);
+builder.Services
+    .AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeyPath));
 
 builder.Services.Configure<RequestObservabilityOptions>(builder.Configuration.GetSection("Observability"));
 builder.Services.Configure<OpenTelemetryTracingOptions>(builder.Configuration.GetSection("OpenTelemetry"));

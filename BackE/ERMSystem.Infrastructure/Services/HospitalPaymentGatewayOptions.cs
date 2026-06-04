@@ -19,5 +19,6 @@ public class HospitalPaymentGatewayProviderOptions
     public string WebhookSecret { get; set; } = string.Empty;
     public int TimestampToleranceMinutes { get; set; } = 10;
     public List<string> SupportedPaymentMethods { get; set; } = new();
+    public Dictionary<string, string> StatusMappings { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, string> StaticCheckoutParameters { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
