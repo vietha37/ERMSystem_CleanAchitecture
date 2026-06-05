@@ -75,7 +75,7 @@ namespace ERMSystem.Infrastructure.Services
                 throw new InvalidOperationException($"Username '{normalizedUsername}' is already taken.");
 
             if (!Array.Exists(AppRole.Internal, r => r == registerDto.Role))
-                throw new ArgumentException($"Invalid role '{registerDto.Role}'. Must be Admin, Doctor, or Receptionist.");
+                throw new ArgumentException($"Invalid role '{registerDto.Role}'. Must be Admin, Doctor, or Cashier.");
 
             var user = new AppUser
             {

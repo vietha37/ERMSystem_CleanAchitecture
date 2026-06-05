@@ -1,7 +1,7 @@
 export type Id = string;
 
 export type AppointmentStatus = "Pending" | "Completed" | "Cancelled";
-export type UserRole = "Admin" | "Doctor" | "Receptionist" | "Patient";
+export type UserRole = "Admin" | "Doctor" | "Cashier" | "Patient";
 
 export type PaginatedResult<T> = {
   items: T[];

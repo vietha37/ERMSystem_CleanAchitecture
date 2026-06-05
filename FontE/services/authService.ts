@@ -18,15 +18,17 @@ const ROLE_CLAIM_URI = "http://schemas.microsoft.com/ws/2008/06/identity/claims/
 const NAME_CLAIM_URI = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
 
 type JwtPayload = {
-  role?: UserRole;
+  role?: unknown;
   unique_name?: string;
   name?: string;
   display_name?: string;
   sub?: string;
-  [ROLE_CLAIM_URI]?: UserRole;
+  [ROLE_CLAIM_URI]?: unknown;
   [NAME_CLAIM_URI]?: string;
   exp?: number;
 };
+
+const knownRoles: UserRole[] = ["Admin", "Doctor", "Cashier", "Patient"];
 
 function parseJwtPayload(token: string): JwtPayload | null {
   const parts = token.split(".");
@@ -41,6 +43,15 @@ function parseJwtPayload(token: string): JwtPayload | null {
   } catch {
     return null;
   }
+}
+
+function normalizeRoleClaim(value: unknown): UserRole | null {
+  const rawRole = Array.isArray(value) ? value[0] : value;
+  if (typeof rawRole !== "string") {
+    return null;
+  }
+
+  return knownRoles.find((role) => role === rawRole.trim()) ?? null;
 }
 
 export const authService = {
@@ -129,7 +140,7 @@ export const authService = {
       return null;
     }
 
-    return payload[ROLE_CLAIM_URI] ?? payload.role ?? null;
+    return normalizeRoleClaim(payload[ROLE_CLAIM_URI] ?? payload.role);
   },
 
   getUsername: (): string | null => {

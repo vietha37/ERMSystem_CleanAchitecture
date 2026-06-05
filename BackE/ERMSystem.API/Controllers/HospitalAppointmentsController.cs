@@ -3,6 +3,7 @@ using ERMSystem.Application.Interfaces;
 using ERMSystem.Application.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 namespace ERMSystem.API.Controllers;
@@ -147,7 +148,7 @@ public class HospitalAppointmentsController : ControllerBase
 
         try
         {
-            var result = await _hospitalAppointmentService.BookPublicAppointmentAsync(request, ct);
+            var result = await _hospitalAppointmentService.BookPublicAppointmentAsync(request, ResolveCurrentUserId(), ct);
             return Ok(result);
         }
         catch (KeyNotFoundException ex)
@@ -167,4 +168,12 @@ public class HospitalAppointmentsController : ControllerBase
         => User.FindFirstValue(ClaimTypes.Name)
            ?? User.FindFirstValue(ClaimTypes.Upn)
            ?? User.FindFirstValue("unique_name");
+
+    private Guid? ResolveCurrentUserId()
+    {
+        var userIdRaw = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+            ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        return Guid.TryParse(userIdRaw, out var userId) ? userId : null;
+    }
 }

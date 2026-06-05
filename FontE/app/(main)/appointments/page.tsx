@@ -295,8 +295,8 @@ export default function AppointmentsPage() {
     }
   };
 
-  const canCheckIn = role === "Admin" || role === "Receptionist";
-  const canManageAppointment = role === "Admin" || role === "Receptionist";
+  const canCheckIn = role === "Admin" || role === "Cashier";
+  const canManageAppointment = role === "Admin" || role === "Cashier";
   const startItem = totalCount === 0 ? 0 : (pageNumber - 1) * pageSize + 1;
   const endItem = totalCount === 0 ? 0 : Math.min(pageNumber * pageSize, totalCount);
 

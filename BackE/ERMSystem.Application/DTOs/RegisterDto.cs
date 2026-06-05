@@ -16,8 +16,8 @@ namespace ERMSystem.Application.DTOs
         public string? Name { get; set; }
 
         [Required]
-        [RegularExpression("^(Admin|Doctor|Receptionist)$",
-            ErrorMessage = "Role must be Admin, Doctor, or Receptionist.")]
+        [RegularExpression("^(Admin|Doctor|Cashier)$",
+            ErrorMessage = "Role must be Admin, Doctor, or Cashier.")]
         public string Role { get; set; } = string.Empty;
     }
 }

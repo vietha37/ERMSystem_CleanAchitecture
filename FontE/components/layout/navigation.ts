@@ -28,12 +28,11 @@ export const menuItemsByRole: Record<UserRole, NavigationItem[]> = {
     { name: "Đơn thuốc", path: "/prescriptions", shortLabel: "DT" },
     { name: "Cận lâm sàng", path: "/clinical-orders", shortLabel: "CLS" },
   ],
-  Receptionist: [
+  Cashier: [
     { name: "Tổng quan", path: "/dashboard", shortLabel: "HQ" },
-    { name: "Công việc bác sĩ", path: "/doctor-worklist", shortLabel: "BS" },
+    { name: "Bảo mật", path: "/security", shortLabel: "BM" },
     { name: "Bệnh nhân", path: "/patients", shortLabel: "BN" },
     { name: "Lịch hẹn", path: "/appointments", shortLabel: "LH" },
-    { name: "Cận lâm sàng", path: "/clinical-orders", shortLabel: "CLS" },
     { name: "Hóa đơn", path: "/billing", shortLabel: "HD" },
     { name: "Thông báo", path: "/notifications", shortLabel: "TB" },
   ],

@@ -15,6 +15,10 @@ namespace ERMSystem.Application.Interfaces
             string? email,
             CancellationToken ct = default);
 
+        Task<HospitalBookingPatientSnapshot?> FindPatientByPortalUserIdAsync(
+            Guid userId,
+            CancellationToken ct = default);
+
         Task<bool> HasDoctorConflictAsync(
             Guid doctorProfileId,
             DateTime appointmentStartUtc,
@@ -83,6 +87,7 @@ namespace ERMSystem.Application.Interfaces
         public DateTime AppointmentEndUtc { get; set; }
         public string? ChiefComplaint { get; set; }
         public string? Notes { get; set; }
+        public Guid? CreatedByUserId { get; set; }
         public DateTime CreatedAtUtc { get; set; }
         public DateTime UpdatedAtUtc { get; set; }
     }

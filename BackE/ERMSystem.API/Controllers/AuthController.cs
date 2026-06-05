@@ -214,7 +214,7 @@ namespace ERMSystem.API.Controllers
 
         // POST: api/auth/mfa/setup
         [HttpPost("mfa/setup")]
-        [Authorize(Roles = "Admin,Doctor,Receptionist")]
+        [Authorize(Roles = "Admin,Doctor,Cashier")]
         public async Task<IActionResult> SetupMfa()
         {
             if (!TryGetCurrentUserId(out var userId))
@@ -238,7 +238,7 @@ namespace ERMSystem.API.Controllers
 
         // POST: api/auth/mfa/enable
         [HttpPost("mfa/enable")]
-        [Authorize(Roles = "Admin,Doctor,Receptionist")]
+        [Authorize(Roles = "Admin,Doctor,Cashier")]
         public async Task<IActionResult> EnableMfa([FromBody] VerifyMfaCodeDto request)
         {
             if (!ModelState.IsValid)
@@ -265,7 +265,7 @@ namespace ERMSystem.API.Controllers
 
         // POST: api/auth/mfa/disable
         [HttpPost("mfa/disable")]
-        [Authorize(Roles = "Admin,Doctor,Receptionist")]
+        [Authorize(Roles = "Admin,Doctor,Cashier")]
         public async Task<IActionResult> DisableMfa([FromBody] VerifyMfaCodeDto request)
         {
             if (!ModelState.IsValid)

@@ -897,13 +897,9 @@ GO
 
 INSERT INTO [identity].Roles (Code, Name, IsSystemRole)
 VALUES
-    ('Admin', N'Quan tri he thong', 1),
-    ('Doctor', N'Bac si', 1),
-    ('Receptionist', N'Le tan', 1),
-    ('Nurse', N'Dieu duong', 1),
-    ('Pharmacist', N'Duoc si', 1),
-    ('LabTech', N'Ky thuat vien xet nghiem', 1),
-    ('Cashier', N'Thu ngan', 1),
-    ('Patient', N'Benh nhan', 1);
+    ('Admin', N'Quản trị hệ thống', 1),
+    ('Doctor', N'Bác sĩ', 1),
+    ('Cashier', N'Thu ngân', 1),
+    ('Patient', N'Bệnh nhân', 1);
 GO
 

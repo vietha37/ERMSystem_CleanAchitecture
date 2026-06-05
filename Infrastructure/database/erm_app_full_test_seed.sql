@@ -1,4 +1,4 @@
-SET ANSI_NULLS ON;
+﻿SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
@@ -11,11 +11,11 @@ DECLARE @NowUtc DATETIME2 = SYSUTCDATETIME();
 
 DECLARE @AdminUserId UNIQUEIDENTIFIER = '11111111-1111-1111-1111-111111111111';
 DECLARE @DoctorUserId UNIQUEIDENTIFIER = '22222222-2222-2222-2222-222222222222';
-DECLARE @ReceptionUserId UNIQUEIDENTIFIER = '33333333-3333-3333-3333-333333333333';
+DECLARE @CashierFrontDeskUserId UNIQUEIDENTIFIER = '33333333-3333-3333-3333-333333333333';
 DECLARE @PatientUserId UNIQUEIDENTIFIER = '44444444-4444-4444-4444-444444444444';
-DECLARE @NurseUserId UNIQUEIDENTIFIER = '55555555-5555-5555-5555-555555555555';
-DECLARE @PharmacistUserId UNIQUEIDENTIFIER = '66666666-6666-6666-6666-666666666666';
-DECLARE @LabTechUserId UNIQUEIDENTIFIER = '77777777-7777-7777-7777-777777777777';
+DECLARE @CashierOpsUserId UNIQUEIDENTIFIER = '55555555-5555-5555-5555-555555555555';
+DECLARE @CashierPharmacyUserId UNIQUEIDENTIFIER = '66666666-6666-6666-6666-666666666666';
+DECLARE @CashierLabUserId UNIQUEIDENTIFIER = '77777777-7777-7777-7777-777777777777';
 DECLARE @CashierUserId UNIQUEIDENTIFIER = '88888888-8888-8888-8888-888888888888';
 
 DECLARE @PortalPatientId UNIQUEIDENTIFIER = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1';
@@ -48,11 +48,11 @@ MERGE dbo.AppUsers AS target
 USING (VALUES
     (@AdminUserId, 'admin00', N'Pham Hoang An', @PasswordHash, 'Admin'),
     (@DoctorUserId, 'doctor00', N'Tran Anh Khoa', @PasswordHash, 'Doctor'),
-    (@ReceptionUserId, 'reception00', N'Le Thu Hang', @PasswordHash, 'Receptionist'),
+    (@CashierFrontDeskUserId, 'cashier04', N'Le Thu Hang', @PasswordHash, 'Cashier'),
     (@PatientUserId, 'patient00', N'Nguyen Minh Anh', @PasswordHash, 'Patient'),
-    (@NurseUserId, 'nurse00', N'Nguyen Ha My', @PasswordHash, 'Nurse'),
-    (@PharmacistUserId, 'pharmacist00', N'Vo Thanh Tung', @PasswordHash, 'Pharmacist'),
-    (@LabTechUserId, 'labtech00', N'Pham Kien Minh', @PasswordHash, 'LabTech'),
+    (@CashierOpsUserId, 'cashier01', N'Nguyen Ha My', @PasswordHash, 'Cashier'),
+    (@CashierPharmacyUserId, 'cashier02', N'Vo Thanh Tung', @PasswordHash, 'Cashier'),
+    (@CashierLabUserId, 'cashier03', N'Pham Kien Minh', @PasswordHash, 'Cashier'),
     (@CashierUserId, 'cashier00', N'Tran Thu Ha', @PasswordHash, 'Cashier')
 ) AS source (Id, Username, Name, PasswordHash, Role)
 ON target.Id = source.Id
@@ -202,11 +202,11 @@ FROM Numbers n
 CROSS JOIN (VALUES
     ('admin', 'Admin'),
     ('doctor', 'Doctor'),
-    ('reception', 'Receptionist'),
+    ('cashierrec', 'Cashier'),
     ('patient', 'Patient'),
-    ('nurse', 'Nurse'),
-    ('pharmacist', 'Pharmacist'),
-    ('labtech', 'LabTech'),
+    ('cashierops', 'Cashier'),
+    ('cashierpha', 'Cashier'),
+    ('cashierlab', 'Cashier'),
     ('cashier', 'Cashier')
 ) seed (Prefix, RoleCode)
 WHERE NOT EXISTS (
@@ -224,7 +224,7 @@ OPTION (MAXRECURSION 19);
            TRY_CONVERT(INT, RIGHT(au.Username, 2)) AS NumberValue
     FROM dbo.AppUsers au
     WHERE au.Username LIKE '%[0-9][0-9]'
-      AND au.Role IN ('Admin', 'Doctor', 'Receptionist', 'Patient', 'Nurse', 'Pharmacist', 'LabTech', 'Cashier')
+      AND au.Role IN ('Admin', 'Doctor', 'Cashier', 'Patient')
 )
 UPDATE au
 SET Name = CASE
@@ -250,28 +250,19 @@ CROSS APPLY
     SELECT CASE nau.Role
             WHEN 'Admin' THEN 1
             WHEN 'Doctor' THEN 2
-            WHEN 'Receptionist' THEN 3
-            WHEN 'Nurse' THEN 4
-            WHEN 'Pharmacist' THEN 5
-            WHEN 'LabTech' THEN 6
+            WHEN 'Cashier' THEN 3
             ELSE 7
         END AS OffsetA,
         CASE nau.Role
             WHEN 'Admin' THEN 4
             WHEN 'Doctor' THEN 5
-            WHEN 'Receptionist' THEN 6
-            WHEN 'Nurse' THEN 7
-            WHEN 'Pharmacist' THEN 8
-            WHEN 'LabTech' THEN 9
+            WHEN 'Cashier' THEN 6
             ELSE 10
         END AS OffsetB,
         CASE nau.Role
             WHEN 'Admin' THEN 7
             WHEN 'Doctor' THEN 8
-            WHEN 'Receptionist' THEN 9
-            WHEN 'Nurse' THEN 10
-            WHEN 'Pharmacist' THEN 11
-            WHEN 'LabTech' THEN 12
+            WHEN 'Cashier' THEN 9
             ELSE 13
         END AS OffsetC
 ) roleOffset;
@@ -398,3 +389,6 @@ SET FullName = CONCAT(
 FROM dbo.Patients p
 JOIN NumberedPatients np ON np.Id = p.Id;
 GO
+
+
+

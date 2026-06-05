@@ -1,3 +1,5 @@
+import api from "./api";
+
 export type PublicHospitalAppointmentBookingPayload = {
   fullName: string;
   phone: string;
@@ -28,36 +30,15 @@ export type PublicHospitalAppointmentBookingResult = {
   notificationQueued: boolean;
 };
 
-function getApiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5219/api";
-}
-
 export const hospitalAppointmentService = {
   async bookPublicAppointment(
     payload: PublicHospitalAppointmentBookingPayload
   ): Promise<PublicHospitalAppointmentBookingResult> {
-    const response = await fetch(`${getApiBaseUrl()}/hospital-appointments/public-booking`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    const response = await api.post<PublicHospitalAppointmentBookingResult>(
+      "/hospital-appointments/public-booking",
+      payload
+    );
 
-    if (!response.ok) {
-      let message = "Khong the dat lich luc nay.";
-      try {
-        const data = (await response.json()) as { message?: string };
-        if (data?.message) {
-          message = data.message;
-        }
-      } catch {
-        // Ignore JSON parse errors and return fallback message.
-      }
-
-      throw new Error(message);
-    }
-
-    return response.json() as Promise<PublicHospitalAppointmentBookingResult>;
+    return response.data;
   },
 };

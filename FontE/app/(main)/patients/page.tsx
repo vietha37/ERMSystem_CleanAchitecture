@@ -181,12 +181,12 @@ export default function PatientsPage() {
         const [appointmentData, encounterData] = await Promise.all([
           hospitalAppointmentWorklistService.getAll({
             pageNumber: 1,
-            pageSize: 200,
+            pageSize: 100,
             textSearch: debouncedSearch || undefined,
           }),
           hospitalEncounterService.getAll({
             pageNumber: 1,
-            pageSize: 200,
+            pageSize: 100,
             textSearch: debouncedSearch || undefined,
           }),
         ]);
@@ -350,12 +350,12 @@ export default function PatientsPage() {
       const [appointmentData, encounterData] = await Promise.all([
         hospitalAppointmentWorklistService.getAll({
           pageNumber: 1,
-          pageSize: 200,
+          pageSize: 100,
           textSearch: patient.medicalRecordNumber || patient.fullName,
         }),
         hospitalEncounterService.getAll({
           pageNumber: 1,
-          pageSize: 200,
+          pageSize: 100,
           textSearch: patient.medicalRecordNumber || patient.fullName,
         }),
       ]);

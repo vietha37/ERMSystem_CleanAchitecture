@@ -1,4 +1,4 @@
-SET ANSI_NULLS ON;
+﻿SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
@@ -21,19 +21,19 @@ DECLARE @FourDaysAgo0900Utc DATETIME2 = DATEADD(DAY, -4, @Today0900Utc);
 
 DECLARE @AdminUserId UNIQUEIDENTIFIER = '11111111-1111-1111-1111-111111111111';
 DECLARE @DoctorUserId UNIQUEIDENTIFIER = '22222222-2222-2222-2222-222222222222';
-DECLARE @ReceptionUserId UNIQUEIDENTIFIER = '33333333-3333-3333-3333-333333333333';
+DECLARE @CashierFrontDeskUserId UNIQUEIDENTIFIER = '33333333-3333-3333-3333-333333333333';
 DECLARE @PatientUserId UNIQUEIDENTIFIER = '44444444-4444-4444-4444-444444444444';
-DECLARE @NurseUserId UNIQUEIDENTIFIER = '55555555-5555-5555-5555-555555555555';
-DECLARE @PharmacistUserId UNIQUEIDENTIFIER = '66666666-6666-6666-6666-666666666666';
-DECLARE @LabTechUserId UNIQUEIDENTIFIER = '77777777-7777-7777-7777-777777777777';
+DECLARE @CashierOpsUserId UNIQUEIDENTIFIER = '55555555-5555-5555-5555-555555555555';
+DECLARE @CashierPharmacyUserId UNIQUEIDENTIFIER = '66666666-6666-6666-6666-666666666666';
+DECLARE @CashierLabUserId UNIQUEIDENTIFIER = '77777777-7777-7777-7777-777777777777';
 DECLARE @CashierUserId UNIQUEIDENTIFIER = '88888888-8888-8888-8888-888888888888';
 
 DECLARE @AdminStaffId UNIQUEIDENTIFIER = '10000000-0000-0000-0000-000000000001';
 DECLARE @DoctorStaffId UNIQUEIDENTIFIER = '10000000-0000-0000-0000-000000000002';
-DECLARE @ReceptionStaffId UNIQUEIDENTIFIER = '10000000-0000-0000-0000-000000000003';
-DECLARE @NurseStaffId UNIQUEIDENTIFIER = '10000000-0000-0000-0000-000000000004';
-DECLARE @PharmacistStaffId UNIQUEIDENTIFIER = '10000000-0000-0000-0000-000000000005';
-DECLARE @LabTechStaffId UNIQUEIDENTIFIER = '10000000-0000-0000-0000-000000000006';
+DECLARE @CashierFrontDeskStaffId UNIQUEIDENTIFIER = '10000000-0000-0000-0000-000000000003';
+DECLARE @CashierOpsStaffId UNIQUEIDENTIFIER = '10000000-0000-0000-0000-000000000004';
+DECLARE @CashierPharmacyStaffId UNIQUEIDENTIFIER = '10000000-0000-0000-0000-000000000005';
+DECLARE @CashierLabStaffId UNIQUEIDENTIFIER = '10000000-0000-0000-0000-000000000006';
 DECLARE @CashierStaffId UNIQUEIDENTIFIER = '10000000-0000-0000-0000-000000000007';
 
 DECLARE @DoctorProfileId UNIQUEIDENTIFIER = '20000000-0000-0000-0000-000000000001';
@@ -245,11 +245,11 @@ MERGE [identity].Users AS target
 USING (VALUES
     (@AdminUserId, 'admin00', 'admin00@erm.local', @PasswordHash, 'Admin'),
     (@DoctorUserId, 'doctor00', 'doctor00@erm.local', @PasswordHash, 'Doctor'),
-    (@ReceptionUserId, 'reception00', 'reception00@erm.local', @PasswordHash, 'Receptionist'),
+    (@CashierFrontDeskUserId, 'cashier.frontdesk', 'cashier.frontdesk@erm.local', @PasswordHash, 'Cashier'),
     (@PatientUserId, 'patient00', 'patient00@erm.local', @PasswordHash, 'Patient'),
-    (@NurseUserId, 'nurse00', 'nurse00@erm.local', @PasswordHash, 'Nurse'),
-    (@PharmacistUserId, 'pharmacist00', 'pharmacist00@erm.local', @PasswordHash, 'Pharmacist'),
-    (@LabTechUserId, 'labtech00', 'labtech00@erm.local', @PasswordHash, 'LabTech'),
+    (@CashierOpsUserId, 'cashier.ops', 'cashier.ops@erm.local', @PasswordHash, 'Cashier'),
+    (@CashierPharmacyUserId, 'cashier.pharmacy', 'cashier.pharmacy@erm.local', @PasswordHash, 'Cashier'),
+    (@CashierLabUserId, 'cashier.lab', 'cashier.lab@erm.local', @PasswordHash, 'Cashier'),
     (@CashierUserId, 'cashier00', 'cashier00@erm.local', @PasswordHash, 'Cashier')
 ) AS source (Id, Username, Email, PasswordHash, PrimaryRoleCode)
 ON target.Id = source.Id
@@ -270,11 +270,11 @@ MERGE [identity].UserRoles AS target
 USING (VALUES
     (@AdminUserId, 'Admin'),
     (@DoctorUserId, 'Doctor'),
-    (@ReceptionUserId, 'Receptionist'),
+    (@CashierFrontDeskUserId, 'Cashier'),
     (@PatientUserId, 'Patient'),
-    (@NurseUserId, 'Nurse'),
-    (@PharmacistUserId, 'Pharmacist'),
-    (@LabTechUserId, 'LabTech'),
+    (@CashierOpsUserId, 'Cashier'),
+    (@CashierPharmacyUserId, 'Cashier'),
+    (@CashierLabUserId, 'Cashier'),
     (@CashierUserId, 'Cashier')
 ) AS source (UserId, RoleCode)
 ON target.UserId = source.UserId AND target.RoleCode = source.RoleCode
@@ -289,10 +289,10 @@ MERGE org.StaffProfiles AS target
 USING (VALUES
     (@AdminStaffId, @AdminUserId, 'ADM001', N'Pham Hoang An', @OpdDepartmentId, '0908111001', 'admin00@erm.local', CAST('2023-01-10' AS DATE)),
     (@DoctorStaffId, @DoctorUserId, 'BS100', N'Tran Anh Khoa', @OpdDepartmentId, '0908111002', 'doctor00@erm.local', CAST('2020-03-15' AS DATE)),
-    (@ReceptionStaffId, @ReceptionUserId, 'LT100', N'Le Thu Hang', @OpdDepartmentId, '0908111003', 'reception00@erm.local', CAST('2022-04-01' AS DATE)),
-    (@NurseStaffId, @NurseUserId, 'DD100', N'Nguyen Ha My', @OpdDepartmentId, '0908111004', 'nurse00@erm.local', CAST('2021-06-12' AS DATE)),
-    (@PharmacistStaffId, @PharmacistUserId, 'DS100', N'Vo Thanh Tung', @PhaDepartmentId, '0908111005', 'pharmacist00@erm.local', CAST('2021-08-20' AS DATE)),
-    (@LabTechStaffId, @LabTechUserId, 'XN100', N'Pham Kien Minh', @LabDepartmentId, '0908111006', 'labtech00@erm.local', CAST('2022-02-11' AS DATE)),
+    (@CashierFrontDeskStaffId, @CashierFrontDeskUserId, 'LT100', N'Le Thu Hang', @OpdDepartmentId, '0908111003', 'cashier.frontdesk@erm.local', CAST('2022-04-01' AS DATE)),
+    (@CashierOpsStaffId, @CashierOpsUserId, 'DD100', N'Nguyen Ha My', @OpdDepartmentId, '0908111004', 'cashier.ops@erm.local', CAST('2021-06-12' AS DATE)),
+    (@CashierPharmacyStaffId, @CashierPharmacyUserId, 'DS100', N'Vo Thanh Tung', @PhaDepartmentId, '0908111005', 'cashier.pharmacy@erm.local', CAST('2021-08-20' AS DATE)),
+    (@CashierLabStaffId, @CashierLabUserId, 'XN100', N'Pham Kien Minh', @LabDepartmentId, '0908111006', 'cashier.lab@erm.local', CAST('2022-02-11' AS DATE)),
     (@CashierStaffId, @CashierUserId, 'TN100', N'Tran Thu Ha', @OpdDepartmentId, '0908111007', 'cashier00@erm.local', CAST('2022-10-05' AS DATE))
 ) AS source (Id, UserId, StaffCode, FullName, DepartmentId, Phone, Email, HireDate)
 ON target.Id = source.Id
@@ -559,10 +559,10 @@ WHEN NOT MATCHED BY TARGET THEN
 MERGE scheduling.Appointments AS target
 USING (VALUES
     (@AppointmentFutureId, 'APT-SEED-0001', @PortalPatientHospitalId, @DoctorProfileId, @ClinicGeneralId, @SlotFutureId, 'FollowUp', 'Portal', 'Scheduled', @TwoDays0900Utc, DATEADD(MINUTE, 30, @TwoDays0900Utc), N'Tai kham da day va xac nhan toa thuoc', N'Benh nhan muon kham buoi sang', @PatientUserId),
-    (@AppointmentCheckedInId, 'APT-SEED-0002', @SeniorPatientHospitalId, @DoctorProfileId, @ClinicGeneralId, @SlotTodayId, 'Consultation', 'Reception', 'CheckedIn', @Today0830Utc, DATEADD(MINUTE, 30, @Today0830Utc), N'Dau nguc nhe khi di bo', N'Da do huyet ap tai quay tiep nhan', @ReceptionUserId),
-    (@AppointmentCompletedId, 'APT-SEED-0003', @MaternityPatientHospitalId, @DoctorProfileId, @ClinicGeneralId, @SlotYesterdayId, 'Consultation', 'Reception', 'Completed', @Yesterday1000Utc, DATEADD(MINUTE, 30, @Yesterday1000Utc), N'Dau bung duoi va non nghen', N'Da lam sieu am', @ReceptionUserId),
+    (@AppointmentCheckedInId, 'APT-SEED-0002', @SeniorPatientHospitalId, @DoctorProfileId, @ClinicGeneralId, @SlotTodayId, 'Consultation', 'Reception', 'CheckedIn', @Today0830Utc, DATEADD(MINUTE, 30, @Today0830Utc), N'Dau nguc nhe khi di bo', N'Da do huyet ap tai quay tiep nhan', @CashierFrontDeskUserId),
+    (@AppointmentCompletedId, 'APT-SEED-0003', @MaternityPatientHospitalId, @DoctorProfileId, @ClinicGeneralId, @SlotYesterdayId, 'Consultation', 'Reception', 'Completed', @Yesterday1000Utc, DATEADD(MINUTE, 30, @Yesterday1000Utc), N'Dau bung duoi va non nghen', N'Da lam sieu am', @CashierFrontDeskUserId),
     (@AppointmentApprovedId, 'APT-SEED-0004', @PortalPatientHospitalId, @DoctorProfileId, @ClinicGeneralId, @SlotPastId, 'Consultation', 'Portal', 'Completed', @ThreeDaysAgo1400Utc, DATEADD(MINUTE, 30, @ThreeDaysAgo1400Utc), N'Tang huyet ap va can tu van thuoc', N'Co toa thuoc va hen tai kham', @PatientUserId),
-    (@AppointmentCancelledId, 'APT-SEED-0005', @PediatricPatientHospitalId, @DoctorProfileId, @ClinicGeneralId, NULL, 'Consultation', 'CallCenter', 'Cancelled', @Tomorrow0900Utc, DATEADD(MINUTE, 30, @Tomorrow0900Utc), N'Sot nhe, ho', N'Gia dinh xin huy lich do tre da do hon', @ReceptionUserId)
+    (@AppointmentCancelledId, 'APT-SEED-0005', @PediatricPatientHospitalId, @DoctorProfileId, @ClinicGeneralId, NULL, 'Consultation', 'CallCenter', 'Cancelled', @Tomorrow0900Utc, DATEADD(MINUTE, 30, @Tomorrow0900Utc), N'Sot nhe, ho', N'Gia dinh xin huy lich do tre da do hon', @CashierFrontDeskUserId)
 ) AS source (Id, AppointmentNumber, PatientId, DoctorProfileId, ClinicId, AppointmentSlotId, AppointmentType, BookingChannel, Status, AppointmentStartUtc, AppointmentEndUtc, ChiefComplaint, Notes, CreatedByUserId)
 ON target.Id = source.Id
 WHEN MATCHED THEN
@@ -642,9 +642,9 @@ WHEN NOT MATCHED BY TARGET THEN
 
 MERGE emr.VitalSigns AS target
 USING (VALUES
-    (@VitalInProgressId, @EncounterInProgressId, 167.00, 72.50, 36.8, 86, 18, 148, 92, 97.00, DATEADD(MINUTE, 8, @Today0830Utc), @NurseUserId),
-    (@VitalFinalizedId, @EncounterFinalizedId, 160.00, 55.00, 36.7, 82, 18, 110, 70, 99.00, DATEADD(MINUTE, 10, @Yesterday1000Utc), @NurseUserId),
-    (@VitalApprovedId, @EncounterApprovedId, 162.00, 58.00, 36.6, 78, 17, 138, 88, 98.00, DATEADD(MINUTE, 8, @ThreeDaysAgo1400Utc), @NurseUserId)
+    (@VitalInProgressId, @EncounterInProgressId, 167.00, 72.50, 36.8, 86, 18, 148, 92, 97.00, DATEADD(MINUTE, 8, @Today0830Utc), @CashierOpsUserId),
+    (@VitalFinalizedId, @EncounterFinalizedId, 160.00, 55.00, 36.7, 82, 18, 110, 70, 99.00, DATEADD(MINUTE, 10, @Yesterday1000Utc), @CashierOpsUserId),
+    (@VitalApprovedId, @EncounterApprovedId, 162.00, 58.00, 36.6, 78, 17, 138, 88, 98.00, DATEADD(MINUTE, 8, @ThreeDaysAgo1400Utc), @CashierOpsUserId)
 ) AS source (Id, EncounterId, HeightCm, WeightKg, TemperatureC, PulseRate, RespiratoryRate, SystolicBp, DiastolicBp, OxygenSaturation, RecordedAtUtc, RecordedByUserId)
 ON target.Id = source.Id
 WHEN MATCHED THEN
@@ -877,14 +877,14 @@ BEGIN
     SET PrescriptionId = @PrescriptionDispensedId,
         DispensingStatus = 'Dispensed',
         DispensedAtUtc = DATEADD(HOUR, 2, @ThreeDaysAgo1400Utc),
-        DispensedByUserId = @PharmacistUserId,
+        DispensedByUserId = @CashierPharmacyUserId,
         Notes = N'Da doi chieu toa va huong dan cach dung cho benh nhan.'
     WHERE Id = @DispensingId;
 END
 ELSE
 BEGIN
     INSERT INTO pharmacy.Dispensings (Id, PrescriptionId, DispensingStatus, DispensedAtUtc, DispensedByUserId, Notes)
-    VALUES (@DispensingId, @PrescriptionDispensedId, 'Dispensed', DATEADD(HOUR, 2, @ThreeDaysAgo1400Utc), @PharmacistUserId, N'Da doi chieu toa va huong dan cach dung cho benh nhan.');
+    VALUES (@DispensingId, @PrescriptionDispensedId, 'Dispensed', DATEADD(HOUR, 2, @ThreeDaysAgo1400Utc), @CashierPharmacyUserId, N'Da doi chieu toa va huong dan cach dung cho benh nhan.');
 END
 
 MERGE pharmacy.InventoryBatches AS target
@@ -1153,11 +1153,11 @@ FROM Numbers n
 CROSS JOIN (VALUES
     ('admin', 'Admin'),
     ('doctor', 'Doctor'),
-    ('reception', 'Receptionist'),
+    ('cashierrec', 'Cashier'),
     ('patient', 'Patient'),
-    ('nurse', 'Nurse'),
-    ('pharmacist', 'Pharmacist'),
-    ('labtech', 'LabTech'),
+    ('cashierops', 'Cashier'),
+    ('cashierpha', 'Cashier'),
+    ('cashierlab', 'Cashier'),
     ('cashier', 'Cashier')
 ) seed (Prefix, RoleCode)
 WHERE NOT EXISTS (
@@ -1181,11 +1181,11 @@ FROM Numbers n
 CROSS JOIN (VALUES
     ('admin', 'Admin'),
     ('doctor', 'Doctor'),
-    ('reception', 'Receptionist'),
+    ('cashierrec', 'Cashier'),
     ('patient', 'Patient'),
-    ('nurse', 'Nurse'),
-    ('pharmacist', 'Pharmacist'),
-    ('labtech', 'LabTech'),
+    ('cashierops', 'Cashier'),
+    ('cashierpha', 'Cashier'),
+    ('cashierlab', 'Cashier'),
     ('cashier', 'Cashier')
 ) seed (Prefix, RoleCode)
 JOIN [identity].Users u
@@ -1221,10 +1221,10 @@ FROM Numbers n
 CROSS JOIN (VALUES
     ('ADX', N'Nguyen Gia An', 'admin', 'OPD', 1000),
     ('BSX', N'Tran Minh Khang', 'doctor', 'OPD', 2000),
-    ('LTX', N'Le Thu Quynh', 'reception', 'OPD', 3000),
-    ('DDX', N'Pham Gia Han', 'nurse', 'OPD', 4000),
-    ('DSX', N'Vo Duc Huy', 'pharmacist', 'PHA', 5000),
-    ('XNX', N'Dang Bao Chau', 'labtech', 'LAB', 6000),
+    ('TNQ', N'Le Thu Quynh', 'cashierrec', 'OPD', 3000),
+    ('TNO', N'Pham Gia Han', 'cashierops', 'OPD', 4000),
+    ('TNP', N'Vo Duc Huy', 'cashierpha', 'PHA', 5000),
+    ('TNL', N'Dang Bao Chau', 'cashierlab', 'LAB', 6000),
     ('TNX', N'Bui Thanh Ha', 'cashier', 'OPD', 7000)
 ) seed (StaffPrefix, DisplayName, UsernamePrefix, DepartmentCode, PhoneSeed)
 JOIN [identity].Users u
@@ -1400,7 +1400,7 @@ OPTION (MAXRECURSION 19);
            TRY_CONVERT(INT, RIGHT(u.Username, 2)) AS NumberValue
     FROM [identity].Users u
     WHERE u.Username LIKE '%[0-9][0-9]'
-      AND u.PrimaryRoleCode IN ('Admin', 'Doctor', 'Receptionist', 'Nurse', 'Pharmacist', 'LabTech', 'Cashier')
+      AND u.PrimaryRoleCode IN ('Admin', 'Doctor', 'Cashier')
 )
 UPDATE sp
 SET FullName = CONCAT(
@@ -1418,28 +1418,19 @@ CROSS APPLY
     SELECT CASE niu.PrimaryRoleCode
             WHEN 'Admin' THEN 1
             WHEN 'Doctor' THEN 2
-            WHEN 'Receptionist' THEN 3
-            WHEN 'Nurse' THEN 4
-            WHEN 'Pharmacist' THEN 5
-            WHEN 'LabTech' THEN 6
+            WHEN 'Cashier' THEN 3
             ELSE 7
         END AS OffsetA,
         CASE niu.PrimaryRoleCode
             WHEN 'Admin' THEN 4
             WHEN 'Doctor' THEN 5
-            WHEN 'Receptionist' THEN 6
-            WHEN 'Nurse' THEN 7
-            WHEN 'Pharmacist' THEN 8
-            WHEN 'LabTech' THEN 9
+            WHEN 'Cashier' THEN 6
             ELSE 10
         END AS OffsetB,
         CASE niu.PrimaryRoleCode
             WHEN 'Admin' THEN 7
             WHEN 'Doctor' THEN 8
-            WHEN 'Receptionist' THEN 9
-            WHEN 'Nurse' THEN 10
-            WHEN 'Pharmacist' THEN 11
-            WHEN 'LabTech' THEN 12
+            WHEN 'Cashier' THEN 9
             ELSE 13
         END AS OffsetC
 ) roleOffset;
@@ -1467,3 +1458,7 @@ SET FullName = CONCAT(
 FROM patient.Patients p
 JOIN NumberedPortalPatients npp ON npp.Id = p.Id;
 GO
+
+
+
+

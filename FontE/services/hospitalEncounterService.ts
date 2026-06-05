@@ -16,9 +16,10 @@ export const hospitalEncounterService = {
   getAll: async (
     query: HospitalEncounterWorklistQuery = {}
   ): Promise<PaginatedResult<HospitalEncounterSummary>> => {
+    const pageSize = Math.min(Math.max(query.pageSize ?? 10, 1), 100);
     const params = new URLSearchParams();
     params.set("pageNumber", String(query.pageNumber ?? 1));
-    params.set("pageSize", String(query.pageSize ?? 10));
+    params.set("pageSize", String(pageSize));
 
     if (query.encounterStatus && query.encounterStatus !== "All") {
       params.set("encounterStatus", query.encounterStatus);

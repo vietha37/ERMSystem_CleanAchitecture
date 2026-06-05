@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using ERMSystem.Application.DTOs;
@@ -9,6 +10,7 @@ namespace ERMSystem.Application.Interfaces
     {
         Task<HospitalAppointmentBookingResultDto> BookPublicAppointmentAsync(
             PublicHospitalAppointmentBookingRequestDto request,
+            Guid? currentUserId = null,
             CancellationToken ct = default);
 
         Task<PaginatedResult<HospitalAppointmentWorklistItemDto>> GetWorklistAsync(

@@ -14,7 +14,7 @@ type FormState = {
   username: string;
   name: string;
   password: string;
-  role: "Doctor" | "Receptionist";
+  role: "Doctor" | "Cashier";
 };
 
 const initialForm: FormState = {
@@ -35,7 +35,7 @@ export default function StaffPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  const [roleFilter, setRoleFilter] = useState<"" | "Doctor" | "Receptionist">("");
+  const [roleFilter, setRoleFilter] = useState<"" | "Doctor" | "Cashier">("");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -161,7 +161,7 @@ export default function StaffPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-800">Nhân sự</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Quản trị viên có thể quản lý tài khoản bác sĩ và lễ tân.
+            Quản trị viên có thể quản lý tài khoản bác sĩ và thu ngân.
           </p>
         </div>
         <Button onClick={openCreateModal}>+ Thêm nhân sự</Button>
@@ -182,13 +182,13 @@ export default function StaffPage() {
               className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
               value={roleFilter}
               onChange={(event) => {
-                setRoleFilter(event.target.value as "" | "Doctor" | "Receptionist");
+                setRoleFilter(event.target.value as "" | "Doctor" | "Cashier");
                 setPageNumber(1);
               }}
             >
               <option value="">Tất cả vai trò</option>
               <option value="Doctor">Bác sĩ</option>
-              <option value="Receptionist">Lễ tân</option>
+              <option value="Cashier">Thu ngân</option>
             </select>
 
             <select
@@ -252,7 +252,7 @@ export default function StaffPage() {
                             : "border border-amber-100 bg-amber-50 text-amber-700"
                         }`}
                       >
-                        {user.role === "Doctor" ? "Bác sĩ" : "Lễ tân"}
+                        {user.role === "Doctor" ? "Bác sĩ" : "Thu ngân"}
                       </span>
                     </td>
                     <td className="space-x-2 p-4 text-right">
@@ -356,13 +356,13 @@ export default function StaffPage() {
               onChange={(event) =>
                 setForm((current) => ({
                   ...current,
-                  role: event.target.value as "Doctor" | "Receptionist",
+                  role: event.target.value as "Doctor" | "Cashier",
                 }))
               }
               required
             >
               <option value="Doctor">Bác sĩ</option>
-              <option value="Receptionist">Lễ tân</option>
+              <option value="Cashier">Thu ngân</option>
             </select>
           </div>
 

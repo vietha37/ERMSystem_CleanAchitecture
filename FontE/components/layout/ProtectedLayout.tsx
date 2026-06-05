@@ -24,11 +24,17 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       const allowedRoutesByRole: Record<UserRole, string[]> = {
         Admin: ['/dashboard', '/doctor-worklist', '/staff', '/security', '/patients', '/appointments', '/medical-records', '/prescriptions', '/clinical-orders', '/billing', '/notifications'],
         Doctor: ['/dashboard', '/doctor-worklist', '/security', '/patients', '/appointments', '/medical-records', '/prescriptions', '/clinical-orders'],
-        Receptionist: ['/dashboard', '/doctor-worklist', '/security', '/patients', '/appointments', '/clinical-orders', '/billing', '/notifications'],
+        Cashier: ['/dashboard', '/security', '/patients', '/appointments', '/billing', '/notifications'],
         Patient: ['/portal'],
       };
 
-      const allowedRoutes = allowedRoutesByRole[role];
+      const allowedRoutes = allowedRoutesByRole[role] ?? [];
+      if (allowedRoutes.length === 0) {
+        await authService.logout();
+        router.push('/login');
+        return;
+      }
+
       const isAllowed = allowedRoutes.some(
         (route) => pathname === route || pathname.startsWith(`${route}/`)
       );

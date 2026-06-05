@@ -55,7 +55,7 @@ export default function DoctorWorklistPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
 
-  const canSelectDoctor = role === "Admin" || role === "Receptionist";
+  const canSelectDoctor = role === "Admin";
 
   useEffect(() => {
     setWorkDate(toDateInputValue(new Date()));

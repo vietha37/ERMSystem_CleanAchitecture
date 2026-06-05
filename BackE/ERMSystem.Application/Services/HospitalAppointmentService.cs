@@ -33,6 +33,7 @@ namespace ERMSystem.Application.Services
 
         public async Task<HospitalAppointmentBookingResultDto> BookPublicAppointmentAsync(
             PublicHospitalAppointmentBookingRequestDto request,
+            Guid? currentUserId = null,
             CancellationToken ct = default)
         {
             var doctor = await _hospitalDoctorRepository.GetDoctorByIdAsync(request.DoctorProfileId, ct);
@@ -81,7 +82,11 @@ namespace ERMSystem.Application.Services
                 throw new InvalidOperationException("Khung gio nay da co lich hen. Vui long chon gio khac.");
             }
 
-            var existingPatient = await _hospitalAppointmentRepository.FindMatchingPatientAsync(
+            var portalPatient = currentUserId.HasValue
+                ? await _hospitalAppointmentRepository.FindPatientByPortalUserIdAsync(currentUserId.Value, ct)
+                : null;
+
+            var existingPatient = portalPatient ?? await _hospitalAppointmentRepository.FindMatchingPatientAsync(
                 request.FullName.Trim(),
                 request.DateOfBirth,
                 request.Phone.Trim(),
@@ -90,6 +95,7 @@ namespace ERMSystem.Application.Services
 
             var patientId = existingPatient?.PatientId ?? Guid.NewGuid();
             var isExistingPatient = existingPatient != null;
+            var bookingChannel = portalPatient != null ? "Portal" : "Website";
             var nowUtc = DateTime.UtcNow;
 
             if (!isExistingPatient)
@@ -120,12 +126,13 @@ namespace ERMSystem.Application.Services
                 DoctorProfileId = doctor.DoctorProfileId,
                 ClinicId = matchingSchedule.ClinicId,
                 AppointmentType = "Outpatient",
-                BookingChannel = "Website",
+                BookingChannel = bookingChannel,
                 Status = "Scheduled",
                 AppointmentStartUtc = appointmentStartUtc,
                 AppointmentEndUtc = appointmentEndUtc,
                 ChiefComplaint = string.IsNullOrWhiteSpace(request.ChiefComplaint) ? null : request.ChiefComplaint.Trim(),
                 Notes = normalizedNotes,
+                CreatedByUserId = currentUserId,
                 CreatedAtUtc = nowUtc,
                 UpdatedAtUtc = nowUtc
             }, ct);
@@ -150,7 +157,7 @@ namespace ERMSystem.Application.Services
                     clinicName = matchingSchedule.ClinicName,
                     appointmentStartLocal,
                     appointmentEndLocal,
-                    channel = "Website"
+                    channel = bookingChannel
                 }, JsonOptions),
                 Status = "Pending",
                 AvailableAtUtc = nowUtc
@@ -160,8 +167,8 @@ namespace ERMSystem.Application.Services
 
             _businessMetricsRecorder.IncrementEvent("hospital_appointment", "booked", new Dictionary<string, string?>
             {
-                ["channel"] = "website",
-                ["patient_type"] = isExistingPatient ? "existing" : "new"
+                ["channel"] = bookingChannel.ToLowerInvariant(),
+                ["patient_type"] = portalPatient != null ? "portal" : isExistingPatient ? "existing" : "new"
             });
 
             return new HospitalAppointmentBookingResultDto

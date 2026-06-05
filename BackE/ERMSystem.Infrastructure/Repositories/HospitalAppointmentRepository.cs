@@ -52,6 +52,32 @@ public class HospitalAppointmentRepository : IHospitalAppointmentRepository
         };
     }
 
+    public async Task<HospitalBookingPatientSnapshot?> FindPatientByPortalUserIdAsync(
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        var patient = await _hospitalDbContext.PatientAccounts
+            .AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .Where(x => x.Patient.DeletedAtUtc == null)
+            .Select(x => x.Patient)
+            .FirstOrDefaultAsync(ct);
+
+        if (patient == null)
+        {
+            return null;
+        }
+
+        return new HospitalBookingPatientSnapshot
+        {
+            PatientId = patient.Id,
+            FullName = patient.FullName,
+            DateOfBirth = patient.DateOfBirth,
+            Phone = patient.Phone,
+            Email = patient.Email
+        };
+    }
+
     public Task<bool> HasDoctorConflictAsync(
         Guid doctorProfileId,
         DateTime appointmentStartUtc,
@@ -104,6 +130,7 @@ public class HospitalAppointmentRepository : IHospitalAppointmentRepository
             AppointmentEndUtc = appointment.AppointmentEndUtc,
             ChiefComplaint = appointment.ChiefComplaint,
             Notes = appointment.Notes,
+            CreatedByUserId = appointment.CreatedByUserId,
             CreatedAtUtc = appointment.CreatedAtUtc,
             UpdatedAtUtc = appointment.UpdatedAtUtc
         });

@@ -174,7 +174,7 @@ export default function LoginPage() {
               <form onSubmit={handleStaffLogin} className="mt-8 space-y-5 animate-fade-in">
                 <HeaderBlock
                   title="Đăng nhập nội bộ"
-                  description="Dành cho Admin, Doctor và Receptionist vận hành hệ thống bệnh viện."
+                  description="Dành cho Admin, Doctor và Cashier vận hành hệ thống bệnh viện."
                 />
 
                 <Field label="Tên đăng nhập" value={username} onChange={setUsername} placeholder="staff.username" />

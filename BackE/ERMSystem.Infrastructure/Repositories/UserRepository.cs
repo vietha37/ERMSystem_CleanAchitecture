@@ -85,7 +85,7 @@ namespace ERMSystem.Infrastructure.Repositories
             }
             else
             {
-                query = query.Where(u => u.Role == AppRole.Doctor || u.Role == AppRole.Receptionist);
+                query = query.Where(u => u.Role == AppRole.Doctor || u.Role == AppRole.Cashier);
             }
 
             if (!string.IsNullOrWhiteSpace(textSearch))
@@ -110,7 +110,7 @@ namespace ERMSystem.Infrastructure.Repositories
         public async Task<IReadOnlyList<AppUser>> GetInternalUsersAsync(CancellationToken ct = default)
         {
             return await BuildUserQuery()
-                .Where(u => u.Role == AppRole.Admin || u.Role == AppRole.Doctor || u.Role == AppRole.Receptionist)
+                .Where(u => u.Role == AppRole.Admin || u.Role == AppRole.Doctor || u.Role == AppRole.Cashier)
                 .OrderBy(u => u.Username)
                 .ToListAsync(ct);
         }

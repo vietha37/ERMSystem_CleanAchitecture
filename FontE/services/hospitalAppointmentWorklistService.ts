@@ -13,9 +13,10 @@ export const hospitalAppointmentWorklistService = {
   getAll: async (
     query: HospitalAppointmentWorklistQuery = {}
   ): Promise<PaginatedResult<HospitalAppointmentWorklistItem>> => {
+    const pageSize = Math.min(Math.max(query.pageSize ?? 10, 1), 100);
     const params = new URLSearchParams();
     params.set("pageNumber", String(query.pageNumber ?? 1));
-    params.set("pageSize", String(query.pageSize ?? 10));
+    params.set("pageSize", String(pageSize));
 
     if (query.status && query.status !== "All") {
       params.set("status", query.status);

@@ -33,13 +33,11 @@ export function Sidebar() {
       { name: "Đơn thuốc", path: "/prescriptions" },
       { name: "Chỉ định cận lâm sàng", path: "/clinical-orders" },
     ],
-    Receptionist: [
+    Cashier: [
       { name: "Tổng quan", path: "/dashboard" },
-      { name: "Công việc bác sĩ", path: "/doctor-worklist" },
       { name: "Bảo mật", path: "/security" },
       { name: "Bệnh nhân", path: "/patients" },
       { name: "Lịch hẹn", path: "/appointments" },
-      { name: "Chỉ định cận lâm sàng", path: "/clinical-orders" },
       { name: "Hóa đơn", path: "/billing" },
       { name: "Thông báo", path: "/notifications" },
     ],

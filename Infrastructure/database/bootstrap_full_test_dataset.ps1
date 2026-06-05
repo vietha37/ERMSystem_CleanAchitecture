@@ -10,6 +10,7 @@ $hospitalSchemaFile = Join-Path $PSScriptRoot "erm_private_hospital_schema.sql"
 $hospitalBaseSeedFile = Join-Path $PSScriptRoot "erm_private_hospital_catalog_seed.sql"
 $hospitalFullSeedFile = Join-Path $PSScriptRoot "erm_private_hospital_full_test_seed.sql"
 $gatewayPatchFile = Join-Path $PSScriptRoot "patch_add_gateway_provider_to_billing_payments.sql"
+$vietnameseNormalizePatchFile = Join-Path $PSScriptRoot "patch_normalize_vietnamese_display_data.sql"
 
 function Invoke-SqlCmdFile {
     param(
@@ -17,7 +18,7 @@ function Invoke-SqlCmdFile {
         [string]$InputFile
     )
 
-    sqlcmd -b -S $ServerInstance -E -d $DatabaseName -i $InputFile
+    sqlcmd -b -f 65001 -S $ServerInstance -E -d $DatabaseName -i $InputFile
     if ($LASTEXITCODE -ne 0) {
         throw "sqlcmd failed for file: $InputFile"
     }
@@ -78,10 +79,15 @@ if (Test-Path $gatewayPatchFile) {
 Write-Host "Seeding hospital full test dataset..." -ForegroundColor Cyan
 Invoke-SqlCmdFile -DatabaseName $HospitalDatabaseName -InputFile $hospitalFullSeedFile
 
+if (Test-Path $vietnameseNormalizePatchFile) {
+    Write-Host "Normalizing Vietnamese display data..." -ForegroundColor Cyan
+    Invoke-SqlCmdFile -DatabaseName $HospitalDatabaseName -InputFile $vietnameseNormalizePatchFile
+}
+
 Write-Host ""
 Write-Host "Seed credentials" -ForegroundColor Green
 Write-Host "  password: 123456"
-Write-Host "  users: admin00..19, doctor00..19, reception00..19, patient00..19, nurse00..19, pharmacist00..19, labtech00..19, cashier00..19"
+Write-Host "  users: admin00..19, doctor00..19, cashier00..19, cashierrec00..19, cashierops00..19, cashierpha00..19, cashierlab00..19, patient00..19"
 Write-Host ""
 
 Write-Host "Hospital DB summary" -ForegroundColor Green
@@ -109,7 +115,7 @@ SELECT 'notification.NotificationDeliveries', COUNT(*) FROM notification.Notific
 
 SELECT PrimaryRoleCode, COUNT(*) AS UserCount
 FROM [identity].Users
-WHERE PrimaryRoleCode IN ('Admin','Doctor','Receptionist','Patient','Nurse','Pharmacist','LabTech','Cashier')
+WHERE PrimaryRoleCode IN ('Admin','Doctor','Cashier','Patient')
 GROUP BY PrimaryRoleCode
 ORDER BY PrimaryRoleCode;
 
