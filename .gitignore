@@ -8,6 +8,7 @@
 # Generated logs and frontend build artifacts
 *.log
 FontE/.next/
+BackE/ERMSystem.API/App_Data/DataProtectionKeys/
 
 # Keep local notes/handoff docs out of git
 *.md

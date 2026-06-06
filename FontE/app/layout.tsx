@@ -1,18 +1,6 @@
 ﻿import type { Metadata } from "next";
-import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
-
-const bodyFont = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin", "latin-ext"],
-});
-
-const displayFont = Cormorant_Garamond({
-  variable: "--font-cormorant",
-  subsets: ["latin", "latin-ext"],
-  weight: ["500", "600", "700"],
-});
 
 export const metadata: Metadata = {
   title: "ERM Private Hospital",
@@ -26,7 +14,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body className={`${bodyFont.variable} ${displayFont.variable} bg-[var(--background)] text-[var(--foreground)] antialiased`}>
+      <body className="bg-[var(--background)] text-[var(--foreground)] antialiased">
         {children}
         <Toaster position="top-right" />
       </body>

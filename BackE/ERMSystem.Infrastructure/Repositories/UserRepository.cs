@@ -85,7 +85,7 @@ namespace ERMSystem.Infrastructure.Repositories
             }
             else
             {
-                query = query.Where(u => u.Role == AppRole.Doctor || u.Role == AppRole.Cashier);
+                query = query.Where(u => u.Role == AppRole.Doctor || u.Role == AppRole.Cashier || u.Role == AppRole.Patient);
             }
 
             if (!string.IsNullOrWhiteSpace(textSearch))
@@ -146,6 +146,15 @@ namespace ERMSystem.Infrastructure.Repositories
             entity.IsActive = false;
             entity.DeletedAtUtc ??= DateTime.UtcNow;
             entity.UpdatedAtUtc = DateTime.UtcNow;
+
+            var patientAccount = await _context.PatientAccounts
+                .FirstOrDefaultAsync(x => x.UserId == user.Id, ct);
+
+            if (patientAccount != null)
+            {
+                patientAccount.PortalStatus = "Disabled";
+            }
+
             await _context.SaveChangesAsync(ct);
         }
 

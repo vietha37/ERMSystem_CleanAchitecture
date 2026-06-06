@@ -27,7 +27,7 @@ public class HospitalClinicalOrderRepository : IHospitalClinicalOrderRepository
         var keyword = request.TextSearch?.Trim();
         var pattern = string.IsNullOrWhiteSpace(keyword) ? null : $"%{keyword}%";
 
-        var labOrdersTask = _hospitalDbContext.LabOrders
+        var labOrders = await _hospitalDbContext.LabOrders
             .AsNoTracking()
             .Include(x => x.OrderHeader).ThenInclude(x => x.Encounter).ThenInclude(x => x.Patient)
             .Include(x => x.OrderHeader).ThenInclude(x => x.Encounter).ThenInclude(x => x.DoctorProfile).ThenInclude(x => x.StaffProfile)
@@ -38,7 +38,7 @@ public class HospitalClinicalOrderRepository : IHospitalClinicalOrderRepository
             .Include(x => x.ResultItems)
             .ToListAsync(ct);
 
-        var imagingOrdersTask = _hospitalDbContext.ImagingOrders
+        var imagingOrders = await _hospitalDbContext.ImagingOrders
             .AsNoTracking()
             .Include(x => x.OrderHeader).ThenInclude(x => x.Encounter).ThenInclude(x => x.Patient)
             .Include(x => x.OrderHeader).ThenInclude(x => x.Encounter).ThenInclude(x => x.DoctorProfile).ThenInclude(x => x.StaffProfile)
@@ -49,11 +49,9 @@ public class HospitalClinicalOrderRepository : IHospitalClinicalOrderRepository
             .Include(x => x.ImagingReport)
             .ToListAsync(ct);
 
-        await Task.WhenAll(labOrdersTask, imagingOrdersTask);
-
-        var combined = labOrdersTask.Result
+        var combined = labOrders
             .Select(MapLabSummary)
-            .Concat(imagingOrdersTask.Result.Select(MapImagingSummary))
+            .Concat(imagingOrders.Select(MapImagingSummary))
             .AsEnumerable();
 
         if (!string.IsNullOrWhiteSpace(categoryFilter))

@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 
 type LoginMode = "staff" | "patient";
@@ -35,7 +36,7 @@ export default function LoginPage() {
   const handleStaffLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
-    const result = await login(username, password, remember);
+    const result = await login(username, password, remember, ["Admin", "Doctor", "Cashier"]);
     if (result.success && result.requiresTwoFactor && result.challengeToken) {
       setStaffMfaChallenge({
         token: result.challengeToken,
@@ -53,7 +54,11 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(true);
-    const result = await verifyMfaLogin(staffMfaChallenge.token, mfaCode, remember);
+    const result = await verifyMfaLogin(staffMfaChallenge.token, mfaCode, remember, [
+      "Admin",
+      "Doctor",
+      "Cashier",
+    ]);
     if (result.success) {
       setStaffMfaChallenge(null);
       setMfaCode("");
@@ -64,7 +69,7 @@ export default function LoginPage() {
   const handlePatientLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
-    await login(patientForm.username, patientForm.password, true);
+    await login(patientForm.username, patientForm.password, true, ["Patient"]);
     setIsSubmitting(false);
   };
 
@@ -85,6 +90,18 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.2),_transparent_30%),linear-gradient(135deg,_#082f49_0%,_#0f172a_38%,_#ecfeff_38%,_#f8fafc_100%)]">
+      <Link
+        href="/"
+        aria-label="Về trang chủ ERM Hospital"
+        className="fixed left-4 top-4 z-20 flex items-center gap-3 rounded-full border border-white/15 bg-slate-950/70 px-3 py-2 text-white shadow-[0_18px_45px_rgba(2,6,23,0.28)] backdrop-blur transition hover:border-cyan-200 hover:bg-slate-900 md:left-6 md:top-6"
+      >
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-emerald-400 text-sm font-bold text-slate-950">
+          ERM
+        </span>
+        <span className="hidden text-sm font-semibold leading-tight sm:block">
+          ERM Hospital
+        </span>
+      </Link>
       <div className="mx-auto grid min-h-screen max-w-7xl gap-10 px-4 py-10 md:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
         <section className="rounded-[2.5rem] border border-white/10 bg-slate-950/72 p-8 text-white shadow-[0_35px_90px_rgba(2,6,23,0.42)] backdrop-blur md:p-10">
           <p className="text-sm font-semibold uppercase tracking-[0.32em] text-cyan-200">ERM Private Hospital</p>

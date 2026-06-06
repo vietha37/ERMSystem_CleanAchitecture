@@ -28,7 +28,12 @@ export function useAuth() {
     void checkAuth();
   }, []);
 
-  const login = async (usernameInput: string, password: string, remember = false) => {
+  const login = async (
+    usernameInput: string,
+    password: string,
+    remember = false,
+    allowedRoles?: UserRole[]
+  ) => {
     const normalizedUsername = usernameInput.trim();
 
     if (normalizedUsername.length < 3) {
@@ -56,6 +61,18 @@ export function useAuth() {
       }
 
       const nextRole = authService.getRole();
+      if (allowedRoles?.length && (!nextRole || !allowedRoles.includes(nextRole))) {
+        await authService.logout();
+        setIsAuthenticated(false);
+        setRole(null);
+        setUsername(null);
+        setDisplayName(null);
+        localStorage.removeItem("emr_remember_me");
+        const msg = "Tài khoản không thuộc cổng đăng nhập đã chọn.";
+        toast.error(msg);
+        return { success: false, error: msg };
+      }
+
       const nextUsername = authService.getUsername();
       const nextDisplayName = authService.getDisplayName();
       setIsAuthenticated(true);
@@ -79,10 +96,27 @@ export function useAuth() {
     }
   };
 
-  const verifyMfaLogin = async (challengeToken: string, code: string, remember = false) => {
+  const verifyMfaLogin = async (
+    challengeToken: string,
+    code: string,
+    remember = false,
+    allowedRoles?: UserRole[]
+  ) => {
     try {
       await authService.verifyMfaLogin({ mfaChallengeToken: challengeToken, code });
       const nextRole = authService.getRole();
+      if (allowedRoles?.length && (!nextRole || !allowedRoles.includes(nextRole))) {
+        await authService.logout();
+        setIsAuthenticated(false);
+        setRole(null);
+        setUsername(null);
+        setDisplayName(null);
+        localStorage.removeItem("emr_remember_me");
+        const msg = "Tài khoản không thuộc cổng đăng nhập đã chọn.";
+        toast.error(msg);
+        return { success: false, error: msg };
+      }
+
       const nextUsername = authService.getUsername();
       const nextDisplayName = authService.getDisplayName();
       setIsAuthenticated(true);

@@ -59,6 +59,7 @@ public class HospitalAppointmentRepository : IHospitalAppointmentRepository
         var patient = await _hospitalDbContext.PatientAccounts
             .AsNoTracking()
             .Where(x => x.UserId == userId)
+            .Where(x => x.PortalStatus == "Active")
             .Where(x => x.Patient.DeletedAtUtc == null)
             .Select(x => x.Patient)
             .FirstOrDefaultAsync(ct);

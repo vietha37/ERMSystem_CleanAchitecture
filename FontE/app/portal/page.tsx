@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import ProtectedLayout from "@/components/layout/ProtectedLayout";
@@ -16,6 +16,7 @@ import {
   HospitalPatientPortalInvoice,
   HospitalPatientPortalOverview,
   HospitalPatientPortalPrescription,
+  HospitalPaymentIntent,
   HospitalPatientVisitHistoryItem,
   HospitalPatientVisitHistoryResult,
 } from "@/services/types";
@@ -158,12 +159,19 @@ export default function PatientPortalPage() {
   const [isVisitHistoryLoading, setIsVisitHistoryLoading] = useState(true);
   const [portalError, setPortalError] = useState<string | null>(null);
   const [visitHistoryPage, setVisitHistoryPage] = useState(1);
+  const [qrInvoice, setQrInvoice] = useState<HospitalPatientPortalInvoice | null>(null);
+  const [qrIntent, setQrIntent] = useState<HospitalPaymentIntent | null>(null);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [qrLoadingInvoiceId, setQrLoadingInvoiceId] = useState<string | null>(null);
+  const [isQrSubmitting, setIsQrSubmitting] = useState(false);
 
   const visitHistoryPageSize = 5;
 
-  useEffect(() => {
-    const loadOverview = async () => {
-      setIsLoading(true);
+  const loadPortalData = useCallback(
+    async (showMainLoading = true) => {
+      if (showMainLoading) {
+        setIsLoading(true);
+      }
       setIsVisitHistoryLoading(true);
 
       try {
@@ -179,13 +187,19 @@ export default function PatientPortalPage() {
         setPortalError(getApiErrorMessage(error, "Không thể tải cổng thông tin bệnh nhân."));
         toast.error(getApiErrorMessage(error, "Không thể tải cổng thông tin bệnh nhân."));
       } finally {
-        setIsLoading(false);
+        if (showMainLoading) {
+          setIsLoading(false);
+        }
+
         setIsVisitHistoryLoading(false);
       }
-    };
+    },
+    [visitHistoryPage, visitHistoryPageSize]
+  );
 
-    void loadOverview();
-  }, [visitHistoryPage]);
+  useEffect(() => {
+    void loadPortalData();
+  }, [loadPortalData]);
 
   const profile = overview?.profile;
   const upcomingAppointments = overview?.upcomingAppointments ?? [];
@@ -204,6 +218,60 @@ export default function PatientPortalPage() {
     totalUpcoming: upcomingAppointments.length,
     totalRecent: recentAppointments.length,
     nextAppointment: upcomingAppointments[0]?.appointmentStartLocal ?? null,
+  };
+
+  const handleCreateQrPayment = async (invoice: HospitalPatientPortalInvoice) => {
+    setQrInvoice(invoice);
+    setQrIntent(null);
+    setIsQrModalOpen(true);
+    setQrLoadingInvoiceId(invoice.invoiceId);
+
+    try {
+      const intent = await hospitalPatientPortalService.createQrPaymentIntent(invoice.invoiceId, {
+        gatewayProvider: "MockGateway",
+        paymentMethod: "QR",
+        amount: invoice.balanceAmount,
+      });
+
+      setQrIntent(intent);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể tạo mã QR thanh toán."));
+      setIsQrModalOpen(false);
+      setQrInvoice(null);
+    } finally {
+      setQrLoadingInvoiceId(null);
+    }
+  };
+
+  const handleConfirmQrPayment = async () => {
+    if (!qrIntent) {
+      return;
+    }
+
+    setIsQrSubmitting(true);
+
+    try {
+      await hospitalPatientPortalService.simulateQrPaymentCallback({
+        invoiceId: qrIntent.invoiceId,
+        gatewayProvider: qrIntent.gatewayProvider,
+        gatewayEventId: `PORTAL-${Date.now()}`,
+        gatewayTimestampUtc: new Date().toISOString(),
+        paymentReference: qrIntent.paymentReference,
+        externalTransactionId: qrIntent.externalTransactionId ?? undefined,
+        gatewayStatus: "Captured",
+        amount: qrIntent.amount,
+      });
+
+      toast.success("Đã ghi nhận thanh toán QR.");
+      setIsQrModalOpen(false);
+      setQrInvoice(null);
+      setQrIntent(null);
+      await loadPortalData(false);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể xác nhận thanh toán QR."));
+    } finally {
+      setIsQrSubmitting(false);
+    }
   };
 
   return (
@@ -383,10 +451,30 @@ export default function PatientPortalPage() {
           <div className="grid gap-6 xl:grid-cols-3">
             <PrescriptionsPanel prescriptions={recentPrescriptions} />
             <ClinicalOrdersPanel orders={recentClinicalOrders} />
-            <InvoicesPanel invoices={recentInvoices} />
+            <InvoicesPanel
+              invoices={recentInvoices}
+              onPayQr={handleCreateQrPayment}
+              payingInvoiceId={qrLoadingInvoiceId}
+            />
           </div>
         </div>
       </div>
+      {isQrModalOpen && qrInvoice && (
+        <QrPaymentModal
+          invoice={qrInvoice}
+          intent={qrIntent}
+          isLoading={qrLoadingInvoiceId === qrInvoice.invoiceId && !qrIntent}
+          isSubmitting={isQrSubmitting}
+          onClose={() => {
+            if (!isQrSubmitting) {
+              setIsQrModalOpen(false);
+              setQrInvoice(null);
+              setQrIntent(null);
+            }
+          }}
+          onConfirm={handleConfirmQrPayment}
+        />
+      )}
     </ProtectedLayout>
   );
 }
@@ -806,7 +894,15 @@ function ClinicalOrdersPanel({
   );
 }
 
-function InvoicesPanel({ invoices }: { invoices: HospitalPatientPortalInvoice[] }) {
+function InvoicesPanel({
+  invoices,
+  onPayQr,
+  payingInvoiceId,
+}: {
+  invoices: HospitalPatientPortalInvoice[];
+  onPayQr: (invoice: HospitalPatientPortalInvoice) => void;
+  payingInvoiceId?: string | null;
+}) {
   return (
     <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
@@ -838,13 +934,23 @@ function InvoicesPanel({ invoices }: { invoices: HospitalPatientPortalInvoice[] 
                   </p>
                 </div>
 
-                <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${getInvoiceStatusStyle(
-                    invoice.invoiceStatus
-                  )}`}
-                >
-                  {getInvoiceStatusLabel(invoice.invoiceStatus)}
-                </span>
+                <div className="flex flex-col items-start gap-2 md:items-end">
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${getInvoiceStatusStyle(
+                      invoice.invoiceStatus
+                    )}`}
+                  >
+                    {getInvoiceStatusLabel(invoice.invoiceStatus)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onPayQr(invoice)}
+                    disabled={!canPayInvoiceByQr(invoice) || payingInvoiceId === invoice.invoiceId}
+                    className="inline-flex min-h-9 items-center justify-center rounded-full bg-emerald-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                  >
+                    {getQrPaymentButtonLabel(invoice, payingInvoiceId === invoice.invoiceId)}
+                  </button>
+                </div>
               </div>
 
               <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -903,6 +1009,154 @@ function InvoicesPanel({ invoices }: { invoices: HospitalPatientPortalInvoice[] 
       )}
     </section>
   );
+}
+
+function canPayInvoiceByQr(invoice: HospitalPatientPortalInvoice): boolean {
+  return invoice.balanceAmount > 0 &&
+    invoice.invoiceStatus !== "Paid" &&
+    invoice.invoiceStatus !== "Cancelled";
+}
+
+function getQrPaymentButtonLabel(invoice: HospitalPatientPortalInvoice, isBusy: boolean): string {
+  if (isBusy) {
+    return "Đang tạo QR";
+  }
+
+  if (invoice.invoiceStatus === "Cancelled") {
+    return "Đã hủy";
+  }
+
+  if (invoice.balanceAmount <= 0 || invoice.invoiceStatus === "Paid") {
+    return "Đã thanh toán";
+  }
+
+  return "Thanh toán QR";
+}
+
+function QrPaymentModal({
+  invoice,
+  intent,
+  isLoading,
+  isSubmitting,
+  onClose,
+  onConfirm,
+}: {
+  invoice: HospitalPatientPortalInvoice;
+  intent: HospitalPaymentIntent | null;
+  isLoading: boolean;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const qrPayload = intent?.checkoutUrl || intent?.checkoutToken || intent?.paymentReference || invoice.invoiceNumber;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-[1.75rem] bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
+              Thanh toán QR
+            </p>
+            <h2 className="mt-2 text-xl font-bold text-slate-950">{invoice.invoiceNumber}</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Số tiền: {formatCurrency(intent?.amount ?? invoice.balanceAmount)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-lg font-bold text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label="Đóng"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mt-6 flex flex-col items-center rounded-[1.4rem] border border-emerald-100 bg-emerald-50/70 p-5">
+          {isLoading ? (
+            <div className="h-56 w-56 animate-pulse rounded-[1.2rem] bg-white/80" />
+          ) : (
+            <MockQrCode payload={qrPayload} />
+          )}
+          <p className="mt-4 text-center text-sm font-semibold text-slate-800">
+            {intent?.gatewayProvider ?? "MockGateway"} / {intent?.paymentMethod ?? "QR"}
+          </p>
+          <p className="mt-2 max-w-full break-all text-center text-xs text-slate-500">
+            {intent?.paymentReference ?? "Đang tạo mã thanh toán"}
+          </p>
+        </div>
+
+        {intent?.instructionText && (
+          <p className="mt-4 rounded-[1.1rem] border border-slate-100 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+            {intent.instructionText}
+          </p>
+        )}
+
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="inline-flex min-h-11 items-center justify-center rounded-full border border-slate-200 px-5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Đóng
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!intent || isLoading || isSubmitting}
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+          >
+            {isSubmitting ? "Đang xác nhận" : "Xác nhận đã thanh toán"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MockQrCode({ payload }: { payload: string }) {
+  const size = 21;
+  const modules = Array.from({ length: size * size }, (_, index) => {
+    const x = index % size;
+    const y = Math.floor(index / size);
+    return isQrModuleFilled(payload, x, y, size);
+  });
+
+  return (
+    <div className="grid h-56 w-56 grid-cols-[repeat(21,minmax(0,1fr))] rounded-[1rem] border-8 border-white bg-white shadow-sm">
+      {modules.map((filled, index) => (
+        <span
+          key={`${payload}-${index}`}
+          className={filled ? "bg-slate-950" : "bg-white"}
+          aria-hidden="true"
+        />
+      ))}
+    </div>
+  );
+}
+
+function isQrModuleFilled(payload: string, x: number, y: number, size: number): boolean {
+  if (isFinderModule(x, y) || isFinderModule(x - (size - 7), y) || isFinderModule(x, y - (size - 7))) {
+    return true;
+  }
+
+  if ((x < 8 && y < 8) || (x >= size - 8 && y < 8) || (x < 8 && y >= size - 8)) {
+    return false;
+  }
+
+  const seed = payload.split("").reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) % 9973, 17);
+  return (seed + x * 13 + y * 19 + x * y) % 7 < 3;
+}
+
+function isFinderModule(x: number, y: number): boolean {
+  if (x < 0 || y < 0 || x > 6 || y > 6) {
+    return false;
+  }
+
+  return x === 0 || y === 0 || x === 6 || y === 6 || (x >= 2 && x <= 4 && y >= 2 && y <= 4);
 }
 
 function EmptyPanel({ message }: { message: string }) {

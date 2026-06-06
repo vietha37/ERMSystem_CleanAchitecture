@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using ERMSystem.Application.Authorization;
+using ERMSystem.Application.DTOs;
 using ERMSystem.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -25,10 +26,7 @@ namespace ERMSystem.API.Controllers
         [HttpGet("me")]
         public async Task<IActionResult> GetMyOverview(CancellationToken ct)
         {
-            var userIdRaw = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
-                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (!Guid.TryParse(userIdRaw, out var userId))
+            if (!TryResolveCurrentUserId(out var userId))
             {
                 return Unauthorized(new { message = "Ngu canh nguoi dung khong hop le." });
             }
@@ -48,10 +46,7 @@ namespace ERMSystem.API.Controllers
             [FromQuery] int pageSize = 10,
             CancellationToken ct = default)
         {
-            var userIdRaw = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
-                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (!Guid.TryParse(userIdRaw, out var userId))
+            if (!TryResolveCurrentUserId(out var userId))
             {
                 return Unauthorized(new { message = "Ngu canh nguoi dung khong hop le." });
             }
@@ -63,6 +58,72 @@ namespace ERMSystem.API.Controllers
             }
 
             return Ok(history);
+        }
+
+        [HttpPost("me/invoices/{invoiceId:guid}/qr-payment-intents")]
+        public async Task<IActionResult> CreateMyQrPaymentIntent(
+            Guid invoiceId,
+            [FromBody] HospitalPatientPortalQrPaymentIntentRequestDto request,
+            CancellationToken ct)
+        {
+            if (!TryResolveCurrentUserId(out var userId))
+            {
+                return Unauthorized(new { message = "Ngu canh nguoi dung khong hop le." });
+            }
+
+            try
+            {
+                var result = await _service.CreateQrPaymentIntentAsync(userId, invoiceId, request ?? new(), ct);
+                if (result == null)
+                {
+                    return NotFound(new { message = "Khong tim thay hoa don cua benh nhan hien tai." });
+                }
+
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("me/qr-payment-callbacks/simulate")]
+        public async Task<IActionResult> SimulateMyQrPaymentCallback(
+            [FromBody] ConfirmHospitalPaymentCallbackDto request,
+            CancellationToken ct)
+        {
+            if (request == null)
+            {
+                return BadRequest(new { message = "Du lieu callback thanh toan khong hop le." });
+            }
+
+            if (!TryResolveCurrentUserId(out var userId))
+            {
+                return Unauthorized(new { message = "Ngu canh nguoi dung khong hop le." });
+            }
+
+            try
+            {
+                var result = await _service.ConfirmQrPaymentAsync(userId, request, ct);
+                if (result == null)
+                {
+                    return NotFound(new { message = "Khong tim thay hoa don cua benh nhan hien tai." });
+                }
+
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        private bool TryResolveCurrentUserId(out Guid userId)
+        {
+            var userIdRaw = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            return Guid.TryParse(userIdRaw, out userId);
         }
     }
 }

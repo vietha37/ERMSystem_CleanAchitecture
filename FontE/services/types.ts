@@ -827,6 +827,7 @@ export type HospitalPaymentIntent = {
   paymentStatus: string;
   externalTransactionId?: string | null;
   checkoutToken: string;
+  checkoutUrl?: string | null;
   instructionText: string;
   callbackMode: string;
   createdAtLocal: string;
@@ -908,6 +909,12 @@ export type ConfirmHospitalPaymentCallbackPayload = {
   paymentReference: string;
   externalTransactionId?: string;
   gatewayStatus: string;
+  amount?: number;
+};
+
+export type HospitalPatientPortalQrPaymentIntentPayload = {
+  gatewayProvider?: string;
+  paymentMethod?: string;
   amount?: number;
 };
 
@@ -1008,7 +1015,7 @@ export type StaffUser = {
   id: Id;
   username: string;
   name: string;
-  role: Exclude<UserRole, "Admin" | "Patient">;
+  role: Exclude<UserRole, "Admin">;
 };
 
 export type CreateStaffUserPayload = {

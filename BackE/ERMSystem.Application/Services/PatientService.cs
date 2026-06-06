@@ -197,13 +197,6 @@ namespace ERMSystem.Application.Services
             if (patient == null)
                 throw new KeyNotFoundException($"Patient with ID {id} not found.");
 
-            var appointmentCount = await _patientRepository.GetAppointmentCountAsync(id, ct);
-            if (appointmentCount > 0)
-            {
-                throw new InvalidOperationException(
-                    $"Cannot delete patient with ID {id} because there are {appointmentCount} linked appointments.");
-            }
-
             await _patientRepository.DeleteAsync(patient, ct);
             await _dashboardQueryCache.InvalidateAsync(ct);
         }

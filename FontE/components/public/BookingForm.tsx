@@ -7,6 +7,49 @@ import {
   type PublicHospitalAppointmentBookingPayload,
 } from "@/services/hospitalAppointmentService";
 import { type HospitalDoctor } from "@/services/hospitalDoctorService";
+import { authService } from "@/services/authService";
+import { patientService } from "@/services/patientService";
+
+type BookingPatientForm = {
+  fullName: string;
+  phone: string;
+  email: string;
+  dateOfBirth: string;
+  gender: string;
+};
+
+const emptyPatientForm: BookingPatientForm = {
+  fullName: "",
+  phone: "",
+  email: "",
+  dateOfBirth: "",
+  gender: "Nam",
+};
+
+function normalizeGender(value?: string | null): string {
+  switch ((value ?? "").trim()) {
+    case "Female":
+    case "Nu":
+    case "Nữ":
+      return "Nu";
+    case "Other":
+    case "Khac":
+    case "Khác":
+      return "Khac";
+    case "Male":
+    case "Nam":
+    default:
+      return "Nam";
+  }
+}
+
+function toDateInputValue(value?: string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  return value.includes("T") ? value.split("T")[0] : value;
+}
 
 export function BookingForm({
   serviceOptions,
@@ -18,6 +61,9 @@ export function BookingForm({
   doctors: HospitalDoctor[];
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [patientForm, setPatientForm] = useState<BookingPatientForm>(emptyPatientForm);
+  const [isPatientPrefillLoading, setIsPatientPrefillLoading] = useState(false);
+  const [isPatientPrefilled, setIsPatientPrefilled] = useState(false);
   const [selectedSpecialtyId, setSelectedSpecialtyId] = useState(specialtyOptions[0]?.id ?? "");
   const [selectedDoctorId, setSelectedDoctorId] = useState("");
 
@@ -42,6 +88,60 @@ export function BookingForm({
     }
   }, [filteredDoctors, selectedDoctorId]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const prefillPatientProfile = async () => {
+      if (typeof window === "undefined") {
+        return;
+      }
+
+      setIsPatientPrefillLoading(true);
+
+      try {
+        const hasSession = await authService.ensureValidSession();
+        if (!hasSession || authService.getRole() !== "Patient") {
+          return;
+        }
+
+        const patient = await patientService.getMe();
+        if (!isMounted) {
+          return;
+        }
+
+        setPatientForm({
+          fullName: patient.fullName ?? "",
+          phone: patient.phone ?? "",
+          email: "",
+          dateOfBirth: toDateInputValue(patient.dateOfBirth),
+          gender: normalizeGender(patient.gender),
+        });
+        setIsPatientPrefilled(true);
+      } catch {
+        if (isMounted) {
+          setIsPatientPrefilled(false);
+        }
+      } finally {
+        if (isMounted) {
+          setIsPatientPrefillLoading(false);
+        }
+      }
+    };
+
+    void prefillPatientProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const updatePatientForm = (field: keyof BookingPatientForm, value: string) => {
+    setPatientForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedDoctor) {
@@ -55,11 +155,11 @@ export function BookingForm({
     const formData = new FormData(form);
 
     const payload: PublicHospitalAppointmentBookingPayload = {
-      fullName: String(formData.get("fullName") ?? "").trim(),
-      phone: String(formData.get("phone") ?? "").trim(),
-      email: String(formData.get("email") ?? "").trim() || undefined,
-      dateOfBirth: String(formData.get("dateOfBirth") ?? ""),
-      gender: String(formData.get("gender") ?? ""),
+      fullName: patientForm.fullName.trim(),
+      phone: patientForm.phone.trim(),
+      email: patientForm.email.trim() || undefined,
+      dateOfBirth: patientForm.dateOfBirth,
+      gender: patientForm.gender,
       doctorProfileId: selectedDoctor.doctorProfileId,
       specialtyId: selectedSpecialtyId || undefined,
       serviceCode: String(formData.get("serviceCode") ?? "").trim() || undefined,
@@ -73,6 +173,9 @@ export function BookingForm({
       const result = await hospitalAppointmentService.bookPublicAppointment(payload);
       toast.success(`Đặt lịch thành công. Mã lịch hẹn: ${result.appointmentNumber}`);
       form.reset();
+      if (!isPatientPrefilled) {
+        setPatientForm(emptyPatientForm);
+      }
       setSelectedSpecialtyId(specialtyOptions[0]?.id ?? "");
       setSelectedDoctorId("");
     } catch (error) {
@@ -88,13 +191,47 @@ export function BookingForm({
       onSubmit={handleSubmit}
       className="grid gap-4 rounded-[2rem] border border-slate-200 bg-white/92 p-6 shadow-[0_30px_90px_rgba(15,23,42,0.08)] backdrop-blur md:grid-cols-2 md:p-8"
     >
-      <Field name="fullName" label="Họ và tên" placeholder="Nguyễn Văn A" required />
-      <Field name="phone" label="Số điện thoại" placeholder="09xx xxx xxx" required />
-      <Field name="email" label="Email" placeholder="tenban@email.com" />
-      <Field name="dateOfBirth" label="Ngày sinh" type="date" required />
+      {isPatientPrefilled && (
+        <div className="md:col-span-2 rounded-[1.2rem] border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+          Thông tin bệnh nhân đã được tự động điền từ tài khoản đang đăng nhập.
+        </div>
+      )}
+      <Field
+        name="fullName"
+        label="Họ và tên"
+        placeholder={isPatientPrefillLoading ? "Đang tải hồ sơ..." : "Nguyễn Văn A"}
+        value={patientForm.fullName}
+        onChange={(value) => updatePatientForm("fullName", value)}
+        required
+      />
+      <Field
+        name="phone"
+        label="Số điện thoại"
+        placeholder="09xx xxx xxx"
+        value={patientForm.phone}
+        onChange={(value) => updatePatientForm("phone", value)}
+        required
+      />
+      <Field
+        name="email"
+        label="Email"
+        placeholder="tenban@email.com"
+        value={patientForm.email}
+        onChange={(value) => updatePatientForm("email", value)}
+      />
+      <Field
+        name="dateOfBirth"
+        label="Ngày sinh"
+        type="date"
+        value={patientForm.dateOfBirth}
+        onChange={(value) => updatePatientForm("dateOfBirth", value)}
+        required
+      />
       <SelectField
         label="Giới tính"
         name="gender"
+        value={patientForm.gender}
+        onChange={(value) => updatePatientForm("gender", value)}
         options={[
           { value: "Nam", label: "Nam" },
           { value: "Nu", label: "Nữ" },
@@ -189,12 +326,16 @@ function Field({
   placeholder,
   type = "text",
   required = false,
+  value,
+  onChange,
 }: {
   name: string;
   label: string;
   placeholder?: string;
   type?: string;
   required?: boolean;
+  value?: string;
+  onChange?: (value: string) => void;
 }) {
   return (
     <label className="grid gap-2 text-sm font-medium text-slate-700">
@@ -204,6 +345,8 @@ function Field({
         type={type}
         placeholder={placeholder}
         required={required}
+        value={value}
+        onChange={(event) => onChange?.(event.target.value)}
         className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white"
       />
     </label>

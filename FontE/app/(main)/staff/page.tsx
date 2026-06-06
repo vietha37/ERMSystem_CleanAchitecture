@@ -24,6 +24,19 @@ const initialForm: FormState = {
   role: "Doctor",
 };
 
+function getAccountRoleClass(role: StaffUser["role"]): string {
+  switch (role) {
+    case "Doctor":
+      return "border border-cyan-100 bg-cyan-50 text-cyan-700";
+    case "Cashier":
+      return "border border-amber-100 bg-amber-50 text-amber-700";
+    case "Patient":
+      return "border border-emerald-100 bg-emerald-50 text-emerald-700";
+    default:
+      return "border border-slate-100 bg-slate-50 text-slate-700";
+  }
+}
+
 export default function StaffPage() {
   const [items, setItems] = useState<StaffUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +48,7 @@ export default function StaffPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  const [roleFilter, setRoleFilter] = useState<"" | "Doctor" | "Cashier">("");
+  const [roleFilter, setRoleFilter] = useState<"" | "Doctor" | "Cashier" | "Patient">("");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -85,6 +98,10 @@ export default function StaffPage() {
   };
 
   const openEditModal = (user: StaffUser) => {
+    if (user.role === "Patient") {
+      return;
+    }
+
     setMode("edit");
     setSelected(user);
     setForm({
@@ -182,13 +199,14 @@ export default function StaffPage() {
               className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
               value={roleFilter}
               onChange={(event) => {
-                setRoleFilter(event.target.value as "" | "Doctor" | "Cashier");
+                setRoleFilter(event.target.value as "" | "Doctor" | "Cashier" | "Patient");
                 setPageNumber(1);
               }}
             >
               <option value="">Tất cả vai trò</option>
               <option value="Doctor">Bác sĩ</option>
               <option value="Cashier">Thu ngân</option>
+              <option value="Patient">Bệnh nhân</option>
             </select>
 
             <select
@@ -245,23 +263,29 @@ export default function StaffPage() {
                     <td className="p-4 font-semibold text-gray-800">{user.username}</td>
                     <td className="p-4 text-gray-700">{user.name}</td>
                     <td className="p-4">
+                      {user.role === "Patient" ? (
+                        <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${getAccountRoleClass(user.role)}`}>
+                          Bệnh nhân
+                        </span>
+                      ) : (
                       <span
-                        className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
-                          user.role === "Doctor"
-                            ? "border border-cyan-100 bg-cyan-50 text-cyan-700"
-                            : "border border-amber-100 bg-amber-50 text-amber-700"
-                        }`}
+                        className={`rounded-lg px-2.5 py-1 text-xs font-bold ${getAccountRoleClass(
+                          user.role
+                        )}`}
                       >
                         {user.role === "Doctor" ? "Bác sĩ" : "Thu ngân"}
                       </span>
+                      )}
                     </td>
                     <td className="space-x-2 p-4 text-right">
+                      {user.role !== "Patient" && (
                       <button
                         onClick={() => openEditModal(user)}
                         className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-600 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
                       >
                         Sửa
                       </button>
+                      )}
                       <button
                         onClick={() => handleDelete(user)}
                         className="rounded-lg border border-red-100 bg-white px-3 py-1.5 text-sm font-semibold text-red-500 shadow-sm transition-colors hover:border-red-600 hover:bg-red-500 hover:text-white"

@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { formatTimeValue } from "@/lib/dateFormatting";
+import { normalizeVietnameseText } from "@/lib/textEncoding";
 import { notificationService } from "@/services/notificationService";
 import { AppointmentNotification } from "@/services/types";
 
@@ -38,6 +39,11 @@ export function Header() {
     () => `emr_notifications_seen_at_${username ?? "anonymous"}`,
     [username]
   );
+  const accountName = useMemo(
+    () => normalizeVietnameseText(displayName) ?? role ?? "Người dùng",
+    [displayName, role]
+  );
+  const accountInitial = accountName.charAt(0) || "U";
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -147,7 +153,7 @@ export function Header() {
           Trung tâm điều hành
         </h2>
         <p className="text-sm font-medium text-gray-500">
-          {displayName ?? role ?? "Người dùng"}
+          {accountName}
           {username ? ` - ${username}` : ""}
         </p>
       </div>
@@ -216,11 +222,11 @@ export function Header() {
 
         <div className="flex cursor-pointer items-center gap-3 transition-opacity hover:opacity-80">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 font-bold text-white shadow-md ring-2 ring-blue-50">
-            {(displayName ?? role ?? "U").charAt(0)}
+            {accountInitial}
           </div>
           <div className="hidden text-left md:block">
             <p className="text-sm font-bold leading-tight text-gray-800">
-              {displayName ?? role ?? "Người dùng"}
+              {accountName}
             </p>
             <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600">
               Đang hoạt động

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace ERMSystem.Application.DTOs
 {
@@ -172,5 +173,27 @@ namespace ERMSystem.Application.DTOs
         public decimal Amount { get; set; }
         public string PaymentStatus { get; set; } = string.Empty;
         public DateTime? PaidAtLocal { get; set; }
+    }
+
+    public class HospitalPatientPortalInvoicePaymentAccessDto
+    {
+        public Guid InvoiceId { get; set; }
+        public string InvoiceNumber { get; set; } = string.Empty;
+        public string InvoiceStatus { get; set; } = string.Empty;
+        public decimal TotalAmount { get; set; }
+        public decimal PaidAmount { get; set; }
+        public decimal BalanceAmount { get; set; }
+    }
+
+    public class HospitalPatientPortalQrPaymentIntentRequestDto
+    {
+        [MaxLength(50)]
+        public string? GatewayProvider { get; set; }
+
+        [MaxLength(50)]
+        public string? PaymentMethod { get; set; }
+
+        [Range(0.01, 999999999)]
+        public decimal? Amount { get; set; }
     }
 }

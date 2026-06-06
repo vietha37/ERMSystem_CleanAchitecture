@@ -12,6 +12,7 @@ namespace ERMSystem.Application.DTOs
         public string FullName { get; set; } = string.Empty;
         public string SpecialtyName { get; set; } = string.Empty;
         public string DepartmentName { get; set; } = string.Empty;
+        public string? PhotoUrl { get; set; }
         public string? LicenseNumber { get; set; }
         public string? Biography { get; set; }
         public int? YearsOfExperience { get; set; }

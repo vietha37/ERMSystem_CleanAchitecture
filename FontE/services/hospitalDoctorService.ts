@@ -19,6 +19,7 @@ export type HospitalDoctor = {
   fullName: string;
   specialtyName: string;
   departmentName: string;
+  photoUrl?: string | null;
   licenseNumber?: string | null;
   biography?: string | null;
   yearsOfExperience?: number | null;

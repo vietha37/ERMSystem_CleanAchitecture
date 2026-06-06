@@ -37,9 +37,10 @@ namespace ERMSystem.API.Controllers
         {
             if (!string.IsNullOrWhiteSpace(role) &&
                 !string.Equals(role, AppRole.Doctor, StringComparison.Ordinal) &&
-                !string.Equals(role, AppRole.Cashier, StringComparison.Ordinal))
+                !string.Equals(role, AppRole.Cashier, StringComparison.Ordinal) &&
+                !string.Equals(role, AppRole.Patient, StringComparison.Ordinal))
             {
-                return BadRequest("Role filter must be Doctor or Cashier.");
+                return BadRequest("Role filter must be Doctor, Cashier or Patient.");
             }
 
             var (items, totalCount) = await _userRepository.GetPagedAsync(
@@ -159,9 +160,9 @@ namespace ERMSystem.API.Controllers
                 return NotFound($"User with ID {id} not found.");
             }
 
-            if (user.Role != AppRole.Doctor && user.Role != AppRole.Cashier)
+            if (user.Role != AppRole.Doctor && user.Role != AppRole.Cashier && user.Role != AppRole.Patient)
             {
-                return BadRequest("Only Doctor and Cashier accounts can be deleted here.");
+                return BadRequest("Only Doctor, Cashier and Patient accounts can be deleted here.");
             }
 
             await _userRepository.DeleteAsync(user, ct);

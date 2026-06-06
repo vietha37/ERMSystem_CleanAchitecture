@@ -212,11 +212,11 @@ namespace ERMSystem.Infrastructure.Repositories
                     EncounterNumber = x.Encounter != null ? x.Encounter.EncounterNumber : null,
                     TotalAmount = x.TotalAmount,
                     PaidAmount = x.Payments
-                        .Where(p => p.PaymentStatus == "Paid")
+                        .Where(p => p.PaymentStatus == "Captured")
                         .Sum(p => (decimal?)p.Amount) ?? 0m,
-                    BalanceAmount = x.TotalAmount - x.Payments
-                        .Where(p => p.PaymentStatus == "Paid")
-                        .Sum(p => (decimal?)p.Amount) ?? 0m,
+                    BalanceAmount = x.TotalAmount - (x.Payments
+                        .Where(p => p.PaymentStatus == "Captured")
+                        .Sum(p => (decimal?)p.Amount) ?? 0m),
                     TotalItems = x.InvoiceItems.Count,
                     TotalPayments = x.Payments.Count,
                     IssuedAtLocal = ConvertUtcToClinicLocal(x.IssuedAtUtc),
@@ -374,14 +374,14 @@ namespace ERMSystem.Infrastructure.Repositories
                     TotalPaidAmount = _hospitalDbContext.Invoices
                         .Where(i => i.Encounter != null && i.Encounter.AppointmentId == x.Id)
                         .SelectMany(i => i.Payments)
-                        .Where(p => p.PaymentStatus == "Paid")
+                        .Where(p => p.PaymentStatus == "Captured")
                         .Sum(p => (decimal?)p.Amount) ?? 0m,
                     OutstandingBalanceAmount = (_hospitalDbContext.Invoices
                         .Where(i => i.Encounter != null && i.Encounter.AppointmentId == x.Id)
                         .Sum(i => (decimal?)i.TotalAmount) ?? 0m) - (_hospitalDbContext.Invoices
                         .Where(i => i.Encounter != null && i.Encounter.AppointmentId == x.Id)
                         .SelectMany(i => i.Payments)
-                        .Where(p => p.PaymentStatus == "Paid")
+                        .Where(p => p.PaymentStatus == "Captured")
                         .Sum(p => (decimal?)p.Amount) ?? 0m)
                 })
                 .ToListAsync(ct);
@@ -395,12 +395,41 @@ namespace ERMSystem.Infrastructure.Repositories
             };
         }
 
+        public async Task<HospitalPatientPortalInvoicePaymentAccessDto?> GetInvoicePaymentAccessAsync(
+            Guid userId,
+            Guid invoiceId,
+            CancellationToken ct = default)
+        {
+            return await _hospitalDbContext.Invoices
+                .AsNoTracking()
+                .Where(x => x.Id == invoiceId)
+                .Where(x => x.Patient.DeletedAtUtc == null)
+                .Where(x => x.Patient.PatientAccount != null &&
+                            x.Patient.PatientAccount.UserId == userId &&
+                            x.Patient.PatientAccount.PortalStatus == "Active")
+                .Select(x => new HospitalPatientPortalInvoicePaymentAccessDto
+                {
+                    InvoiceId = x.Id,
+                    InvoiceNumber = x.InvoiceNumber,
+                    InvoiceStatus = x.InvoiceStatus,
+                    TotalAmount = x.TotalAmount,
+                    PaidAmount = x.Payments
+                        .Where(p => p.PaymentStatus == "Captured")
+                        .Sum(p => (decimal?)p.Amount) ?? 0m,
+                    BalanceAmount = x.TotalAmount - (x.Payments
+                        .Where(p => p.PaymentStatus == "Captured")
+                        .Sum(p => (decimal?)p.Amount) ?? 0m)
+                })
+                .FirstOrDefaultAsync(ct);
+        }
+
         private async Task<PortalAccountProjection?> GetPortalAccountAsync(Guid userId, CancellationToken ct)
         {
             return await _hospitalDbContext.PatientAccounts
                 .AsNoTracking()
                 .Include(x => x.Patient)
                 .Where(x => x.UserId == userId)
+                .Where(x => x.PortalStatus == "Active")
                 .Where(x => x.Patient.DeletedAtUtc == null)
                 .Select(x => new PortalAccountProjection
                 {

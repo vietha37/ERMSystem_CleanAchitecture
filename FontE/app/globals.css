@@ -9,13 +9,15 @@
   --brand-cyan: #0891b2;
   --brand-teal: #0f766e;
   --brand-gold: #c9a35a;
+  --font-system-sans: "Segoe UI", Arial, sans-serif;
+  --font-system-serif: Georgia, "Times New Roman", serif;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-manrope);
-  --font-serif: var(--font-cormorant);
+  --font-sans: var(--font-system-sans);
+  --font-serif: var(--font-system-serif);
 }
 
 * {
@@ -29,11 +31,11 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-manrope), sans-serif;
+  font-family: var(--font-system-sans);
 }
 
 .font-serif {
-  font-family: var(--font-cormorant), serif;
+  font-family: var(--font-system-serif);
 }
 
 .animate-fade-in {

@@ -13,5 +13,14 @@ namespace ERMSystem.Application.Interfaces
             int pageNumber,
             int pageSize,
             CancellationToken ct = default);
+        Task<HospitalPaymentIntentDto?> CreateQrPaymentIntentAsync(
+            Guid userId,
+            Guid invoiceId,
+            HospitalPatientPortalQrPaymentIntentRequestDto request,
+            CancellationToken ct = default);
+        Task<HospitalInvoiceDetailDto?> ConfirmQrPaymentAsync(
+            Guid userId,
+            ConfirmHospitalPaymentCallbackDto request,
+            CancellationToken ct = default);
     }
 }

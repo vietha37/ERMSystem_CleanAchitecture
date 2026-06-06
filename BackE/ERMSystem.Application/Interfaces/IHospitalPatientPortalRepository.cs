@@ -13,5 +13,9 @@ namespace ERMSystem.Application.Interfaces
             int pageNumber,
             int pageSize,
             CancellationToken ct = default);
+        Task<HospitalPatientPortalInvoicePaymentAccessDto?> GetInvoicePaymentAccessAsync(
+            Guid userId,
+            Guid invoiceId,
+            CancellationToken ct = default);
     }
 }

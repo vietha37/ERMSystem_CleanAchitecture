@@ -10,7 +10,7 @@ export const staffUserService = {
   getAll: async (
     pageNumber = 1,
     pageSize = 10,
-    role: "Doctor" | "Cashier" | "" = "",
+    role: "Doctor" | "Cashier" | "Patient" | "" = "",
     textSearch = ""
   ): Promise<PaginatedResult<StaffUser>> => {
     const params = new URLSearchParams();

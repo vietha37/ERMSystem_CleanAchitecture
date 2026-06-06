@@ -1,4 +1,5 @@
 import api from './api';
+import { normalizeVietnameseText } from "@/lib/textEncoding";
 import {
   AuthResponse,
   MfaSetupResponse,
@@ -168,7 +169,7 @@ export const authService = {
       return null;
     }
 
-    return payload.display_name ?? null;
+    return normalizeVietnameseText(payload.display_name);
   },
 
   isTokenExpired: (): boolean => {
