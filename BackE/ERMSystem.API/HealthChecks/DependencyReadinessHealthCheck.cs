@@ -1,9 +1,10 @@
-using System.Net.Sockets;
 using ERMSystem.Infrastructure.Messaging;
 using ERMSystem.Infrastructure.Services;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
+using RabbitMQ.Client;
 
 namespace ERMSystem.API.HealthChecks;
 
@@ -14,19 +15,22 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
     private readonly BackgroundWorkerHealthRegistry _workerHealthRegistry;
     private readonly DistributedCacheRuntimeInfo _distributedCacheRuntimeInfo;
     private readonly RabbitMqOptions _rabbitMqOptions;
+    private readonly IDistributedCache _distributedCache;
 
     public DependencyReadinessHealthCheck(
         IConfiguration configuration,
         ILogger<DependencyReadinessHealthCheck> logger,
         BackgroundWorkerHealthRegistry workerHealthRegistry,
         DistributedCacheRuntimeInfo distributedCacheRuntimeInfo,
-        IOptions<RabbitMqOptions> rabbitMqOptions)
+        IOptions<RabbitMqOptions> rabbitMqOptions,
+        IDistributedCache distributedCache)
     {
         _configuration = configuration;
         _logger = logger;
         _workerHealthRegistry = workerHealthRegistry;
         _distributedCacheRuntimeInfo = distributedCacheRuntimeInfo;
         _rabbitMqOptions = rabbitMqOptions.Value;
+        _distributedCache = distributedCache;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -52,7 +56,7 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
 
         if (string.Equals(_distributedCacheRuntimeInfo.Provider, "redis", StringComparison.OrdinalIgnoreCase))
         {
-            await CheckTcpAsync("redis", _configuration["Redis:ConnectionString"], 6379, data, failures, cancellationToken);
+            await CheckDistributedCacheAsync(data, failures, cancellationToken);
         }
         else
         {
@@ -61,13 +65,7 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
 
         if (_rabbitMqOptions.Enabled)
         {
-            await CheckTcpAsync(
-                "rabbitMq",
-                $"{_rabbitMqOptions.Host}:{_rabbitMqOptions.Port}",
-                5672,
-                data,
-                failures,
-                cancellationToken);
+            await CheckRabbitMqAsync(data, failures, cancellationToken);
         }
         else
         {
@@ -115,72 +113,80 @@ public sealed class DependencyReadinessHealthCheck : IHealthCheck
         }
     }
 
-    private async Task CheckTcpAsync(
-        string name,
-        string? endpointValue,
-        int defaultPort,
+    private async Task CheckDistributedCacheAsync(
         IDictionary<string, object> data,
         ICollection<string> failures,
         CancellationToken cancellationToken)
     {
-        if (!TryParseEndpoint(endpointValue, defaultPort, out var host, out var port))
-        {
-            data[name] = "missing-endpoint";
-            failures.Add($"{name} missing endpoint");
-            return;
-        }
+        var key = $"health:readiness:{Guid.NewGuid():N}";
+        var expectedValue = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
 
         try
         {
-            using var tcpClient = new TcpClient();
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(3));
-            await tcpClient.ConnectAsync(host, port, timeoutCts.Token);
-            data[name] = "ok";
+            await _distributedCache.SetStringAsync(
+                key,
+                expectedValue,
+                new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30)
+                },
+                cancellationToken);
+
+            var actualValue = await _distributedCache.GetStringAsync(key, cancellationToken);
+            await _distributedCache.RemoveAsync(key, cancellationToken);
+
+            if (!string.Equals(actualValue, expectedValue, StringComparison.Ordinal))
+            {
+                data["redis"] = "roundtrip-mismatch";
+                failures.Add("redis cache roundtrip mismatch");
+                return;
+            }
+
+            data["redis"] = "ok";
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Dependency check failed for {Dependency}.", name);
-            data[name] = ex.GetType().Name;
-            failures.Add($"{name} unreachable");
+            _logger.LogWarning(ex, "Dependency check failed for Redis distributed cache.");
+            data["redis"] = ex.GetType().Name;
+            failures.Add("redis cache roundtrip failed");
         }
     }
 
-    private static bool TryParseEndpoint(
-        string? endpointValue,
-        int defaultPort,
-        out string host,
-        out int port)
+    private async Task CheckRabbitMqAsync(
+        IDictionary<string, object> data,
+        ICollection<string> failures,
+        CancellationToken cancellationToken)
     {
-        host = string.Empty;
-        port = defaultPort;
-
-        if (string.IsNullOrWhiteSpace(endpointValue))
+        try
         {
-            return false;
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+
+            await Task.Run(() =>
+            {
+                var factory = new ConnectionFactory
+                {
+                    HostName = _rabbitMqOptions.Host,
+                    Port = _rabbitMqOptions.Port,
+                    UserName = _rabbitMqOptions.Username,
+                    Password = _rabbitMqOptions.Password,
+                    VirtualHost = _rabbitMqOptions.VirtualHost,
+                    AutomaticRecoveryEnabled = false,
+                    RequestedConnectionTimeout = TimeSpan.FromSeconds(3)
+                };
+
+                using var connection = factory.CreateConnection("ermsystem-readiness");
+                using var channel = connection.CreateModel();
+            }, timeoutCts.Token);
+
+            data["rabbitMq"] = "ok";
         }
-
-        var firstEndpoint = endpointValue.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .FirstOrDefault();
-
-        if (string.IsNullOrWhiteSpace(firstEndpoint))
+        catch (Exception ex)
         {
-            return false;
+            _logger.LogWarning(ex, "Dependency check failed for RabbitMQ.");
+            data["rabbitMq"] = ex.GetType().Name;
+            failures.Add("rabbitMq broker check failed");
         }
-
-        var parts = firstEndpoint.Split(':', StringSplitOptions.TrimEntries);
-        host = parts[0];
-        if (string.IsNullOrWhiteSpace(host))
-        {
-            return false;
-        }
-
-        if (parts.Length >= 2 && int.TryParse(parts[^1], out var parsedPort))
-        {
-            port = parsedPort;
-        }
-
-        return true;
     }
 
     private void CheckWorkers(

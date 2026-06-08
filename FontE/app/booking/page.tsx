@@ -44,18 +44,18 @@ export default async function BookingPage() {
         <div className="grid gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-start">
           <div>
             <SectionHeading
-              eyebrow="Đặt lịch thông minh"
-              title="Trang đặt lịch đã bắt đầu đi vào luồng đặt lịch thật trên cơ sở dữ liệu đích."
-              description="Người bệnh chọn chuyên khoa, bác sĩ, ngày giờ và gửi yêu cầu. Hệ thống kiểm tra lịch làm việc và tạo lịch hẹn nếu hợp lệ."
+              eyebrow="Đặt lịch khám"
+              title="Gửi yêu cầu trước, ERM xác nhận khung giờ phù hợp."
+              description="Bạn có thể chọn chuyên khoa, bác sĩ, ngày giờ mong muốn và để lại thông tin liên hệ. Bộ phận điều phối sẽ xác nhận lịch hẹn trước khi bạn đến viện."
             />
 
             <div className="mt-8 grid gap-4">
               {[
-                "Kiểm tra khung giờ dựa trên lịch làm việc của bác sĩ.",
-                "Tự động tạo hồ sơ bệnh nhân mới nếu chưa tồn tại trong hệ thống đích.",
-                "Đẩy sự kiện AppointmentCreated.v1 vào notification outbox để xử lý nhắc lịch ở giai đoạn sau.",
+                "Nên đặt trước ít nhất 2 giờ để được điều phối bác sĩ và phòng khám phù hợp.",
+                "Nếu chưa biết nên chọn chuyên khoa nào, hãy mô tả triệu chứng trong phần ghi chú.",
+                "Mang theo giấy tờ tùy thân, kết quả xét nghiệm cũ và đơn thuốc đang sử dụng nếu có.",
               ].map((item) => (
-                <div key={item} className="rounded-[1.6rem] border border-slate-200 bg-white p-5 text-sm leading-7 text-slate-700 shadow-[0_20px_55px_rgba(15,23,42,0.05)]">
+                <div key={item} className="rounded-xl border border-slate-200 bg-white p-5 text-sm leading-7 text-slate-700 shadow-sm">
                   {item}
                 </div>
               ))}

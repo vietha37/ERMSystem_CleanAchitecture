@@ -27,5 +27,8 @@ public class OperationalAlertWebhookOptions
     public bool Enabled { get; set; }
     public string Url { get; set; } = string.Empty;
     public string? BearerToken { get; set; }
+    public string? SigningSecret { get; set; }
+    public string SignatureHeaderName { get; set; } = "X-ERM-Alert-Signature";
+    public string TimestampHeaderName { get; set; } = "X-ERM-Alert-Timestamp";
     public int TimeoutSeconds { get; set; } = 10;
 }

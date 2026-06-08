@@ -1,86 +1,66 @@
-﻿import { PublicPageShell } from "@/components/public/PublicPageShell";
+import Link from "next/link";
+import { PublicPageShell } from "@/components/public/PublicPageShell";
 import { SectionHeading } from "@/components/public/SectionHeading";
 import { serviceCategories } from "@/content/hospitalContent";
-import { hospitalCatalogService } from "@/services/hospitalCatalogService";
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-export default async function ServicesPage() {
-  let servicesFromApi = [] as Awaited<ReturnType<typeof hospitalCatalogService.getServices>>;
-
-  try {
-    servicesFromApi = await hospitalCatalogService.getServices();
-  } catch {
-    servicesFromApi = [];
-  }
-
-  const groupedServices = servicesFromApi.reduce<Record<string, typeof servicesFromApi>>((acc, service) => {
-    const key = service.category || "Khác";
-    acc[key] ??= [];
-    acc[key].push(service);
-    return acc;
-  }, {});
-
-  const hasApiData = servicesFromApi.length > 0;
-
+export default function ServicesPage() {
   return (
     <PublicPageShell>
-      <section className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-22">
-        <SectionHeading
-          eyebrow="Danh mục dịch vụ"
-          title="Cấu trúc dịch vụ được đồng bộ với database đích của bệnh viện tư."
-          description="Frontend có thể bám trực tiếp vào danh mục vận hành thật thay vì chỉ dùng nội dung mô tả cố định."
-        />
+      <section className="bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-16">
+          <SectionHeading
+            eyebrow="Dịch vụ khám bệnh"
+            title="Chọn dịch vụ theo nhu cầu, thời gian và mức chi phí dự kiến."
+            description="Trang này dùng dữ liệu tĩnh để người bệnh dễ hiểu trước khi đặt lịch, không phụ thuộc database vận hành."
+          />
+        </div>
+      </section>
 
-        {hasApiData ? (
-          <div className="mt-12 grid gap-6 lg:grid-cols-2">
-            {Object.entries(groupedServices).map(([category, items]) => (
-              <article key={category} className="rounded-[2rem] border border-slate-200 bg-white p-7 shadow-[0_20px_55px_rgba(15,23,42,0.05)]">
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-700">{category}</p>
-                <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">
-                  {items.length} dịch vụ sẵn sàng cho vận hành thực tế
-                </h2>
-                <p className="mt-4 text-sm leading-7 text-slate-600">
-                  Danh mục này được lấy trực tiếp từ ERMSystemHospitalDb để backend và frontend dùng cùng một nguồn dữ liệu chuẩn.
-                </p>
-                <ul className="mt-6 grid gap-3">
-                  {items.map((item) => (
-                    <li key={item.id} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                      <div className="font-semibold text-slate-900">{item.name}</div>
-                      <div className="mt-1 flex items-center justify-between gap-3 text-xs uppercase tracking-[0.18em] text-slate-500">
-                        <span>{item.serviceCode}</span>
-                        <span>{formatCurrency(item.unitPrice)}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-12 grid gap-6 lg:grid-cols-2">
-            {serviceCategories.map((service) => (
-              <article key={service.title} className="rounded-[2rem] border border-slate-200 bg-white p-7 shadow-[0_20px_55px_rgba(15,23,42,0.05)]">
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-cyan-700">Chương trình chăm sóc</p>
-                <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{service.title}</h2>
-                <p className="mt-4 text-sm leading-7 text-slate-600">{service.summary}</p>
-                <ul className="mt-6 grid gap-3">
-                  {service.items.map((item) => (
-                    <li key={item} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-        )}
+      <section className="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-16">
+        <div className="grid gap-5 lg:grid-cols-2">
+          {serviceCategories.map((service) => (
+            <article key={service.title} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-5 md:flex-row md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-700">Dịch vụ</p>
+                  <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">{service.title}</h2>
+                  <p className="mt-4 text-sm leading-7 text-slate-600">{service.summary}</p>
+                </div>
+                <div className="grid min-w-48 gap-3 text-sm">
+                  <div className="rounded-lg bg-slate-50 p-3">
+                    <p className="font-semibold text-slate-950">Thời gian</p>
+                    <p className="mt-1 text-slate-600">{service.duration}</p>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 p-3">
+                    <p className="font-semibold text-slate-950">Chi phí dự kiến</p>
+                    <p className="mt-1 text-slate-600">{service.priceRange}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-950">Phù hợp với</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{service.idealFor}</p>
+              </div>
+
+              <ul className="mt-5 grid gap-3">
+                {service.items.map((item) => (
+                  <li key={item} className="flex gap-3 text-sm leading-6 text-slate-700">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-600" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <Link
+                href="/booking"
+                className="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-cyan-700"
+              >
+                Đặt lịch dịch vụ này
+              </Link>
+            </article>
+          ))}
+        </div>
       </section>
     </PublicPageShell>
   );

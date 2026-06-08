@@ -56,6 +56,7 @@ builder.Services.Configure<SatisfactionSurveyOptions>(builder.Configuration.GetS
 builder.Services.Configure<CustomerCareFollowUpOptions>(builder.Configuration.GetSection("CustomerCareFollowUp"));
 builder.Services.Configure<DistributedCacheRuntimeOptions>(builder.Configuration.GetSection("Redis"));
 builder.Services.Configure<HospitalDocumentStorageOptions>(builder.Configuration.GetSection("DocumentStorage"));
+builder.Services.Configure<ExternalDrugKnowledgeOptions>(builder.Configuration.GetSection("ExternalDrugKnowledge"));
 builder.Services.AddSingleton<ApiMetricsCollector>();
 builder.Services.AddSingleton<IBusinessMetricsRecorder, BusinessMetricsRecorder>();
 builder.Services.AddSingleton<BackgroundWorkerHealthRegistry>();
@@ -73,6 +74,11 @@ var documentStorageOptions =
     builder.Configuration.GetSection("DocumentStorage").Get<HospitalDocumentStorageOptions>()
     ?? new HospitalDocumentStorageOptions();
 ValidateDocumentStorageOptions(documentStorageOptions);
+
+var externalDrugKnowledgeOptions =
+    builder.Configuration.GetSection("ExternalDrugKnowledge").Get<ExternalDrugKnowledgeOptions>()
+    ?? new ExternalDrugKnowledgeOptions();
+ValidateExternalDrugKnowledgeOptions(externalDrugKnowledgeOptions);
 
 var operationalAlertOptions =
     builder.Configuration.GetSection("OperationalAlerts").Get<OperationalAlertOptions>()
@@ -331,6 +337,10 @@ builder.Services.AddScoped<IHospitalEncounterRepository, HospitalEncounterReposi
 builder.Services.AddScoped<IHospitalEncounterService, HospitalEncounterService>();
 builder.Services.AddSingleton<IHospitalDocumentStorageService, ConfigurableHospitalDocumentStorageService>();
 builder.Services.AddScoped<IHospitalPrescriptionRepository, HospitalPrescriptionRepository>();
+builder.Services.AddHttpClient<IExternalDrugKnowledgeProvider, ConfigurableExternalDrugKnowledgeProvider>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(Math.Max(1, externalDrugKnowledgeOptions.TimeoutSeconds));
+});
 builder.Services.AddScoped<IHospitalPrescriptionService, HospitalPrescriptionService>();
 builder.Services.AddScoped<IHospitalClinicalOrderRepository, HospitalClinicalOrderRepository>();
 builder.Services.AddScoped<IHospitalClinicalOrderService, HospitalClinicalOrderService>();
@@ -817,6 +827,40 @@ static void ValidateDocumentStorageOptions(HospitalDocumentStorageOptions option
     }
 }
 
+static void ValidateExternalDrugKnowledgeOptions(ExternalDrugKnowledgeOptions options)
+{
+    if (options.TimeoutSeconds <= 0)
+    {
+        throw new InvalidOperationException("ExternalDrugKnowledge:TimeoutSeconds must be greater than 0.");
+    }
+
+    if (!options.Enabled)
+    {
+        return;
+    }
+
+    if (string.IsNullOrWhiteSpace(options.ProviderName))
+    {
+        throw new InvalidOperationException("ExternalDrugKnowledge:ProviderName must not be empty when enabled.");
+    }
+
+    if (string.IsNullOrWhiteSpace(options.BaseUrl) || !IsAbsoluteHttpUrl(options.BaseUrl))
+    {
+        throw new InvalidOperationException("ExternalDrugKnowledge:BaseUrl must be an absolute http/https URL when enabled.");
+    }
+
+    if (string.IsNullOrWhiteSpace(options.EvaluationPath))
+    {
+        throw new InvalidOperationException("ExternalDrugKnowledge:EvaluationPath must not be empty when enabled.");
+    }
+
+    if (!string.IsNullOrWhiteSpace(options.ApiKey) &&
+        string.IsNullOrWhiteSpace(options.ApiKeyHeaderName))
+    {
+        throw new InvalidOperationException("ExternalDrugKnowledge:ApiKeyHeaderName must not be empty when ApiKey is configured.");
+    }
+}
+
 static void ValidateOpenTelemetryTracingOptions(OpenTelemetryTracingOptions options)
 {
     if (!options.Enabled)
@@ -899,6 +943,14 @@ static void ValidateOperationalAlertOptions(OperationalAlertOptions options)
     {
         throw new InvalidOperationException(
             "Operational alert webhook dispatch is enabled but OperationalAlerts:Webhook:Url is not a valid absolute http/https URL.");
+    }
+
+    if (!string.IsNullOrWhiteSpace(options.Webhook.SigningSecret) &&
+        (string.IsNullOrWhiteSpace(options.Webhook.SignatureHeaderName) ||
+         string.IsNullOrWhiteSpace(options.Webhook.TimestampHeaderName)))
+    {
+        throw new InvalidOperationException(
+            "Operational alert webhook signing requires SignatureHeaderName and TimestampHeaderName.");
     }
 }
 

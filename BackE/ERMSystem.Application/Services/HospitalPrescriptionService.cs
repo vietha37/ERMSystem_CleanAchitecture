@@ -125,17 +125,20 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
     private readonly IHospitalIdentityBridgeService _hospitalIdentityBridgeService;
     private readonly IBusinessMetricsRecorder _businessMetricsRecorder;
     private readonly IHospitalDoctorWorklistRepository _hospitalDoctorWorklistRepository;
+    private readonly IExternalDrugKnowledgeProvider _externalDrugKnowledgeProvider;
 
     public HospitalPrescriptionService(
         IHospitalPrescriptionRepository hospitalPrescriptionRepository,
         IHospitalIdentityBridgeService hospitalIdentityBridgeService,
         IBusinessMetricsRecorder businessMetricsRecorder,
-        IHospitalDoctorWorklistRepository hospitalDoctorWorklistRepository)
+        IHospitalDoctorWorklistRepository hospitalDoctorWorklistRepository,
+        IExternalDrugKnowledgeProvider externalDrugKnowledgeProvider)
     {
         _hospitalPrescriptionRepository = hospitalPrescriptionRepository;
         _hospitalIdentityBridgeService = hospitalIdentityBridgeService;
         _businessMetricsRecorder = businessMetricsRecorder;
         _hospitalDoctorWorklistRepository = hospitalDoctorWorklistRepository;
+        _externalDrugKnowledgeProvider = externalDrugKnowledgeProvider;
     }
 
     public Task<PaginatedResult<HospitalPrescriptionSummaryDto>> GetWorklistAsync(
@@ -162,7 +165,7 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
             return null;
         }
 
-        return MapDetail(prescription);
+        return await MapDetailAsync(prescription, ct);
     }
 
     public async Task<HospitalPrescriptionEligibleEncounterDto[]> GetEligibleEncountersAsync(
@@ -309,7 +312,7 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
         var created = await _hospitalPrescriptionRepository.GetByIdAsync(prescriptionId, ct)
             ?? throw new InvalidOperationException("Khong the tai lai don thuoc sau khi tao.");
 
-        return MapDetail(created);
+        return await MapDetailAsync(created, ct);
     }
 
     public async Task<HospitalPrescriptionDetailDto?> DispenseAsync(
@@ -383,7 +386,7 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
         var updated = await _hospitalPrescriptionRepository.GetByIdAsync(prescriptionId, ct)
             ?? throw new InvalidOperationException("Khong the tai lai don thuoc sau khi cap thuoc.");
 
-        return MapDetail(updated);
+        return await MapDetailAsync(updated, ct);
     }
 
     public async Task DeleteAsync(Guid prescriptionId, CancellationToken ct = default)
@@ -444,9 +447,19 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
     private Task<Guid?> ResolveHospitalActorUserIdAsync(Guid? actorUserId, string? actorUsername, CancellationToken ct)
         => _hospitalIdentityBridgeService.ResolveHospitalUserIdAsync(actorUserId, actorUsername, ct);
 
-    private static HospitalPrescriptionDetailDto MapDetail(HospitalPrescriptionAggregateSnapshot prescription)
+    private async Task<HospitalPrescriptionDetailDto> MapDetailAsync(
+        HospitalPrescriptionAggregateSnapshot prescription,
+        CancellationToken ct)
     {
         var warningDetails = BuildPrescriptionWarningDetails(prescription);
+        var externalWarnings = await _externalDrugKnowledgeProvider.EvaluatePrescriptionAsync(
+            prescription,
+            warningDetails,
+            ct);
+        foreach (var warning in externalWarnings)
+        {
+            AddUniqueWarning(warningDetails, warning);
+        }
 
         return new HospitalPrescriptionDetailDto
         {

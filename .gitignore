@@ -1,6 +1,7 @@
 # Local runtime/cache folders
 .dotnet-home/
 .localuser/
+.tmp/
 
 # IDE workspace caches at repo root
 .vs/

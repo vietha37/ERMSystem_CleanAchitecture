@@ -1,55 +1,50 @@
-﻿import { PublicPageShell } from "@/components/public/PublicPageShell";
+import Link from "next/link";
+import { PublicPageShell } from "@/components/public/PublicPageShell";
 import { SectionHeading } from "@/components/public/SectionHeading";
 import { specialties } from "@/content/hospitalContent";
-import { hospitalCatalogService } from "@/services/hospitalCatalogService";
 
-export default async function SpecialtiesPage() {
-  let specialtiesFromApi = [] as Awaited<ReturnType<typeof hospitalCatalogService.getSpecialties>>;
-
-  try {
-    specialtiesFromApi = await hospitalCatalogService.getSpecialties();
-  } catch {
-    specialtiesFromApi = [];
-  }
-
-  const hasApiData = specialtiesFromApi.length > 0;
-
+export default function SpecialtiesPage() {
   return (
     <PublicPageShell>
-      <section className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-22">
-        <SectionHeading
-          eyebrow="Hệ chuyên khoa"
-          title="Chuyên khoa được đồng bộ theo danh mục nghiệp vụ thay vì chỉ dùng nội dung giới thiệu."
-          description="Đây là điểm neo để đặt lịch, điều phối và phân quyền vận hành nội bộ bám cùng một cấu trúc dữ liệu."
-        />
+      <section className="bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-16">
+          <SectionHeading
+            eyebrow="Hệ chuyên khoa"
+            title="Chọn chuyên khoa theo triệu chứng và mục tiêu khám."
+            description="Nội dung tĩnh giúp người bệnh tự định hướng trước khi đặt lịch, không phụ thuộc dữ liệu database."
+          />
+        </div>
+      </section>
 
-        {hasApiData ? (
-          <div className="mt-12 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-            {specialtiesFromApi.map((specialty) => (
-              <article key={specialty.id} className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_55px_rgba(15,23,42,0.05)]">
-                <p className="text-sm uppercase tracking-[0.22em] text-cyan-700">
-                  {specialty.departmentName ?? "Hệ chuyên khoa"}
-                </p>
-                <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{specialty.name}</h2>
-                <p className="mt-4 text-sm font-medium leading-7 text-slate-700">Mã chuyên khoa: {specialty.specialtyCode}</p>
-                <p className="mt-4 text-sm leading-7 text-slate-600">
-                  Chuyên khoa này đang được đọc từ database đích để frontend, đặt lịch và dashboard nội bộ sử dụng cùng một danh mục.
-                </p>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-12 grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-            {specialties.map((specialty) => (
-              <article key={specialty.title} className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_55px_rgba(15,23,42,0.05)]">
-                <p className="text-sm uppercase tracking-[0.22em] text-cyan-700">Chuyên khoa</p>
-                <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{specialty.title}</h2>
-                <p className="mt-4 text-sm font-medium leading-7 text-slate-700">{specialty.lead}</p>
-                <p className="mt-4 text-sm leading-7 text-slate-600">{specialty.description}</p>
-              </article>
-            ))}
-          </div>
-        )}
+      <section className="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-16">
+        <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+          {specialties.map((specialty) => (
+            <article key={specialty.title} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-700">Chuyên khoa</p>
+              <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">{specialty.title}</h2>
+              <p className="mt-4 text-sm font-semibold leading-7 text-slate-800">{specialty.lead}</p>
+              <p className="mt-3 text-sm leading-7 text-slate-600">{specialty.description}</p>
+
+              <div className="mt-5">
+                <p className="text-sm font-semibold text-slate-950">Nên đặt lịch khi có</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {specialty.symptoms.map((symptom) => (
+                    <span key={symptom} className="rounded-full border border-slate-200 px-3 py-1.5 text-sm text-slate-700">
+                      {symptom}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <Link
+                href="/booking"
+                className="mt-6 inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-cyan-700"
+              >
+                Đặt lịch chuyên khoa
+              </Link>
+            </article>
+          ))}
+        </div>
       </section>
     </PublicPageShell>
   );
