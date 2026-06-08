@@ -18,6 +18,11 @@ type BookingPatientForm = {
   gender: string;
 };
 
+export type BookingServiceOption = {
+  value: string;
+  label: string;
+};
+
 const emptyPatientForm: BookingPatientForm = {
   fullName: "",
   phone: "",
@@ -56,7 +61,7 @@ export function BookingForm({
   specialtyOptions,
   doctors,
 }: {
-  serviceOptions: string[];
+  serviceOptions: BookingServiceOption[];
   specialtyOptions: Array<{ id: string; name: string }>;
   doctors: HospitalDoctor[];
 }) {
@@ -259,14 +264,16 @@ export function BookingForm({
           label: `${doctor.fullName} - ${doctor.specialtyName}`,
         }))}
       />
-      <label className="grid gap-2 text-sm font-medium text-slate-700">
+      <label className="grid min-w-0 gap-2 text-sm font-medium text-slate-700">
         Dịch vụ quan tâm
         <select
           name="serviceCode"
-          className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white"
+          className="h-12 w-full min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white"
         >
           {serviceOptions.map((service) => (
-            <option key={service}>{service}</option>
+            <option key={service.value} value={service.value}>
+              {service.label}
+            </option>
           ))}
         </select>
       </label>
@@ -338,7 +345,7 @@ function Field({
   onChange?: (value: string) => void;
 }) {
   return (
-    <label className="grid gap-2 text-sm font-medium text-slate-700">
+    <label className="grid min-w-0 gap-2 text-sm font-medium text-slate-700">
       {label}
       <input
         name={name}
@@ -347,7 +354,7 @@ function Field({
         required={required}
         value={value}
         onChange={(event) => onChange?.(event.target.value)}
-        className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white"
+        className="h-12 w-full min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white"
       />
     </label>
   );
@@ -369,14 +376,14 @@ function SelectField({
   disabled?: boolean;
 }) {
   return (
-    <label className="grid gap-2 text-sm font-medium text-slate-700">
+    <label className="grid min-w-0 gap-2 text-sm font-medium text-slate-700">
       {label}
       <select
         name={name}
         value={value}
         disabled={disabled}
         onChange={(event) => onChange?.(event.target.value)}
-        className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+        className="h-12 w-full min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white disabled:cursor-not-allowed disabled:opacity-70"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

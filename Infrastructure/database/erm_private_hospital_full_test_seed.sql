@@ -1259,17 +1259,48 @@ FROM Numbers n
 JOIN org.StaffProfiles sp
     ON sp.StaffCode = CONCAT('BSX', RIGHT(CONCAT('000', CAST(n.NumberValue AS VARCHAR(3))), 3))
 JOIN org.Specialties spec
-    ON spec.SpecialtyCode = CASE n.NumberValue % 4
-        WHEN 1 THEN 'GEN'
-        WHEN 2 THEN 'CARD'
-        WHEN 3 THEN 'PED'
-        ELSE 'OBGYN'
+    ON spec.SpecialtyCode = CASE n.NumberValue % 6
+        WHEN 1 THEN 'CARD'
+        WHEN 2 THEN 'GASTRO'
+        WHEN 3 THEN 'OBGYN'
+        WHEN 4 THEN 'PED'
+        WHEN 5 THEN 'MSK'
+        ELSE 'NEURO'
     END
 WHERE NOT EXISTS (
     SELECT 1
     FROM org.DoctorProfiles dp
     WHERE dp.StaffProfileId = sp.Id
 )
+OPTION (MAXRECURSION 19);
+
+;WITH Numbers AS
+(
+    SELECT 1 AS NumberValue
+    UNION ALL
+    SELECT NumberValue + 1
+    FROM Numbers
+    WHERE NumberValue < 19
+)
+UPDATE dp
+SET SpecialtyId = spec.Id,
+    LicenseNumber = CONCAT(spec.SpecialtyCode, '-X-', RIGHT(CONCAT('000', CAST(n.NumberValue AS VARCHAR(3))), 3)),
+    Biography = N'Bac si kham ngoai tru phuc vu kiem thu he thong.',
+    IsBookable = 1
+FROM Numbers n
+JOIN org.StaffProfiles sp
+    ON sp.StaffCode = CONCAT('BSX', RIGHT(CONCAT('000', CAST(n.NumberValue AS VARCHAR(3))), 3))
+JOIN org.DoctorProfiles dp
+    ON dp.StaffProfileId = sp.Id
+JOIN org.Specialties spec
+    ON spec.SpecialtyCode = CASE n.NumberValue % 6
+        WHEN 1 THEN 'CARD'
+        WHEN 2 THEN 'GASTRO'
+        WHEN 3 THEN 'OBGYN'
+        WHEN 4 THEN 'PED'
+        WHEN 5 THEN 'MSK'
+        ELSE 'NEURO'
+    END
 OPTION (MAXRECURSION 19);
 
 ;WITH Numbers AS

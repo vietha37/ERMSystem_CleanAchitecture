@@ -35,6 +35,7 @@ public class HospitalCatalogRepository : IHospitalCatalogRepository
         return await _hospitalDbContext.Specialties
             .AsNoTracking()
             .Include(x => x.Department)
+            .Where(x => x.IsActive)
             .OrderBy(x => x.Name)
             .Select(x => new HospitalSpecialtyDto
             {

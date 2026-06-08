@@ -1,16 +1,20 @@
-﻿import { BookingForm } from "@/components/public/BookingForm";
+import { BookingForm, type BookingServiceOption } from "@/components/public/BookingForm";
 import { PublicPageShell } from "@/components/public/PublicPageShell";
 import { SectionHeading } from "@/components/public/SectionHeading";
 import { hospitalCatalogService } from "@/services/hospitalCatalogService";
 import { hospitalDoctorService } from "@/services/hospitalDoctorService";
 
-const fallbackServices = [
-  "Khám tổng quát cao cấp",
-  "Lấy mẫu xét nghiệm tại nhà",
-  "Khám chuyên khoa tim mạch",
-  "Khám sản phụ khoa",
-  "Tầm soát doanh nghiệp",
+const fallbackServices: BookingServiceOption[] = [
+  { value: "GENERAL-CHECKUP", label: "Khám tổng quát cao cấp" },
+  { value: "HOME-LAB", label: "Lấy mẫu xét nghiệm tại nhà" },
+  { value: "CARDIOLOGY", label: "Khám chuyên khoa tim mạch" },
+  { value: "OBGYN", label: "Khám sản phụ khoa" },
+  { value: "CORPORATE-SCREENING", label: "Tầm soát doanh nghiệp" },
 ];
+
+const serviceLabelOverrides: Record<string, string> = {
+  "IMG-US-ABD": "Siêu âm ổ bụng tổng quát",
+};
 
 export default async function BookingPage() {
   let serviceOptions = fallbackServices;
@@ -20,7 +24,10 @@ export default async function BookingPage() {
   try {
     const services = await hospitalCatalogService.getServices();
     if (services.length > 0) {
-      serviceOptions = services.map((service) => `${service.serviceCode} - ${service.name}`);
+      serviceOptions = services.map((service) => ({
+        value: service.serviceCode,
+        label: serviceLabelOverrides[service.serviceCode] ?? service.name,
+      }));
     }
   } catch {
     serviceOptions = fallbackServices;
@@ -55,7 +62,10 @@ export default async function BookingPage() {
                 "Nếu chưa biết nên chọn chuyên khoa nào, hãy mô tả triệu chứng trong phần ghi chú.",
                 "Mang theo giấy tờ tùy thân, kết quả xét nghiệm cũ và đơn thuốc đang sử dụng nếu có.",
               ].map((item) => (
-                <div key={item} className="rounded-xl border border-slate-200 bg-white p-5 text-sm leading-7 text-slate-700 shadow-sm">
+                <div
+                  key={item}
+                  className="rounded-xl border border-slate-200 bg-white p-5 text-sm leading-7 text-slate-700 shadow-sm"
+                >
                   {item}
                 </div>
               ))}
@@ -64,10 +74,12 @@ export default async function BookingPage() {
 
           <BookingForm
             serviceOptions={serviceOptions}
-            specialtyOptions={specialties.map((specialty) => ({
-              id: specialty.id,
-              name: specialty.name,
-            }))}
+            specialtyOptions={specialties
+              .filter((specialty) => specialty.isActive)
+              .map((specialty) => ({
+                id: specialty.id,
+                name: specialty.name,
+              }))}
             doctors={doctors}
           />
         </div>

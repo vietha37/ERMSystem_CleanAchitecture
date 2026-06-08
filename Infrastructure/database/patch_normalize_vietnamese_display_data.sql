@@ -96,11 +96,19 @@ SET Name = CASE DepartmentCode
 UPDATE org.Specialties
 SET Name = CASE SpecialtyCode
     WHEN 'CARD' THEN N'Tim mạch'
+    WHEN 'GASTRO' THEN N'Tiêu hóa - gan mật'
     WHEN 'OBGYN' THEN N'Sản phụ khoa'
     WHEN 'PED' THEN N'Nhi khoa'
+    WHEN 'MSK' THEN N'Cơ xương khớp'
+    WHEN 'NEURO' THEN N'Thần kinh'
     WHEN 'GEN' THEN N'Nội tổng quát'
     ELSE dbo.NormalizeVietnameseSeedText(Name)
-END;
+END,
+    IsActive = CASE
+        WHEN SpecialtyCode IN ('CARD', 'GASTRO', 'OBGYN', 'PED', 'MSK', 'NEURO') THEN 1
+        WHEN SpecialtyCode = 'GEN' THEN 0
+        ELSE IsActive
+    END;
 
 UPDATE org.Clinics
 SET Name = CASE ClinicCode

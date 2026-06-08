@@ -22,29 +22,30 @@ SELECT NEWID(), 'PHA', N'Nha thuoc benh vien', N'Quan ly cap phat thuoc va ton k
 WHERE NOT EXISTS (SELECT 1 FROM org.Departments WHERE DepartmentCode = 'PHA');
 GO
 
-INSERT INTO org.Specialties (Id, SpecialtyCode, Name, DepartmentId)
-SELECT NEWID(), 'CARD', N'Tim mach', d.Id
-FROM org.Departments d
-WHERE d.DepartmentCode = 'OPD'
-  AND NOT EXISTS (SELECT 1 FROM org.Specialties WHERE SpecialtyCode = 'CARD');
-
-INSERT INTO org.Specialties (Id, SpecialtyCode, Name, DepartmentId)
-SELECT NEWID(), 'OBGYN', N'San phu khoa', d.Id
-FROM org.Departments d
-WHERE d.DepartmentCode = 'OPD'
-  AND NOT EXISTS (SELECT 1 FROM org.Specialties WHERE SpecialtyCode = 'OBGYN');
-
-INSERT INTO org.Specialties (Id, SpecialtyCode, Name, DepartmentId)
-SELECT NEWID(), 'PED', N'Nhi khoa', d.Id
-FROM org.Departments d
-WHERE d.DepartmentCode = 'OPD'
-  AND NOT EXISTS (SELECT 1 FROM org.Specialties WHERE SpecialtyCode = 'PED');
-
-INSERT INTO org.Specialties (Id, SpecialtyCode, Name, DepartmentId)
-SELECT NEWID(), 'GEN', N'Noi tong quat', d.Id
-FROM org.Departments d
-WHERE d.DepartmentCode = 'OPD'
-  AND NOT EXISTS (SELECT 1 FROM org.Specialties WHERE SpecialtyCode = 'GEN');
+MERGE org.Specialties AS target
+USING (
+    SELECT code.SpecialtyCode, code.Name, d.Id AS DepartmentId, code.IsActive
+    FROM (VALUES
+        ('CARD', N'Tim mach', 1),
+        ('GASTRO', N'Tieu hoa - gan mat', 1),
+        ('OBGYN', N'San phu khoa', 1),
+        ('PED', N'Nhi khoa', 1),
+        ('MSK', N'Co xuong khop', 1),
+        ('NEURO', N'Than kinh', 1),
+        ('GEN', N'Noi tong quat', 0)
+    ) code (SpecialtyCode, Name, IsActive)
+    CROSS JOIN org.Departments d
+    WHERE d.DepartmentCode = 'OPD'
+) AS source (SpecialtyCode, Name, DepartmentId, IsActive)
+ON target.SpecialtyCode = source.SpecialtyCode
+WHEN MATCHED THEN
+    UPDATE SET
+        Name = source.Name,
+        DepartmentId = source.DepartmentId,
+        IsActive = source.IsActive
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (Id, SpecialtyCode, Name, DepartmentId, IsActive)
+    VALUES (NEWID(), source.SpecialtyCode, source.Name, source.DepartmentId, source.IsActive);
 GO
 
 INSERT INTO org.Clinics (Id, ClinicCode, Name, DepartmentId, FloorLabel, RoomLabel)
