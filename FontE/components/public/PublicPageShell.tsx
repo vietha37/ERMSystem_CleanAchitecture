@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { AiChatWidget } from "./AiChatWidget";
 import { SiteFooter } from "./SiteFooter";
 import { SiteHeader } from "./SiteHeader";
 
@@ -8,6 +9,7 @@ export function PublicPageShell({ children }: { children: ReactNode }) {
       <SiteHeader />
       <main className="relative">{children}</main>
       <SiteFooter />
+      <AiChatWidget />
     </div>
   );
 }

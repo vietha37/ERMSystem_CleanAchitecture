@@ -57,6 +57,7 @@ builder.Services.Configure<CustomerCareFollowUpOptions>(builder.Configuration.Ge
 builder.Services.Configure<DistributedCacheRuntimeOptions>(builder.Configuration.GetSection("Redis"));
 builder.Services.Configure<HospitalDocumentStorageOptions>(builder.Configuration.GetSection("DocumentStorage"));
 builder.Services.Configure<ExternalDrugKnowledgeOptions>(builder.Configuration.GetSection("ExternalDrugKnowledge"));
+builder.Services.Configure<AiSymptomChatOptions>(builder.Configuration.GetSection("AiSymptomChat"));
 builder.Services.AddSingleton<ApiMetricsCollector>();
 builder.Services.AddSingleton<IBusinessMetricsRecorder, BusinessMetricsRecorder>();
 builder.Services.AddSingleton<BackgroundWorkerHealthRegistry>();
@@ -253,6 +254,8 @@ builder.Services.AddHealthChecks()
 
 var authPermitLimit = builder.Configuration.GetValue<int?>("Security:AuthRateLimit:PermitLimit") ?? 12;
 var authWindowSeconds = builder.Configuration.GetValue<int?>("Security:AuthRateLimit:WindowSeconds") ?? 60;
+var aiChatPermitLimit = builder.Configuration.GetValue<int?>("AiSymptomChat:RateLimit:PermitLimit") ?? 8;
+var aiChatWindowSeconds = builder.Configuration.GetValue<int?>("AiSymptomChat:RateLimit:WindowSeconds") ?? 60;
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -264,7 +267,7 @@ builder.Services.AddRateLimiter(options =>
             ApiErrorResponseFactory.Create(
                 context.HttpContext,
                 "rate_limit_exceeded",
-                "Too many authentication requests. Please retry later."));
+                "Too many requests. Please retry later."));
 
         await context.HttpContext.Response.WriteAsync(payload, token);
     };
@@ -278,6 +281,21 @@ builder.Services.AddRateLimiter(options =>
             {
                 PermitLimit = authPermitLimit,
                 Window = TimeSpan.FromSeconds(authWindowSeconds),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                AutoReplenishment = true
+            });
+    });
+
+    options.AddPolicy("ai-chat-fixed-window", httpContext =>
+    {
+        var remoteIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: remoteIp,
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = aiChatPermitLimit,
+                Window = TimeSpan.FromSeconds(aiChatWindowSeconds),
                 QueueLimit = 0,
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 AutoReplenishment = true
@@ -325,6 +343,7 @@ builder.Services.AddScoped<IDashboardQueryCache, DashboardQueryCache>();
 // ── DI – Dashboard ────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddHttpClient<IAiSymptomChatService, OllamaSymptomChatService>();
 builder.Services.AddScoped<IHospitalCatalogRepository, HospitalCatalogRepository>();
 builder.Services.AddScoped<IHospitalCatalogService, HospitalCatalogService>();
 builder.Services.AddScoped<IHospitalDoctorRepository, HospitalDoctorRepository>();

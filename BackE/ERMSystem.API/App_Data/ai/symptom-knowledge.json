@@ -1,0 +1,51 @@
+[
+  {
+    "title": "Đau ngực và hồi hộp",
+    "symptoms": ["đau ngực", "hoi hop", "hồi hộp", "khó thở", "kho tho", "đánh trống ngực", "met khi gang suc", "mệt khi gắng sức", "phù chân"],
+    "possibleConditions": ["rối loạn nhịp tim", "tăng huyết áp", "bệnh mạch vành", "suy tim"],
+    "recommendedSpecialty": "Tim mạch",
+    "emergencySigns": ["đau ngực dữ dội", "khó thở nhiều", "ngất", "đau ngực lan lên hàm hoặc tay trái"]
+  },
+  {
+    "title": "Ho sốt và đau họng",
+    "symptoms": ["sốt", "sot", "ho", "đau họng", "dau hong", "nghẹt mũi", "chảy mũi", "khàn tiếng", "đau đầu"],
+    "possibleConditions": ["viêm họng", "cúm", "nhiễm khuẩn hô hấp trên", "viêm phế quản"],
+    "recommendedSpecialty": "Nội tổng quát",
+    "emergencySigns": ["khó thở", "tím tái", "sốt cao co giật", "sốt cao kéo dài"]
+  },
+  {
+    "title": "Đau bụng và rối loạn tiêu hóa",
+    "symptoms": ["đau bụng", "dau bung", "buồn nôn", "non", "nôn", "tiêu chảy", "tieu chay", "táo bón", "đầy hơi", "vàng da", "đau thượng vị"],
+    "possibleConditions": ["viêm dạ dày", "rối loạn tiêu hóa", "viêm đại tràng", "bệnh gan mật"],
+    "recommendedSpecialty": "Tiêu hóa - gan mật",
+    "emergencySigns": ["đau bụng dữ dội", "nôn ra máu", "đi ngoài phân đen", "vàng da tăng nhanh"]
+  },
+  {
+    "title": "Triệu chứng sản phụ khoa",
+    "symptoms": ["trễ kinh", "tre kinh", "đau bụng dưới", "ra máu âm đạo", "khí hư", "đau khi quan hệ", "mang thai", "đau bụng khi mang thai"],
+    "possibleConditions": ["rối loạn kinh nguyệt", "viêm nhiễm phụ khoa", "vấn đề thai kỳ", "u nang phụ khoa"],
+    "recommendedSpecialty": "Sản phụ khoa",
+    "emergencySigns": ["ra máu nhiều khi mang thai", "đau bụng dữ dội khi mang thai", "ngất", "sốt cao sau sinh"]
+  },
+  {
+    "title": "Triệu chứng nhi khoa",
+    "symptoms": ["trẻ bị sốt", "tre bi sot", "trẻ ho", "trẻ tiêu chảy", "trẻ bỏ bú", "trẻ quấy khóc", "phát ban", "nôn ở trẻ"],
+    "possibleConditions": ["nhiễm siêu vi", "viêm đường hô hấp", "rối loạn tiêu hóa ở trẻ", "bệnh truyền nhiễm trẻ em"],
+    "recommendedSpecialty": "Nhi khoa",
+    "emergencySigns": ["trẻ khó thở", "trẻ co giật", "trẻ li bì", "trẻ bỏ bú kèm sốt cao"]
+  },
+  {
+    "title": "Đau xương khớp và chấn thương",
+    "symptoms": ["đau khớp", "dau khop", "đau lưng", "đau gối", "sưng khớp", "tê tay", "tê chân", "chấn thương", "khó vận động"],
+    "possibleConditions": ["thoái hóa khớp", "viêm khớp", "chấn thương cơ xương khớp", "thoát vị đĩa đệm"],
+    "recommendedSpecialty": "Cơ xương khớp",
+    "emergencySigns": ["biến dạng chi sau chấn thương", "mất cảm giác", "yếu liệt", "đau sau ngã kèm không đi lại được"]
+  },
+  {
+    "title": "Đau đầu và thần kinh",
+    "symptoms": ["đau đầu", "dau dau", "chóng mặt", "tê nửa người", "yếu nửa người", "nói khó", "mất thăng bằng", "co giật", "mất ngủ"],
+    "possibleConditions": ["đau nửa đầu", "rối loạn tiền đình", "tai biến mạch máu não", "rối loạn giấc ngủ"],
+    "recommendedSpecialty": "Thần kinh",
+    "emergencySigns": ["yếu liệt nửa người", "nói khó đột ngột", "co giật", "đau đầu dữ dội đột ngột", "mất ý thức"]
+  }
+]
