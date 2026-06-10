@@ -1,51 +1,135 @@
 [
   {
-    "title": "Đau ngực và hồi hộp",
-    "symptoms": ["đau ngực", "hoi hop", "hồi hộp", "khó thở", "kho tho", "đánh trống ngực", "met khi gang suc", "mệt khi gắng sức", "phù chân"],
-    "possibleConditions": ["rối loạn nhịp tim", "tăng huyết áp", "bệnh mạch vành", "suy tim"],
-    "recommendedSpecialty": "Tim mạch",
-    "emergencySigns": ["đau ngực dữ dội", "khó thở nhiều", "ngất", "đau ngực lan lên hàm hoặc tay trái"]
-  },
-  {
-    "title": "Ho sốt và đau họng",
-    "symptoms": ["sốt", "sot", "ho", "đau họng", "dau hong", "nghẹt mũi", "chảy mũi", "khàn tiếng", "đau đầu"],
-    "possibleConditions": ["viêm họng", "cúm", "nhiễm khuẩn hô hấp trên", "viêm phế quản"],
+    "title": "Cảm cúm hoặc nhiễm siêu vi đường hô hấp trên",
+    "symptoms": ["sốt", "ớn lạnh", "ho", "đau họng", "đau đầu", "đau mỏi người", "nghẹt mũi", "chảy mũi", "mệt mỏi"],
+    "possibleConditions": ["cảm cúm", "nhiễm siêu vi", "viêm đường hô hấp trên"],
     "recommendedSpecialty": "Nội tổng quát",
-    "emergencySigns": ["khó thở", "tím tái", "sốt cao co giật", "sốt cao kéo dài"]
+    "emergencySigns": ["khó thở", "tím tái", "sốt cao kéo dài", "lơ mơ", "đau ngực"]
   },
   {
-    "title": "Đau bụng và rối loạn tiêu hóa",
-    "symptoms": ["đau bụng", "dau bung", "buồn nôn", "non", "nôn", "tiêu chảy", "tieu chay", "táo bón", "đầy hơi", "vàng da", "đau thượng vị"],
-    "possibleConditions": ["viêm dạ dày", "rối loạn tiêu hóa", "viêm đại tràng", "bệnh gan mật"],
+    "title": "Viêm họng hoặc viêm amidan",
+    "symptoms": ["đau họng", "nuốt đau", "sốt", "khàn tiếng", "ho", "sưng hạch cổ", "hơi thở hôi"],
+    "possibleConditions": ["viêm họng", "viêm amidan", "nhiễm khuẩn hô hấp trên"],
+    "recommendedSpecialty": "Nội tổng quát",
+    "emergencySigns": ["khó thở", "khó nuốt nước bọt", "sốt cao co giật", "cứng cổ"]
+  },
+  {
+    "title": "Viêm phế quản hoặc kích ứng đường thở",
+    "symptoms": ["ho kéo dài", "ho có đờm", "tức ngực", "khò khè", "sốt nhẹ", "mệt", "đau rát ngực khi ho"],
+    "possibleConditions": ["viêm phế quản", "kích ứng đường thở", "nhiễm trùng hô hấp dưới"],
+    "recommendedSpecialty": "Nội tổng quát",
+    "emergencySigns": ["khó thở tăng", "tím tái", "đau ngực dữ dội", "ho ra máu"]
+  },
+  {
+    "title": "Viêm phổi hoặc nhiễm trùng hô hấp nặng",
+    "symptoms": ["sốt cao", "ho có đờm", "khó thở", "đau ngực", "thở nhanh", "mệt nhiều", "ớn lạnh"],
+    "possibleConditions": ["viêm phổi", "nhiễm trùng hô hấp dưới"],
+    "recommendedSpecialty": "Nội tổng quát",
+    "emergencySigns": ["khó thở nhiều", "tím tái", "lơ mơ", "đau ngực dữ dội", "sốt cao không hạ"]
+  },
+  {
+    "title": "Viêm dạ dày hoặc trào ngược dạ dày thực quản",
+    "symptoms": ["đau thượng vị", "ợ nóng", "ợ chua", "buồn nôn", "đầy hơi", "đau bụng sau ăn", "nóng rát ngực"],
+    "possibleConditions": ["viêm dạ dày", "trào ngược dạ dày thực quản", "rối loạn tiêu hóa"],
     "recommendedSpecialty": "Tiêu hóa - gan mật",
-    "emergencySigns": ["đau bụng dữ dội", "nôn ra máu", "đi ngoài phân đen", "vàng da tăng nhanh"]
+    "emergencySigns": ["nôn ra máu", "đi ngoài phân đen", "sụt cân nhanh", "đau bụng dữ dội"]
   },
   {
-    "title": "Triệu chứng sản phụ khoa",
-    "symptoms": ["trễ kinh", "tre kinh", "đau bụng dưới", "ra máu âm đạo", "khí hư", "đau khi quan hệ", "mang thai", "đau bụng khi mang thai"],
-    "possibleConditions": ["rối loạn kinh nguyệt", "viêm nhiễm phụ khoa", "vấn đề thai kỳ", "u nang phụ khoa"],
-    "recommendedSpecialty": "Sản phụ khoa",
-    "emergencySigns": ["ra máu nhiều khi mang thai", "đau bụng dữ dội khi mang thai", "ngất", "sốt cao sau sinh"]
+    "title": "Viêm ruột cấp hoặc ngộ độc thực phẩm",
+    "symptoms": ["tiêu chảy", "đau bụng quặn", "buồn nôn", "nôn", "sốt", "ăn đồ lạ", "mất nước", "đi ngoài nhiều lần"],
+    "possibleConditions": ["viêm ruột cấp", "ngộ độc thực phẩm", "nhiễm khuẩn tiêu hóa"],
+    "recommendedSpecialty": "Tiêu hóa - gan mật",
+    "emergencySigns": ["mất nước nặng", "đi ngoài ra máu", "sốt cao", "đau bụng dữ dội", "lơ mơ"]
   },
   {
-    "title": "Triệu chứng nhi khoa",
-    "symptoms": ["trẻ bị sốt", "tre bi sot", "trẻ ho", "trẻ tiêu chảy", "trẻ bỏ bú", "trẻ quấy khóc", "phát ban", "nôn ở trẻ"],
-    "possibleConditions": ["nhiễm siêu vi", "viêm đường hô hấp", "rối loạn tiêu hóa ở trẻ", "bệnh truyền nhiễm trẻ em"],
-    "recommendedSpecialty": "Nhi khoa",
-    "emergencySigns": ["trẻ khó thở", "trẻ co giật", "trẻ li bì", "trẻ bỏ bú kèm sốt cao"]
+    "title": "Bệnh gan mật hoặc tắc mật",
+    "symptoms": ["vàng da", "vàng mắt", "nước tiểu sẫm", "đau hạ sườn phải", "ngứa", "buồn nôn", "chán ăn"],
+    "possibleConditions": ["bệnh gan mật", "viêm gan", "tắc mật", "sỏi mật"],
+    "recommendedSpecialty": "Tiêu hóa - gan mật",
+    "emergencySigns": ["vàng da tăng nhanh", "sốt kèm đau hạ sườn phải", "lơ mơ", "nôn nhiều"]
   },
   {
-    "title": "Đau xương khớp và chấn thương",
-    "symptoms": ["đau khớp", "dau khop", "đau lưng", "đau gối", "sưng khớp", "tê tay", "tê chân", "chấn thương", "khó vận động"],
-    "possibleConditions": ["thoái hóa khớp", "viêm khớp", "chấn thương cơ xương khớp", "thoát vị đĩa đệm"],
-    "recommendedSpecialty": "Cơ xương khớp",
-    "emergencySigns": ["biến dạng chi sau chấn thương", "mất cảm giác", "yếu liệt", "đau sau ngã kèm không đi lại được"]
+    "title": "Cơn đau thắt ngực hoặc bệnh mạch vành",
+    "symptoms": ["đau ngực", "tức ngực", "đau ngực khi gắng sức", "đau lan tay trái", "đau lan hàm", "khó thở", "vã mồ hôi", "buồn nôn"],
+    "possibleConditions": ["cơn đau thắt ngực", "bệnh mạch vành", "nhồi máu cơ tim cần loại trừ"],
+    "recommendedSpecialty": "Tim mạch",
+    "emergencySigns": ["đau ngực dữ dội", "đau ngực kéo dài", "khó thở nhiều", "vã mồ hôi", "ngất"]
   },
   {
-    "title": "Đau đầu và thần kinh",
-    "symptoms": ["đau đầu", "dau dau", "chóng mặt", "tê nửa người", "yếu nửa người", "nói khó", "mất thăng bằng", "co giật", "mất ngủ"],
-    "possibleConditions": ["đau nửa đầu", "rối loạn tiền đình", "tai biến mạch máu não", "rối loạn giấc ngủ"],
+    "title": "Rối loạn nhịp tim",
+    "symptoms": ["hồi hộp", "đánh trống ngực", "tim đập nhanh", "chóng mặt", "ngất", "khó thở", "mệt khi gắng sức"],
+    "possibleConditions": ["rối loạn nhịp tim", "nhịp nhanh", "ngoại tâm thu"],
+    "recommendedSpecialty": "Tim mạch",
+    "emergencySigns": ["ngất", "đau ngực", "khó thở nhiều", "tim đập nhanh kéo dài"]
+  },
+  {
+    "title": "Tăng huyết áp hoặc biến chứng tim mạch",
+    "symptoms": ["đau đầu", "chóng mặt", "đỏ mặt", "huyết áp cao", "mờ mắt", "đau ngực", "khó thở"],
+    "possibleConditions": ["tăng huyết áp", "cơn tăng huyết áp", "nguy cơ biến chứng tim mạch"],
+    "recommendedSpecialty": "Tim mạch",
+    "emergencySigns": ["đau ngực", "khó thở", "yếu liệt", "nói khó", "đau đầu dữ dội"]
+  },
+  {
+    "title": "Đau nửa đầu hoặc đau đầu căng cơ",
+    "symptoms": ["đau đầu", "đau nửa đầu", "buồn nôn", "sợ ánh sáng", "căng thẳng", "mất ngủ", "đau vùng thái dương"],
+    "possibleConditions": ["đau nửa đầu", "đau đầu căng cơ", "rối loạn giấc ngủ"],
     "recommendedSpecialty": "Thần kinh",
-    "emergencySigns": ["yếu liệt nửa người", "nói khó đột ngột", "co giật", "đau đầu dữ dội đột ngột", "mất ý thức"]
+    "emergencySigns": ["đau đầu dữ dội đột ngột", "yếu liệt", "nói khó", "co giật", "sốt kèm cứng cổ"]
+  },
+  {
+    "title": "Rối loạn tiền đình",
+    "symptoms": ["chóng mặt", "quay cuồng", "buồn nôn", "mất thăng bằng", "ù tai", "nôn", "chóng mặt khi xoay đầu"],
+    "possibleConditions": ["rối loạn tiền đình", "viêm tiền đình", "chóng mặt tư thế"],
+    "recommendedSpecialty": "Thần kinh",
+    "emergencySigns": ["yếu liệt nửa người", "nói khó", "nhìn đôi", "đau đầu dữ dội", "ngất"]
+  },
+  {
+    "title": "Dấu hiệu nghi ngờ đột quỵ",
+    "symptoms": ["yếu nửa người", "tê nửa người", "méo miệng", "nói khó", "mất thăng bằng", "nhìn mờ đột ngột", "đau đầu dữ dội"],
+    "possibleConditions": ["đột quỵ cần loại trừ", "tai biến mạch máu não"],
+    "recommendedSpecialty": "Thần kinh",
+    "emergencySigns": ["yếu liệt nửa người", "nói khó đột ngột", "méo miệng", "mất ý thức", "co giật"]
+  },
+  {
+    "title": "Thoái hóa khớp hoặc viêm khớp",
+    "symptoms": ["đau khớp", "sưng khớp", "cứng khớp buổi sáng", "đau gối", "đau vai", "khó vận động", "đau tăng khi đi lại"],
+    "possibleConditions": ["thoái hóa khớp", "viêm khớp", "bệnh lý cơ xương khớp"],
+    "recommendedSpecialty": "Cơ xương khớp",
+    "emergencySigns": ["sưng nóng đỏ đau nhiều", "sốt kèm đau khớp", "không đi lại được", "biến dạng khớp"]
+  },
+  {
+    "title": "Thoát vị đĩa đệm hoặc đau thần kinh tọa",
+    "symptoms": ["đau lưng", "đau lan xuống chân", "tê chân", "yếu chân", "đau tăng khi cúi", "đau mông", "khó đi lại"],
+    "possibleConditions": ["thoát vị đĩa đệm", "đau thần kinh tọa", "chèn ép rễ thần kinh"],
+    "recommendedSpecialty": "Cơ xương khớp",
+    "emergencySigns": ["bí tiểu", "mất kiểm soát đại tiểu tiện", "yếu liệt chân", "tê vùng yên ngựa"]
+  },
+  {
+    "title": "Rối loạn kinh nguyệt hoặc bệnh lý phụ khoa",
+    "symptoms": ["trễ kinh", "kinh nguyệt không đều", "đau bụng dưới", "ra máu bất thường", "khí hư", "đau khi quan hệ"],
+    "possibleConditions": ["rối loạn kinh nguyệt", "viêm nhiễm phụ khoa", "u nang buồng trứng", "bệnh lý tử cung phần phụ"],
+    "recommendedSpecialty": "Sản phụ khoa",
+    "emergencySigns": ["ra máu nhiều", "đau bụng dữ dội", "ngất", "sốt cao"]
+  },
+  {
+    "title": "Thai kỳ cần đánh giá sản khoa",
+    "symptoms": ["mang thai", "trễ kinh", "buồn nôn buổi sáng", "đau bụng khi mang thai", "ra máu khi mang thai", "thai máy ít"],
+    "possibleConditions": ["thai kỳ cần theo dõi", "dọa sảy thai cần loại trừ", "thai ngoài tử cung cần loại trừ"],
+    "recommendedSpecialty": "Sản phụ khoa",
+    "emergencySigns": ["ra máu khi mang thai", "đau bụng dữ dội khi mang thai", "ngất", "thai máy giảm rõ"]
+  },
+  {
+    "title": "Sốt và ho ở trẻ em",
+    "symptoms": ["trẻ sốt", "trẻ ho", "trẻ sổ mũi", "trẻ thở nhanh", "trẻ bỏ bú", "trẻ quấy khóc", "trẻ mệt"],
+    "possibleConditions": ["nhiễm siêu vi ở trẻ", "viêm hô hấp trẻ em", "viêm phế quản/phổi cần loại trừ"],
+    "recommendedSpecialty": "Nhi khoa",
+    "emergencySigns": ["trẻ khó thở", "trẻ tím tái", "trẻ co giật", "trẻ li bì", "trẻ bỏ bú"]
+  },
+  {
+    "title": "Tiêu chảy hoặc mất nước ở trẻ em",
+    "symptoms": ["trẻ tiêu chảy", "trẻ nôn", "trẻ sốt", "trẻ khát nhiều", "trẻ tiểu ít", "trẻ mệt", "trẻ đau bụng"],
+    "possibleConditions": ["tiêu chảy cấp ở trẻ", "rối loạn tiêu hóa trẻ em", "mất nước cần đánh giá"],
+    "recommendedSpecialty": "Nhi khoa",
+    "emergencySigns": ["trẻ li bì", "trẻ tiểu rất ít", "môi khô", "mắt trũng", "đi ngoài ra máu"]
   }
 ]

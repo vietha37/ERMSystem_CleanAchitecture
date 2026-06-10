@@ -202,6 +202,24 @@ export function AiChatWidget() {
                           ))}
                         </div>
                       ) : null}
+
+                      {message.analysis.matches.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {message.analysis.matches.slice(0, 3).map((match) => (
+                            <div
+                              key={match.title}
+                              className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs leading-5 text-slate-700"
+                            >
+                              <p className="font-semibold text-slate-900">{match.title}</p>
+                              {match.matchedSymptoms.length > 0 ? (
+                                <p className="mt-0.5 text-slate-500">
+                                  Khớp: {match.matchedSymptoms.slice(0, 4).join(", ")}
+                                </p>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

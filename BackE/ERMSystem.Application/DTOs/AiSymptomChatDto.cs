@@ -20,4 +20,6 @@ public class AiSymptomKnowledgeMatchDto
     public string RecommendedSpecialty { get; set; } = string.Empty;
     public IReadOnlyList<string> PossibleConditions { get; set; } = Array.Empty<string>();
     public IReadOnlyList<string> EmergencySigns { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> MatchedSymptoms { get; set; } = Array.Empty<string>();
+    public double Score { get; set; }
 }

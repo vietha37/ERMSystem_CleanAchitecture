@@ -1,8 +1,8 @@
-using System.Net.Http.Json;
 using System.Globalization;
+using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text;
 using ERMSystem.Application.DTOs;
 using ERMSystem.Application.Interfaces;
 using Microsoft.Extensions.Hosting;
@@ -13,9 +13,6 @@ namespace ERMSystem.Infrastructure.Services;
 
 public class OllamaSymptomChatService : IAiSymptomChatService
 {
-    private const string FriendlyUnavailableMessage =
-        "Hệ thống AI đang tạm thời chưa sẵn sàng. Bạn vui lòng thử lại sau hoặc đặt lịch để được nhân viên y tế tư vấn trực tiếp.";
-
     private readonly HttpClient _httpClient;
     private readonly AiSymptomChatOptions _options;
     private readonly IHostEnvironment _environment;
@@ -62,8 +59,8 @@ public class OllamaSymptomChatService : IAiSymptomChatService
             Stream = false,
             Options = new OllamaModelOptions
             {
-                Temperature = 0.2,
-                TopP = 0.9
+                Temperature = 0.15,
+                TopP = 0.85
             }
         };
 
@@ -74,9 +71,7 @@ public class OllamaSymptomChatService : IAiSymptomChatService
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning(
-                    "Ollama symptom chat returned {StatusCode}.",
-                    (int)response.StatusCode);
+                _logger.LogWarning("Ollama symptom chat returned {StatusCode}.", (int)response.StatusCode);
                 return BuildResponse(BuildFallbackAnswer(matches), matches, urgencyLevel, aiRuntimeAvailable: false);
             }
 
@@ -116,34 +111,91 @@ public class OllamaSymptomChatService : IAiSymptomChatService
         var trimmed = message.Trim();
         var maxLength = _options.MaxInputCharacters <= 0 ? 1200 : _options.MaxInputCharacters;
 
-        return trimmed.Length <= maxLength
-            ? trimmed
-            : trimmed[..maxLength];
+        return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
     }
 
-    private IReadOnlyList<SymptomKnowledgeEntry> FindKnowledgeMatches(string message)
+    private IReadOnlyList<KnowledgeMatch> FindKnowledgeMatches(string message)
     {
         var entries = LoadKnowledgeEntries();
         if (entries.Count == 0)
         {
-            return Array.Empty<SymptomKnowledgeEntry>();
+            return Array.Empty<KnowledgeMatch>();
         }
 
         var normalizedMessage = NormalizeForSearch(message);
+        var tokens = Tokenize(normalizedMessage);
 
-        return entries
-            .Select(entry => new
-            {
-                Entry = entry,
-                Score = entry.Symptoms.Count(symptom =>
-                    normalizedMessage.Contains(NormalizeForSearch(symptom), StringComparison.OrdinalIgnoreCase))
-            })
+        var scoredMatches = entries
+            .Select(entry => ScoreEntry(entry, normalizedMessage, tokens))
             .Where(match => match.Score > 0)
             .OrderByDescending(match => match.Score)
+            .ThenByDescending(match => match.MatchedSymptoms.Count)
             .ThenBy(match => match.Entry.Title)
-            .Take(3)
-            .Select(match => match.Entry)
             .ToArray();
+
+        if (scoredMatches.Length == 0)
+        {
+            return Array.Empty<KnowledgeMatch>();
+        }
+
+        var topScore = scoredMatches[0].Score;
+        var threshold = topScore >= 6 ? topScore * 0.45 : topScore;
+
+        return scoredMatches
+            .Where(match => match.Score >= threshold)
+            .Take(5)
+            .ToArray();
+    }
+
+    private KnowledgeMatch ScoreEntry(
+        SymptomKnowledgeEntry entry,
+        string normalizedMessage,
+        IReadOnlySet<string> messageTokens)
+    {
+        var matchedSymptoms = new List<string>();
+        double score = 0;
+
+        foreach (var symptom in entry.Symptoms)
+        {
+            var normalizedSymptom = NormalizeForSearch(symptom);
+            if (string.IsNullOrWhiteSpace(normalizedSymptom))
+            {
+                continue;
+            }
+
+            if (normalizedMessage.Contains(normalizedSymptom, StringComparison.OrdinalIgnoreCase))
+            {
+                matchedSymptoms.Add(symptom);
+                score += normalizedSymptom.Contains(' ', StringComparison.Ordinal) ? 4 : 2.5;
+                continue;
+            }
+
+            var symptomTokens = Tokenize(normalizedSymptom);
+            if (symptomTokens.Count == 0)
+            {
+                continue;
+            }
+
+            var overlap = symptomTokens.Count(messageTokens.Contains);
+            var coverage = overlap / (double)symptomTokens.Count;
+            if (coverage >= 0.75)
+            {
+                matchedSymptoms.Add(symptom);
+                score += 1.5 * coverage;
+            }
+        }
+
+        if (matchedSymptoms.Count >= 2)
+        {
+            score += 1.5;
+        }
+
+        if (matchedSymptoms.Count >= 3)
+        {
+            score += 2;
+        }
+
+        return new KnowledgeMatch(entry, matchedSymptoms.Distinct().ToArray(), Math.Round(score, 2));
     }
 
     private IReadOnlyList<SymptomKnowledgeEntry> LoadKnowledgeEntries()
@@ -158,12 +210,10 @@ public class OllamaSymptomChatService : IAiSymptomChatService
         {
             var json = File.ReadAllText(path);
             var entries = JsonSerializer.Deserialize<List<SymptomKnowledgeEntry>>(
-                    json,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            return entries is null
-                ? Array.Empty<SymptomKnowledgeEntry>()
-                : entries;
+            return entries is null ? Array.Empty<SymptomKnowledgeEntry>() : entries;
         }
         catch (JsonException ex)
         {
@@ -191,19 +241,27 @@ public class OllamaSymptomChatService : IAiSymptomChatService
             }
         }
 
-        return builder.ToString()
+        return builder
+            .ToString()
             .Normalize(NormalizationForm.FormC)
             .Replace('đ', 'd');
     }
 
-    private static string DetermineUrgencyLevel(string message, IReadOnlyList<SymptomKnowledgeEntry> matches)
+    private static IReadOnlySet<string> Tokenize(string value)
+        => NormalizeForSearch(value)
+            .Split([' ', ',', '.', ';', ':', '/', '\\', '-', '_', '\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries)
+            .Where(token => token.Length >= 2)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static string DetermineUrgencyLevel(string message, IReadOnlyList<KnowledgeMatch> matches)
     {
         var normalizedMessage = NormalizeForSearch(message);
         var emergencySigns = matches
-            .SelectMany(match => match.EmergencySigns)
+            .SelectMany(match => match.Entry.EmergencySigns)
             .Concat(new[]
             {
                 "đau ngực dữ dội",
+                "đau ngực kéo dài",
                 "khó thở",
                 "ngất",
                 "yếu liệt",
@@ -211,27 +269,29 @@ public class OllamaSymptomChatService : IAiSymptomChatService
                 "chảy máu nhiều",
                 "đau bụng dữ dội",
                 "tím tái",
-                "mất ý thức"
+                "mất ý thức",
+                "nói khó",
+                "méo miệng",
+                "bí tiểu",
+                "nôn ra máu"
             });
 
         return emergencySigns.Any(sign =>
             normalizedMessage.Contains(NormalizeForSearch(sign), StringComparison.OrdinalIgnoreCase))
             ? "emergency"
-            : matches.Count > 0
-                ? "routine"
-                : "unknown";
+            : matches.Count > 0 ? "routine" : "unknown";
     }
 
     private static AiSymptomChatResponseDto BuildResponse(
         string answer,
-        IReadOnlyList<SymptomKnowledgeEntry> matches,
+        IReadOnlyList<KnowledgeMatch> matches,
         string urgencyLevel,
         bool aiRuntimeAvailable)
         => new()
         {
             Answer = answer.Trim(),
             RecommendedSpecialties = matches
-                .Select(match => match.RecommendedSpecialty)
+                .Select(match => match.Entry.RecommendedSpecialty)
                 .Where(specialty => !string.IsNullOrWhiteSpace(specialty))
                 .Distinct()
                 .ToArray(),
@@ -239,14 +299,16 @@ public class OllamaSymptomChatService : IAiSymptomChatService
             AiRuntimeAvailable = aiRuntimeAvailable,
             Matches = matches.Select(match => new AiSymptomKnowledgeMatchDto
             {
-                Title = match.Title,
-                RecommendedSpecialty = match.RecommendedSpecialty,
-                PossibleConditions = match.PossibleConditions,
-                EmergencySigns = match.EmergencySigns
+                Title = match.Entry.Title,
+                RecommendedSpecialty = match.Entry.RecommendedSpecialty,
+                PossibleConditions = match.Entry.PossibleConditions,
+                EmergencySigns = match.Entry.EmergencySigns,
+                MatchedSymptoms = match.MatchedSymptoms,
+                Score = match.Score
             }).ToArray()
         };
 
-    private static string BuildKnowledgeContext(IReadOnlyList<SymptomKnowledgeEntry> matches)
+    private static string BuildKnowledgeContext(IReadOnlyList<KnowledgeMatch> matches)
     {
         if (matches.Count == 0)
         {
@@ -257,43 +319,73 @@ public class OllamaSymptomChatService : IAiSymptomChatService
             Environment.NewLine,
             matches.Select((match, index) =>
                 $"""
-                Ngữ cảnh {index + 1}:
-                - Nhóm: {match.Title}
-                - Bệnh lý có thể liên quan: {string.Join(", ", match.PossibleConditions)}
-                - Chuyên khoa gợi ý: {match.RecommendedSpecialty}
-                - Dấu hiệu nguy hiểm: {string.Join(", ", match.EmergencySigns)}
+                Khả năng {index + 1}:
+                - Nhóm bệnh lý: {match.Entry.Title}
+                - Triệu chứng đã khớp: {FormatList(match.MatchedSymptoms)}
+                - Điểm phù hợp nội bộ: {match.Score}
+                - Bệnh lý có thể liên quan: {FormatList(match.Entry.PossibleConditions)}
+                - Chuyên khoa gợi ý: {match.Entry.RecommendedSpecialty}
+                - Dấu hiệu nguy hiểm: {FormatList(match.Entry.EmergencySigns)}
                 """));
     }
 
-    private static string BuildFallbackAnswer(IReadOnlyList<SymptomKnowledgeEntry> matches)
+    private static string BuildFallbackAnswer(IReadOnlyList<KnowledgeMatch> matches)
     {
         if (matches.Count == 0)
         {
             return """
-            Mình chưa tìm thấy nhóm triệu chứng đủ rõ trong cơ sở tri thức nội bộ.
+            Mình chưa có đủ dữ kiện để gợi ý nhóm bệnh lý phù hợp.
 
-            Bạn có thể mô tả thêm: triệu chứng chính, thời gian xuất hiện, mức độ nặng, tuổi, bệnh nền, thuốc đang dùng và có dấu hiệu nguy hiểm như khó thở, đau ngực, ngất, co giật hay không.
+            Bạn hãy mô tả thêm: triệu chứng chính, thời gian xuất hiện, mức độ nặng, tuổi, bệnh nền, thuốc đang dùng và có dấu hiệu nguy hiểm như khó thở, đau ngực, ngất, co giật hay không.
 
             Thông tin này chỉ mang tính tham khảo và không thay thế chẩn đoán của bác sĩ.
             """;
         }
 
-        var specialties = string.Join(", ", matches.Select(match => match.RecommendedSpecialty).Distinct());
-        var possibleConditions = string.Join(", ", matches.SelectMany(match => match.PossibleConditions).Distinct().Take(6));
-        var emergencySigns = string.Join(", ", matches.SelectMany(match => match.EmergencySigns).Distinct().Take(6));
+        var topMatches = matches.Take(3).ToArray();
+        var builder = new StringBuilder();
+        builder.AppendLine("Dựa trên triệu chứng bạn mô tả, các khả năng cần nghĩ tới gồm:");
+        builder.AppendLine();
 
-        return $"""
-        Hệ thống AI đang tạm thời chưa sẵn sàng, nhưng dựa trên cơ sở tri thức nội bộ, triệu chứng của bạn có thể liên quan đến: {possibleConditions}.
+        for (var index = 0; index < topMatches.Length; index++)
+        {
+            var match = topMatches[index];
+            builder
+                .Append(index + 1)
+                .Append(". ")
+                .Append(match.Entry.Title)
+                .Append(" - phù hợp vì có: ")
+                .Append(FormatList(match.MatchedSymptoms))
+                .Append(". Có thể liên quan đến: ")
+                .Append(FormatList(match.Entry.PossibleConditions))
+                .AppendLine(".");
+        }
 
-        Chuyên khoa nên cân nhắc đặt lịch: {specialties}.
+        builder.AppendLine();
+        builder
+            .Append("Chuyên khoa nên cân nhắc đặt lịch: ")
+            .Append(FormatList(topMatches.Select(match => match.Entry.RecommendedSpecialty).Distinct()))
+            .AppendLine(".");
 
-        Nếu có các dấu hiệu như {emergencySigns}, bạn nên đi cấp cứu hoặc liên hệ cơ sở y tế ngay.
+        var emergencySigns = topMatches
+            .SelectMany(match => match.Entry.EmergencySigns)
+            .Distinct()
+            .Take(8)
+            .ToArray();
 
-        Thông tin này chỉ mang tính tham khảo và không thay thế chẩn đoán của bác sĩ.
-        """;
+        builder.AppendLine();
+        builder
+            .Append("Nếu có các dấu hiệu như ")
+            .Append(FormatList(emergencySigns))
+            .AppendLine(", bạn nên đi cấp cứu hoặc liên hệ cơ sở y tế ngay.");
+
+        builder.AppendLine();
+        builder.Append("Thông tin này chỉ mang tính tham khảo và không thay thế chẩn đoán của bác sĩ.");
+
+        return builder.ToString();
     }
 
-    private static string BuildPrompt(string message, IReadOnlyList<SymptomKnowledgeEntry> matches)
+    private static string BuildPrompt(string message, IReadOnlyList<KnowledgeMatch> matches)
         => $$"""
         Bạn là trợ lý sàng lọc triệu chứng cho website bệnh viện ERM Hospital.
         Chỉ trả lời bằng tiếng Việt.
@@ -301,9 +393,13 @@ public class OllamaSymptomChatService : IAiSymptomChatService
         Không được kê đơn thuốc, liều dùng, hoặc hướng dẫn tự điều trị nguy hiểm.
         Luôn nói đây chỉ là thông tin tham khảo và bệnh nhân nên đặt lịch khám bác sĩ.
 
-        Nếu có dấu hiệu nguy hiểm như đau ngực, khó thở, ngất, yếu liệt nửa người,
-        co giật, chảy máu nhiều, đau bụng dữ dội, sốt cao kéo dài, tím tái,
-        hãy ưu tiên khuyên người dùng đi cấp cứu ngay.
+        Nhiệm vụ:
+        - Ưu tiên ngữ cảnh nội bộ bên dưới.
+        - Đưa ra 2-4 khả năng bệnh lý theo mức phù hợp, không nói chắc chắn.
+        - Nêu ngắn gọn lý do khớp triệu chứng.
+        - Nêu dấu hiệu nguy hiểm cần đi cấp cứu.
+        - Gợi ý chuyên khoa phù hợp.
+        - Nếu dữ kiện thiếu, hỏi 2-3 câu làm rõ.
 
         Ngữ cảnh nội bộ từ cơ sở tri thức triệu chứng - chuyên khoa:
         {{BuildKnowledgeContext(matches)}}
@@ -311,13 +407,28 @@ public class OllamaSymptomChatService : IAiSymptomChatService
         Triệu chứng người dùng:
         {{message}}
 
-        Hãy trả lời ngắn gọn, dễ hiểu theo cấu trúc:
+        Hãy trả lời theo cấu trúc:
         1. Tóm tắt triệu chứng.
-        2. Các nhóm bệnh lý có thể liên quan.
+        2. Khả năng bệnh lý có thể liên quan.
         3. Dấu hiệu nguy hiểm cần đi cấp cứu.
         4. Chuyên khoa phù hợp để đặt lịch.
-        5. Khuyến nghị tiếp theo.
+        5. Câu hỏi cần làm rõ hoặc khuyến nghị tiếp theo.
         """;
+
+    private static string FormatList(IEnumerable<string> values)
+    {
+        var items = values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct()
+            .ToArray();
+
+        return items.Length == 0 ? "chưa rõ" : string.Join(", ", items);
+    }
+
+    private sealed record KnowledgeMatch(
+        SymptomKnowledgeEntry Entry,
+        IReadOnlyList<string> MatchedSymptoms,
+        double Score);
 
     private sealed class SymptomKnowledgeEntry
     {

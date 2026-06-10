@@ -5,6 +5,8 @@ export type AiSymptomKnowledgeMatch = {
   recommendedSpecialty: string;
   possibleConditions: string[];
   emergencySigns: string[];
+  matchedSymptoms: string[];
+  score: number;
 };
 
 export type AiSymptomChatResponse = {
