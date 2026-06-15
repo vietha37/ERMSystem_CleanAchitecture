@@ -1,4 +1,5 @@
 import api from "./api";
+import { getApiErrorMessage } from "./error";
 
 export type PublicHospitalAppointmentBookingPayload = {
   fullName: string;
@@ -34,11 +35,15 @@ export const hospitalAppointmentService = {
   async bookPublicAppointment(
     payload: PublicHospitalAppointmentBookingPayload
   ): Promise<PublicHospitalAppointmentBookingResult> {
-    const response = await api.post<PublicHospitalAppointmentBookingResult>(
-      "/hospital-appointments/public-booking",
-      payload
-    );
+    try {
+      const response = await api.post<PublicHospitalAppointmentBookingResult>(
+        "/hospital-appointments/public-booking",
+        payload
+      );
 
-    return response.data;
+      return response.data;
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, "Không thể đặt lịch lúc này."));
+    }
   },
 };

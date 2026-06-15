@@ -62,7 +62,7 @@ namespace ERMSystem.Application.Services
 
             if (matchingSchedule == null)
             {
-                throw new InvalidOperationException("Khung gio duoc chon khong nam trong lich lam viec cua bac si.");
+                throw new InvalidOperationException("Hãy đặt lịch trong khung giờ bác sĩ trực.");
             }
 
             var appointmentStartLocal = request.PreferredDate.ToDateTime(request.PreferredTime);
