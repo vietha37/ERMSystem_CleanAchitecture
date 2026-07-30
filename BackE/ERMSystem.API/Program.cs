@@ -343,7 +343,7 @@ builder.Services.AddScoped<IDashboardQueryCache, DashboardQueryCache>();
 // ── DI – Dashboard ────────────────────────────────────────────────────────────
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
-builder.Services.AddHttpClient<IAiSymptomChatService, OllamaSymptomChatService>();
+builder.Services.AddHttpClient<IAiSymptomChatService, GeminiSymptomChatService>();
 builder.Services.AddScoped<IHospitalCatalogRepository, HospitalCatalogRepository>();
 builder.Services.AddScoped<IHospitalCatalogService, HospitalCatalogService>();
 builder.Services.AddScoped<IHospitalDoctorRepository, HospitalDoctorRepository>();
@@ -463,6 +463,8 @@ builder.Services.AddControllers()
 var app = builder.Build();
 
 // ── HTTP Pipeline ─────────────────────────────────────────────────────────────
+app.UseCors("AllowFrontend");
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -491,7 +493,6 @@ app.Use(async (context, next) =>
 });
 
 app.UseMiddleware<RequestObservabilityMiddleware>();
-app.UseCors("AllowFrontend");
 app.UseRateLimiter();
 
 app.UseAuthentication();

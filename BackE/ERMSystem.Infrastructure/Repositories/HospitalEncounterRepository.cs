@@ -70,7 +70,8 @@ public class HospitalEncounterRepository : IHospitalEncounterRepository
 
         var totalCount = await query.CountAsync(ct);
         var items = await query
-            .OrderByDescending(x => x.UpdatedAtUtc)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ThenByDescending(x => x.UpdatedAtUtc)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);

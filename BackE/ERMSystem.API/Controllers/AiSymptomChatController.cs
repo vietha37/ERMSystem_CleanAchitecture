@@ -27,7 +27,8 @@ public class AiSymptomChatController : ControllerBase
             return BadRequest(new { message = "Vui lòng nhập triệu chứng." });
         }
 
-        var result = await _aiSymptomChatService.AnalyzeAsync(request.Message, ct);
+        var history = request.History ?? Array.Empty<AiChatTurnDto>();
+        var result = await _aiSymptomChatService.AnalyzeAsync(request.Message, history, ct);
         return Ok(result);
     }
 }

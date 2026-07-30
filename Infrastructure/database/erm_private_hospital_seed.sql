@@ -10,6 +10,23 @@ GO
   Uu tien ten goi va noi dung bang tieng Viet, giu nguyen ten thuoc va ma chuan khi can.
 */
 
+MERGE [identity].Roles AS target
+USING (VALUES
+    ('Admin', N'Quan tri he thong', 1),
+    ('Doctor', N'Bac si', 1),
+    ('Cashier', N'Thu ngan', 1),
+    ('Patient', N'Benh nhan', 1)
+) AS source (Code, Name, IsSystemRole)
+ON target.Code = source.Code
+WHEN MATCHED THEN
+    UPDATE SET
+        Name = source.Name,
+        IsSystemRole = source.IsSystemRole
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (Code, Name, IsSystemRole)
+    VALUES (source.Code, source.Name, source.IsSystemRole);
+GO
+
 INSERT INTO org.Departments (Id, DepartmentCode, Name, Description)
 SELECT NEWID(), 'OPD', N'Khối khám ngoại trú', N'Tiếp nhận và điều phối khám ngoại trú'
 WHERE NOT EXISTS (SELECT 1 FROM org.Departments WHERE DepartmentCode = 'OPD');
@@ -30,6 +47,32 @@ GO
 DECLARE @OpdDepartmentId UNIQUEIDENTIFIER = (SELECT TOP 1 Id FROM org.Departments WHERE DepartmentCode = 'OPD');
 DECLARE @LabDepartmentId UNIQUEIDENTIFIER = (SELECT TOP 1 Id FROM org.Departments WHERE DepartmentCode = 'LAB');
 DECLARE @ImgDepartmentId UNIQUEIDENTIFIER = (SELECT TOP 1 Id FROM org.Departments WHERE DepartmentCode = 'IMG');
+GO
+
+MERGE org.Specialties AS target
+USING (
+    SELECT code.SpecialtyCode, code.Name, d.Id AS DepartmentId, code.IsActive
+    FROM (VALUES
+        ('CARD', N'Tim mach', 1),
+        ('GASTRO', N'Tieu hoa - gan mat', 1),
+        ('OBGYN', N'San phu khoa', 1),
+        ('PED', N'Nhi khoa', 1),
+        ('MSK', N'Co xuong khop', 1),
+        ('NEURO', N'Than kinh', 1),
+        ('GEN', N'Noi tong quat', 0)
+    ) code (SpecialtyCode, Name, IsActive)
+    CROSS JOIN org.Departments d
+    WHERE d.DepartmentCode = 'OPD'
+) AS source (SpecialtyCode, Name, DepartmentId, IsActive)
+ON target.SpecialtyCode = source.SpecialtyCode
+WHEN MATCHED THEN
+    UPDATE SET
+        Name = source.Name,
+        DepartmentId = source.DepartmentId,
+        IsActive = source.IsActive
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (Id, SpecialtyCode, Name, DepartmentId, IsActive)
+    VALUES (NEWID(), source.SpecialtyCode, source.Name, source.DepartmentId, source.IsActive);
 GO
 
 INSERT INTO org.Specialties (Id, SpecialtyCode, Name, DepartmentId)

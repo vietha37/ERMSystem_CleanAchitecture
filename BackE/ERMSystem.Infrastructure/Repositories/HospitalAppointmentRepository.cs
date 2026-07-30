@@ -206,7 +206,8 @@ public class HospitalAppointmentRepository : IHospitalAppointmentRepository
 
         var totalCount = await query.CountAsync(ct);
         var items = await query
-            .OrderBy(x => x.AppointmentStartUtc)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ThenByDescending(x => x.AppointmentStartUtc)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(ct);

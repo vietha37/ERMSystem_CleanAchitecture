@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import ProtectedLayout from "@/components/layout/ProtectedLayout";
@@ -164,6 +164,8 @@ export default function PatientPortalPage() {
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [qrLoadingInvoiceId, setQrLoadingInvoiceId] = useState<string | null>(null);
   const [isQrSubmitting, setIsQrSubmitting] = useState(false);
+  const [dismissedReminderIds, setDismissedReminderIds] = useState<Set<string>>(new Set());
+  const [now, setNow] = useState(() => new Date());
 
   const visitHistoryPageSize = 5;
 
@@ -201,13 +203,38 @@ export default function PatientPortalPage() {
     void loadPortalData();
   }, [loadPortalData]);
 
+  // Cập nhật "now" mỗi phút để countdown tự refresh
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const profile = overview?.profile;
-  const upcomingAppointments = overview?.upcomingAppointments ?? [];
+  const upcomingAppointments = useMemo(
+    () => overview?.upcomingAppointments ?? [],
+    [overview]
+  );
   const recentAppointments = overview?.recentAppointments ?? [];
   const recentPrescriptions = overview?.recentPrescriptions ?? [];
   const recentClinicalOrders = overview?.recentClinicalOrders ?? [];
   const recentInvoices = overview?.recentInvoices ?? [];
   const visitHistoryItems = visitHistory?.items ?? [];
+
+  // Lịch hẹn cần nhắc nhở: trong vòng 24 giờ, chưa bị dismiss
+  const reminderAppointments = useMemo(() => {
+    const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    return upcomingAppointments
+      .filter((appt) => {
+        if (appt.status === "Cancelled" || appt.status === "Completed") return false;
+        if (dismissedReminderIds.has(appt.appointmentId)) return false;
+        const start = new Date(appt.appointmentStartLocal);
+        return start > now && start <= cutoff;
+      })
+      .sort((a, b) =>
+        new Date(a.appointmentStartLocal).getTime() -
+        new Date(b.appointmentStartLocal).getTime()
+      );
+  }, [upcomingAppointments, dismissedReminderIds, now]);
 
   const visitHistoryTotalPages = Math.max(
     1,
@@ -321,6 +348,17 @@ export default function PatientPortalPage() {
               </div>
             </div>
           </section>
+
+          {/* Banner nhắc lịch khám */}
+          {!isLoading && reminderAppointments.length > 0 && (
+            <AppointmentReminderBanner
+              appointments={reminderAppointments}
+              now={now}
+              onDismiss={(id) =>
+                setDismissedReminderIds((prev) => new Set([...prev, id]))
+              }
+            />
+          )}
 
           <section className="overflow-hidden rounded-[2.5rem] border border-cyan-100 bg-white/90 shadow-[0_30px_90px_rgba(15,23,42,0.08)] backdrop-blur">
             <div className="grid gap-8 px-8 py-8 lg:grid-cols-[1.2fr_0.8fr] lg:px-10 lg:py-10">
@@ -1194,5 +1232,183 @@ function RichInfoBlock({
         {value || "--"}
       </p>
     </div>
+  );
+}
+
+// --- Appointment Reminder Banner --------------------------------------------
+
+type ReminderUrgency = "critical" | "high" | "normal";
+
+function getReminderUrgency(minutesUntil: number): ReminderUrgency {
+  if (minutesUntil <= 120) return "critical";
+  if (minutesUntil <= 360) return "high";
+  return "normal";
+}
+
+function formatCountdown(minutesUntil: number): string {
+  if (minutesUntil < 1) return "S?p b?t d?u";
+  const hours = Math.floor(minutesUntil / 60);
+  const mins = minutesUntil % 60;
+  if (hours === 0) return `c�n ${mins} ph�t`;
+  if (mins === 0) return `c�n ${hours} gi?`;
+  return `c�n ${hours} gi? ${mins} ph�t`;
+}
+
+const urgencyConfig: Record<
+  ReminderUrgency,
+  { wrapperClass: string; badgeClass: string; timeClass: string; label: string }
+> = {
+  critical: {
+    wrapperClass:
+      "border-orange-300 bg-gradient-to-r from-orange-50 via-red-50 to-orange-50 shadow-[0_0_0_3px_rgba(251,146,60,0.22)]",
+    badgeClass: "border border-orange-300 bg-orange-100 text-orange-700",
+    timeClass: "text-orange-700 font-bold",
+    label: "R?t g?p",
+  },
+  high: {
+    wrapperClass:
+      "border-amber-200 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]",
+    badgeClass: "border border-amber-300 bg-amber-100 text-amber-700",
+    timeClass: "text-amber-700 font-semibold",
+    label: "G?p",
+  },
+  normal: {
+    wrapperClass:
+      "border-cyan-200 bg-gradient-to-r from-cyan-50/60 via-sky-50/60 to-cyan-50/60",
+    badgeClass: "border border-cyan-200 bg-cyan-50 text-cyan-700",
+    timeClass: "text-cyan-700 font-semibold",
+    label: "S?p t?i",
+  },
+};
+
+const urgencyAccentClass: Record<ReminderUrgency, string> = {
+  critical: "bg-orange-400",
+  high: "bg-amber-400",
+  normal: "bg-cyan-400",
+};
+
+function AppointmentReminderBanner({
+  appointments,
+  now,
+  onDismiss,
+}: {
+  appointments: HospitalPatientPortalAppointment[];
+  now: Date;
+  onDismiss: (id: string) => void;
+}) {
+  return (
+    <section aria-label="Nh?c l?ch kh�m s?p t?i">
+      <div className="mb-3 flex items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 animate-bounce items-center justify-center rounded-full bg-orange-100">
+          <span className="text-lg leading-none">??</span>
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-orange-600">
+            Nh?c nh? l?ch kh�m
+          </p>
+          <p className="mt-0.5 text-sm text-slate-600">
+            B?n c� {appointments.length} l?ch h?n s?p di?n ra trong 24 gi? t?i.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {appointments.map((appt) => {
+          const start = new Date(appt.appointmentStartLocal);
+          const minutesUntil = Math.max(
+            0,
+            Math.round((start.getTime() - now.getTime()) / 60_000)
+          );
+          const urgency = getReminderUrgency(minutesUntil);
+          const cfg = urgencyConfig[urgency];
+          const accentClass = urgencyAccentClass[urgency];
+
+          return (
+            <article
+              key={appt.appointmentId}
+              className={`relative overflow-hidden rounded-[1.75rem] border p-5 transition-all ${cfg.wrapperClass}`}
+            >
+              <div
+                className={`absolute left-0 top-0 h-full w-1 rounded-l-[1.75rem] ${accentClass}`}
+              />
+              <div className="flex flex-col gap-4 pl-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${cfg.badgeClass}`}
+                    >
+                      {urgency === "critical" && (
+                        <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-orange-500" />
+                      )}
+                      {cfg.label}
+                    </span>
+                    <span className={`text-sm ${cfg.timeClass}`}>
+                      {formatCountdown(minutesUntil)}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      {appt.doctorName}
+                    </h3>
+                    <p className="mt-0.5 text-sm text-slate-600">
+                      {appt.specialtyName}
+                      {appt.clinicName ? ` � ${appt.clinicName}` : ""}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                    <span className="flex items-center gap-1.5 text-slate-700">
+                      <span className="text-base leading-none">??</span>
+                      <span className="font-medium">
+                        {start.toLocaleDateString("vi-VN", {
+                          weekday: "long",
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-1.5 text-slate-700">
+                      <span className="text-base leading-none">??</span>
+                      <span className="font-medium">
+                        {start.toLocaleTimeString("vi-VN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </span>
+                    {appt.chiefComplaint && (
+                      <span className="italic text-slate-500">
+                        &ldquo;{appt.chiefComplaint}&rdquo;
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="font-mono text-[11px] font-semibold tracking-wide text-slate-400">
+                    {appt.appointmentNumber}
+                  </p>
+                </div>
+
+                <button
+                  aria-label={`��ng nh?c nh? l?ch h?n ${appt.appointmentNumber}`}
+                  onClick={() => onDismiss(appt.appointmentId)}
+                  className="shrink-0 self-start rounded-full p-2 text-slate-400 transition hover:bg-white/60 hover:text-slate-600"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-4 w-4"
+                  >
+                    <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                  </svg>
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }

@@ -2,7 +2,21 @@ namespace ERMSystem.Application.DTOs;
 
 public class AiSymptomChatRequestDto
 {
+    /// <summary>Latest message from the user.</summary>
     public string Message { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Optional prior turns in the conversation (oldest first).
+    /// Each turn has role ("user" | "assistant") and content.
+    /// </summary>
+    public IReadOnlyList<AiChatTurnDto> History { get; set; } = Array.Empty<AiChatTurnDto>();
+}
+
+public class AiChatTurnDto
+{
+    /// <summary>"user" or "assistant"</summary>
+    public string Role { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
 }
 
 public class AiSymptomChatResponseDto

@@ -69,3 +69,16 @@ body {
     transform: translateY(0);
   }
 }
+
+/* Hide Next.js Dev Indicator Logo, Toast, & Portal Badge */
+nextjs-portal,
+[data-nextjs-toast],
+[data-nextjs-dialog-overlay],
+[data-next-badge],
+#next-route-announcer,
+div[class*="nextjs-toast"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

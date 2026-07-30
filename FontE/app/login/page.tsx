@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
@@ -127,11 +127,12 @@ export default function LoginPage() {
         </section>
 
         <section className="rounded-[2.5rem] border border-slate-200 bg-white/94 p-6 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur md:p-8">
-          <div className="rounded-full bg-slate-100 p-1">
+          <div className="rounded-full bg-slate-100 p-1" suppressHydrationWarning>
             <div className="grid grid-cols-2 gap-1">
               <button
                 type="button"
                 onClick={() => setLoginMode("staff")}
+                suppressHydrationWarning
                 className={`rounded-full px-4 py-3 text-sm font-semibold transition ${
                   loginMode === "staff" ? "bg-slate-950 text-white" : "text-slate-600"
                 }`}
@@ -141,6 +142,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setLoginMode("patient")}
+                suppressHydrationWarning
                 className={`rounded-full px-4 py-3 text-sm font-semibold transition ${
                   loginMode === "patient" ? "bg-cyan-700 text-white" : "text-slate-600"
                 }`}

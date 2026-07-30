@@ -18,7 +18,7 @@ namespace ERMSystem.Infrastructure.Repositories
         public async Task<List<Patient>> GetAllAsync(CancellationToken ct = default)
         {
             var rows = await BuildPatientQuery()
-                .OrderBy(x => x.Patient.CreatedAtUtc)
+                .OrderByDescending(x => x.Patient.CreatedAtUtc)
                 .ToListAsync(ct);
 
             return rows.Select(MapPatient).ToList();
@@ -52,7 +52,7 @@ namespace ERMSystem.Infrastructure.Repositories
 
             var totalCount = await query.CountAsync(ct);
             var rows = await query
-                .OrderBy(x => x.Patient.CreatedAtUtc)
+                .OrderByDescending(x => x.Patient.CreatedAtUtc)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync(ct);

@@ -17,7 +17,18 @@ export type AiSymptomChatResponse = {
   matches: AiSymptomKnowledgeMatch[];
 };
 
-export async function sendSymptomMessage(message: string): Promise<AiSymptomChatResponse> {
-  const response = await api.post<AiSymptomChatResponse>("/ai-symptom-chat", { message });
+export type ChatTurn = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export async function sendSymptomMessage(
+  message: string,
+  history: ChatTurn[] = [],
+): Promise<AiSymptomChatResponse> {
+  const response = await api.post<AiSymptomChatResponse>("/ai-symptom-chat", {
+    message,
+    history,
+  });
   return response.data;
 }

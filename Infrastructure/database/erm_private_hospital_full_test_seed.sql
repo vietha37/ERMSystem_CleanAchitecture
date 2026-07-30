@@ -1,4 +1,4 @@
-﻿SET ANSI_NULLS ON;
+SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
@@ -1419,7 +1419,7 @@ JOIN [identity].Users u
 WHERE NOT EXISTS (
     SELECT 1
     FROM patient.PatientAccounts pa
-    WHERE pa.PatientId = p.Id
+    WHERE pa.PatientId = p.Id OR pa.UserId = u.Id
 )
 OPTION (MAXRECURSION 19);
 

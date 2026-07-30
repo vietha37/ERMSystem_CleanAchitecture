@@ -66,7 +66,8 @@ public class HospitalDoctorWorklistRepository : IHospitalDoctorWorklistRepositor
         }
 
         var appointments = await appointmentsQuery
-            .OrderBy(x => x.AppointmentStartUtc)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .ThenByDescending(x => x.AppointmentStartUtc)
             .ToListAsync(ct);
 
         var appointmentIds = appointments.Select(x => x.Id).ToArray();
