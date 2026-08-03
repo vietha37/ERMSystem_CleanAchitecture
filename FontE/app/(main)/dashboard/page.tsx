@@ -154,6 +154,156 @@ function MainTrendChart({ points }: { points: DashboardTrendPoint[] }) {
   const patientLine = chartPoints(patientValues, width, height, padding);
   const appointmentLine = chartPoints(appointmentValues, width, height, padding);
   const prescriptionLine = chartPoints(prescriptionValues, width, height, padding);
+import { DashboardStats, DashboardTrendPoint, DashboardTrends } from "@/services/types";
+import { getApiErrorMessage } from "@/services/error";
+import toast from "react-hot-toast";
+
+type TrendPeriod = "daily" | "monthly";
+
+function toDateInputValue(date: Date): string {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function getDefaultRange(period: TrendPeriod): { from: string; to: string } {
+  const today = new Date();
+
+  if (period === "monthly") {
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const from = new Date(monthStart);
+    from.setMonth(from.getMonth() - 11);
+    return { from: toDateInputValue(from), to: toDateInputValue(today) };
+  }
+
+  const from = new Date(today);
+  from.setDate(from.getDate() - 29);
+  return { from: toDateInputValue(from), to: toDateInputValue(today) };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("vi-VN").format(value);
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function chartPoints(values: number[], width: number, height: number, padding: number): string {
+  if (values.length === 0) return "";
+  const max = Math.max(...values, 1);
+  const innerWidth = width - padding * 2;
+  const innerHeight = height - padding * 2;
+
+  return values
+    .map((value, idx) => {
+      const x = padding + (idx * innerWidth) / Math.max(values.length - 1, 1);
+      const y = padding + innerHeight - (value / max) * innerHeight;
+      return `${x},${y}`;
+    })
+    .join(" ");
+}
+
+function areaPath(points: string, width: number, height: number, padding: number): string {
+  if (!points) return "";
+  const first = points.split(" ")[0];
+  const last = points.split(" ").at(-1);
+  if (!first || !last) return "";
+  const firstX = first.split(",")[0];
+  const lastX = last.split(",")[0];
+  const bottomY = height - padding;
+  return `M ${firstX},${bottomY} L ${points.replaceAll(" ", " L ")} L ${lastX},${bottomY} Z`;
+}
+
+function ProgressRing({
+  value,
+  colorClass,
+}: {
+  value: number;
+  colorClass: string;
+}) {
+  const size = 64;
+  const stroke = 7;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = (clamp(value, 0, 100) / 100) * circumference;
+
+  return (
+    <div className="relative h-16 w-16">
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#dbeafe"
+          strokeWidth={stroke}
+          fill="transparent"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference - progress}
+          className={colorClass}
+          fill="transparent"
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-slate-600">
+        {Math.round(value)}%
+      </span>
+    </div>
+  );
+}
+
+function KpiCard({
+  title,
+  value,
+  percent,
+  colorClass,
+  note,
+}: {
+  title: string;
+  value: number;
+  percent: number;
+  colorClass: string;
+  note: string;
+}) {
+  return (
+    <Card className="rounded-3xl border border-slate-100 bg-white/90 p-5 shadow-sm">
+      <div className="mb-3 flex items-start justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-700">{title}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{formatNumber(value)}</p>
+          <p className="mt-1 text-xs text-slate-500">{note}</p>
+        </div>
+        <ProgressRing value={percent} colorClass={colorClass} />
+      </div>
+    </Card>
+  );
+}
+
+function MainTrendChart({ points }: { points: DashboardTrendPoint[] }) {
+  const width = 980;
+  const height = 310;
+  const padding = 28;
+  const patientValues = points.map((point) => point.patientsCount);
+  const appointmentValues = points.map((point) => point.appointmentsCount);
+  const prescriptionValues = points.map((point) => point.prescriptionsCount);
+  const maxValue = Math.max(...patientValues, ...appointmentValues, ...prescriptionValues, 1);
+  const patientLine = chartPoints(patientValues, width, height, padding);
+  const appointmentLine = chartPoints(appointmentValues, width, height, padding);
+  const prescriptionLine = chartPoints(prescriptionValues, width, height, padding);
   const patientArea = areaPath(patientLine, width, height, padding);
   const labelStep = Math.max(1, Math.floor(points.length / 7));
 
@@ -161,8 +311,8 @@ function MainTrendChart({ points }: { points: DashboardTrendPoint[] }) {
     <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-slate-800">Phân tích xu hướng</p>
-          <p className="text-xs text-slate-500">Biến động bệnh nhân, lịch hẹn và đơn thuốc</p>
+          <p className="text-sm font-semibold text-slate-800">Biểu đồ</p>
+          <p className="text-xs text-slate-500">Bệnh nhân, lịch hẹn và đơn thuốc theo thời gian</p>
         </div>
         <div className="flex items-center gap-4 text-xs">
           <span className="flex items-center gap-2 text-slate-600">
@@ -240,7 +390,7 @@ function DailySnapshotDonut({
   const total = items.reduce((sum, item) => sum + item.value, 0);
 
   if (total <= 0) {
-    return <p className="text-sm text-slate-500">Chưa có dữ liệu tổng hợp.</p>;
+    return <p className="text-sm text-slate-500">Chưa có dữ liệu.</p>;
   }
 
   const stops = items.reduce<{ next: number; parts: string[] }>(
@@ -500,7 +650,7 @@ export default function DashboardPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-100 bg-white px-5 py-4 shadow-sm">
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">Bảng điều hành</h1>
-                <p className="text-xs text-slate-500">Tổng quan vận hành bệnh viện</p>
+                <p className="text-xs text-slate-500">Tổng quan</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <input
@@ -565,8 +715,8 @@ export default function DashboardPage() {
               <Card className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-800">Cơ cấu trạng thái hôm nay</p>
-                    <p className="text-xs text-slate-500">Lịch đang chờ, đã hoàn thành và đã hủy</p>
+                    <p className="text-sm font-semibold text-slate-800">Lịch hẹn hôm nay</p>
+                    <p className="text-xs text-slate-500">Theo trạng thái</p>
                   </div>
                   <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
                     Đang chờ {formatNumber(pending)}
@@ -594,8 +744,8 @@ export default function DashboardPage() {
               <Card className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-800">Ảnh chụp tài chính</p>
-                    <p className="text-xs text-slate-500">Số phát hành và số đã thu trong tháng</p>
+                    <p className="text-sm font-semibold text-slate-800">Tài chính tháng này</p>
+                    <p className="text-xs text-slate-500">Hóa đơn phát hành và đã thu</p>
                   </div>
                   <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
                     {collectionPercent.toFixed(0)}% đã thu
@@ -622,7 +772,7 @@ export default function DashboardPage() {
             </div>
 
             <Card className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-              <p className="text-sm font-semibold text-slate-800">Ảnh chụp trong ngày</p>
+              <p className="text-sm font-semibold text-slate-800">Hoạt động hôm nay</p>
               <div className="mt-4">
                 <DailySnapshotDonut items={snapshotPieData} />
               </div>
@@ -644,7 +794,7 @@ export default function DashboardPage() {
               <MainTrendChart points={trendPoints} />
             ) : (
               <Card className="flex h-[390px] items-center justify-center rounded-3xl border border-slate-100 bg-white text-slate-500">
-                Chưa có dữ liệu xu hướng.
+                Chưa có dữ liệu.
               </Card>
             )}
 
@@ -674,18 +824,18 @@ export default function DashboardPage() {
 
           <div className="space-y-4 xl:col-span-3">
             <Card className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-              <p className="text-sm font-semibold text-slate-800">Tổng hợp hoạt động</p>
+              <p className="text-sm font-semibold text-slate-800">Tổng hợp</p>
               <div className="mt-4 space-y-3">
                 <div className="rounded-2xl bg-gradient-to-r from-blue-500 to-sky-500 px-4 py-3 text-white">
-                  <p className="text-xs opacity-90">Bệnh nhân trong kỳ đã chọn</p>
+                  <p className="text-xs opacity-90">Bệnh nhân</p>
                   <p className="mt-1 text-2xl font-bold">{formatNumber(trendSummary.totalPatients)}</p>
                 </div>
                 <div className="rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 text-white">
-                  <p className="text-xs opacity-90">Lịch hẹn trong kỳ đã chọn</p>
+                  <p className="text-xs opacity-90">Lịch hẹn</p>
                   <p className="mt-1 text-2xl font-bold">{formatNumber(trendSummary.totalAppointments)}</p>
                 </div>
                 <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-3 text-white">
-                  <p className="text-xs opacity-90">Đơn thuốc trong kỳ đã chọn</p>
+                  <p className="text-xs opacity-90">Đơn thuốc</p>
                   <p className="mt-1 text-2xl font-bold">{formatNumber(trendSummary.totalPrescriptions)}</p>
                 </div>
               </div>

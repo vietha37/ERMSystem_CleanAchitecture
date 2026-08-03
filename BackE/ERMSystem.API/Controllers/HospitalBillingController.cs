@@ -46,6 +46,18 @@ public class HospitalBillingController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("encounter-preview/{encounterId:guid}")]
+    [Authorize(Policy = AppPermissions.HospitalBilling.Read)]
+    public async Task<IActionResult> GetEncounterPreview(Guid encounterId, CancellationToken ct)
+    {
+        var result = await _hospitalBillingService.GetEncounterPreviewAsync(encounterId, ct);
+        if (result == null)
+        {
+            return NotFound(new { message = "Khong tim thay encounter." });
+        }
+        return Ok(result);
+    }
+
     [HttpGet("{invoiceId:guid}")]
     [Authorize(Policy = AppPermissions.HospitalBilling.Read)]
     public async Task<IActionResult> GetById(Guid invoiceId, CancellationToken ct)

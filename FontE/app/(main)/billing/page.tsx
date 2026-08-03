@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -10,6 +10,7 @@ import { getApiErrorMessage } from "@/services/error";
 import { hospitalBillingService } from "@/services/hospitalBillingService";
 import {
   HospitalBillingEligibleEncounter,
+  HospitalBillingEncounterPreview,
   HospitalInvoiceDetail,
   HospitalInvoiceStatus,
   HospitalInvoiceSummary,
@@ -97,7 +98,8 @@ export default function BillingPage() {
 
   const [selectedEncounterId, setSelectedEncounterId] = useState("");
   const [discountAmount, setDiscountAmount] = useState("0");
-  const [insuranceAmount, setInsuranceAmount] = useState("0");
+  const [encounterPreview, setEncounterPreview] = useState<HospitalBillingEncounterPreview | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -115,6 +117,20 @@ export default function BillingPage() {
 
     return () => window.clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (!selectedEncounterId) {
+      setEncounterPreview(null);
+      return;
+    }
+
+    setIsLoadingPreview(true);
+    hospitalBillingService
+      .getEncounterPreview(selectedEncounterId)
+      .then((preview) => setEncounterPreview(preview))
+      .catch(() => setEncounterPreview(null))
+      .finally(() => setIsLoadingPreview(false));
+  }, [selectedEncounterId]);
 
   const fetchData = useCallback(
     async (showRefreshState = false) => {
@@ -177,6 +193,33 @@ export default function BillingPage() {
     [invoices]
   );
 
+  const previewBreakdown = useMemo(() => {
+    if (!encounterPreview) return { medTotal: 0, otherTotal: 0, total: 0 };
+    let medTotal = 0;
+    let otherTotal = 0;
+    for (const line of encounterPreview.billableLines) {
+      if (line.itemType === "Medication" || line.itemType === "Pharmacy") {
+        medTotal += line.lineAmount;
+      } else {
+        otherTotal += line.lineAmount;
+      }
+    }
+    return { medTotal, otherTotal, total: medTotal + otherTotal };
+  }, [encounterPreview]);
+
+  const detailBreakdown = useMemo(() => {
+    if (!selectedInvoice) return { medItems: [], otherItems: [], medTotal: 0, otherTotal: 0 };
+    const medItems = selectedInvoice.items.filter(
+      (item) => item.itemType === "Medication" || item.itemType === "Pharmacy"
+    );
+    const otherItems = selectedInvoice.items.filter(
+      (item) => item.itemType !== "Medication" && item.itemType !== "Pharmacy"
+    );
+    const medTotal = medItems.reduce((sum, item) => sum + item.lineAmount, 0);
+    const otherTotal = otherItems.reduce((sum, item) => sum + item.lineAmount, 0);
+    return { medItems, otherItems, medTotal, otherTotal };
+  }, [selectedInvoice]);
+
   const openDetail = async (invoiceId: string) => {
     try {
       const detail = await hospitalBillingService.getById(invoiceId);
@@ -199,14 +242,14 @@ export default function BillingPage() {
       await hospitalBillingService.createInvoice({
         encounterId: selectedEncounterId,
         discountAmount: Number(discountAmount || 0),
-        insuranceAmount: Number(insuranceAmount || 0),
+        insuranceAmount: 0,
       });
 
       toast.success("Đã tạo hóa đơn.");
       setIsCreateModalOpen(false);
       setSelectedEncounterId("");
       setDiscountAmount("0");
-      setInsuranceAmount("0");
+      setEncounterPreview(null);
       await fetchData(true);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Không thể tạo hóa đơn."));
@@ -261,7 +304,7 @@ export default function BillingPage() {
       setGatewayStatus("Captured");
       setIsGatewayModalOpen(false);
       setIsGatewayCallbackModalOpen(true);
-      toast.success("Đã tạo giao dịch chờ xác nhận.");
+      toast.success("Đã tạo giao dịch.");
       await fetchData(true);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Không thể tạo giao dịch thanh toán."));
@@ -292,8 +335,8 @@ export default function BillingPage() {
       setIsGatewayCallbackModalOpen(false);
       toast.success(
         gatewayStatus === "Captured"
-          ? "Đã xác nhận callback thanh toán thành công."
-          : "Đã ghi nhận callback thất bại."
+          ? "Xác nhận thanh toán thành công."
+          : "Giao dịch thất bại."
       );
       await fetchData(true);
     } catch (error: unknown) {
@@ -315,8 +358,7 @@ export default function BillingPage() {
               Hóa đơn và thanh toán
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-              Lập hóa đơn từ hồ sơ khám mới, gom phí khám và các dịch vụ cận lâm sàng đã
-              hoàn thành.
+              Quản lý hóa đơn, thu tiền và đối soát giao dịch.
             </p>
           </div>
 
@@ -347,7 +389,12 @@ export default function BillingPage() {
             <Button variant="secondary" onClick={() => void fetchData(true)} disabled={isRefreshing}>
               {isRefreshing ? "Đang làm mới..." : "Làm mới"}
             </Button>
-            <Button onClick={() => setIsCreateModalOpen(true)}>Lập hóa đơn</Button>
+            <Button onClick={() => {
+              setSelectedEncounterId("");
+              setEncounterPreview(null);
+              setDiscountAmount("0");
+              setIsCreateModalOpen(true);
+            }}>Lập hóa đơn</Button>
           </div>
         </div>
       </section>
@@ -367,7 +414,7 @@ export default function BillingPage() {
                 Đối soát thanh toán
               </p>
               <h2 className="mt-2 text-lg font-bold text-slate-950">
-                Queue gateway và ảnh chụp giao dịch
+                Trạng thái giao dịch
               </h2>
               <p className="mt-1 text-sm text-slate-600">
                 Cập nhật {formatDateTime(reconciliationSummary.generatedAtLocal)}
@@ -398,8 +445,8 @@ export default function BillingPage() {
           />
         ) : invoices.length === 0 ? (
           <EmptyState
-            title="Chưa có hóa đơn nào khớp bộ lọc hiện tại."
-            description="Thử đổi trạng thái, từ khóa hoặc lập hóa đơn từ hồ sơ khám đủ điều kiện."
+            title="Không tìm thấy hóa đơn."
+            description="Thay đổi bộ lọc hoặc lập hóa đơn mới."
             tone="emerald"
           />
         ) : (
@@ -443,14 +490,14 @@ export default function BillingPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-slate-700">
+                      <div className="text-sm font-semibold text-slate-900">
                         Tổng: {formatCurrency(invoice.totalAmount)}
                       </div>
-                      <div className="mt-1 text-sm text-slate-500">
+                      <div className="mt-1 text-sm text-emerald-600">
                         Đã thu: {formatCurrency(invoice.paidAmount)}
                       </div>
-                      <div className="mt-1 text-sm font-semibold text-rose-600">
-                        Còn lại: {formatCurrency(invoice.balanceAmount)}
+                      <div className="mt-1 text-sm font-bold text-rose-600">
+                        Còn nợ: {formatCurrency(invoice.balanceAmount)}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -527,94 +574,158 @@ export default function BillingPage() {
         </div>
       </Card>
 
+      {/* MODAL LẬP HÓA ĐƠN */}
       <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Lập hóa đơn">
         <form className="space-y-4" onSubmit={handleCreateInvoice}>
-          <select
-            value={selectedEncounterId}
-            onChange={(event) => setSelectedEncounterId(event.target.value)}
-            aria-label="Chọn hồ sơ khám để lập hóa đơn"
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-          >
-            <option value="">Chọn hồ sơ khám</option>
-            {availableEncounters.map((item) => (
-              <option key={item.encounterId} value={item.encounterId}>
-                {item.encounterNumber} - {item.patientName} - {item.completedLabOrders} xét nghiệm -{" "}
-                {item.completedImagingOrders} CĐHA
-              </option>
-            ))}
-          </select>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Chọn hồ sơ khám</label>
+            <select
+              value={selectedEncounterId}
+              onChange={(event) => setSelectedEncounterId(event.target.value)}
+              aria-label="Chọn hồ sơ khám để lập hóa đơn"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            >
+              <option value="">-- Chọn hồ sơ khám --</option>
+              {availableEncounters.map((item) => (
+                <option key={item.encounterId} value={item.encounterId}>
+                  {item.encounterNumber} - {item.patientName} (Khoa: {item.specialtyName})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {isLoadingPreview && (
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-center text-sm text-slate-500">
+              Đang tải chi phí...
+            </div>
+          )}
+
+          {encounterPreview && !isLoadingPreview && (
+            <div className="space-y-3 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 to-teal-50/70 p-4">
+              <div className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                Chi tiết ({encounterPreview.patientName} - MRN: {encounterPreview.medicalRecordNumber})
+              </div>
+
+              <div className="grid gap-2 text-sm">
+                <div className="flex justify-between rounded-xl bg-white/80 px-3 py-2">
+                  <span className="text-slate-600">Tiền thuốc:</span>
+                  <span className="font-semibold text-slate-900">{formatCurrency(previewBreakdown.medTotal)}</span>
+                </div>
+                <div className="flex justify-between rounded-xl bg-white/80 px-3 py-2">
+                  <span className="text-slate-600">Tiền khám & dịch vụ:</span>
+                  <span className="font-semibold text-slate-900">{formatCurrency(previewBreakdown.otherTotal)}</span>
+                </div>
+                <div className="flex justify-between border-t border-emerald-200/60 pt-2 font-bold text-slate-900 px-3">
+                  <span>Tạm tính:</span>
+                  <span className="text-emerald-700">{formatCurrency(previewBreakdown.total)}</span>
+                </div>
+              </div>
+
+              {encounterPreview.billableLines.length > 0 && (
+                <div className="mt-2 text-xs text-slate-500">
+                  Chi tiết: {encounterPreview.billableLines.map((l) => l.description).join(", ")}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Giảm giá (nếu có)</label>
             <input
               type="number"
               value={discountAmount}
               onChange={(event) => setDiscountAmount(event.target.value)}
-              placeholder="Giảm giá"
+              placeholder="0"
               aria-label="Giảm giá"
-              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-            />
-            <input
-              type="number"
-              value={insuranceAmount}
-              onChange={(event) => setInsuranceAmount(event.target.value)}
-              placeholder="Bảo hiểm"
-              aria-label="Giá trị bảo hiểm"
-              className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
             />
           </div>
-          <div className="flex justify-end gap-3">
+
+          {encounterPreview && (
+            <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-100/60 px-4 py-3 font-bold text-emerald-950">
+              <span>Tổng thanh toán:</span>
+              <span className="text-lg text-emerald-700">
+                {formatCurrency(Math.max(0, previewBreakdown.total - Number(discountAmount || 0)))}
+              </span>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => setIsCreateModalOpen(false)}>
-              Đóng
+              Hủy
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || !selectedEncounterId}>
               {isSubmitting ? "Đang lập..." : "Tạo hóa đơn"}
             </Button>
           </div>
         </form>
       </Modal>
 
-      <Modal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} title="Thu tiền">
+      {/* MODAL THU TIỀN */}
+      <Modal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} title="Thu tiền hóa đơn">
         <form className="space-y-4" onSubmit={handleReceivePayment}>
-          <select
-            value={paymentMethod}
-            onChange={(event) => setPaymentMethod(event.target.value)}
-            aria-label="Phương thức thu tiền"
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-          >
-            <option value="Cash">Tiền mặt</option>
-            <option value="Transfer">Chuyển khoản</option>
-            <option value="Card">Thẻ</option>
-          </select>
-          <input
-            type="number"
-            value={paymentAmount}
-            onChange={(event) => setPaymentAmount(event.target.value)}
-            placeholder="Số tiền"
-            aria-label="Số tiền thu"
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-          />
-          <input
-            type="text"
-            value={paymentReference}
-            onChange={(event) => setPaymentReference(event.target.value)}
-            placeholder="Mã tham chiếu"
-            aria-label="Mã tham chiếu thanh toán"
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-          />
-          <div className="flex justify-end gap-3">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-700">
+            <div className="font-semibold text-slate-900">{paymentInvoice?.invoiceNumber}</div>
+            <div className="mt-1">Bệnh nhân: {paymentInvoice?.patientName}</div>
+            <div className="mt-1 text-emerald-700 font-bold">
+              Số tiền còn nợ: {paymentInvoice ? formatCurrency(paymentInvoice.balanceAmount) : "--"}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Phương thức thanh toán</label>
+            <select
+              value={paymentMethod}
+              onChange={(event) => setPaymentMethod(event.target.value)}
+              aria-label="Phương thức thu tiền"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            >
+              <option value="Cash">Tiền mặt</option>
+              <option value="Transfer">Chuyển khoản bank</option>
+              <option value="Card">Thẻ POS</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Số tiền thu (VNĐ)</label>
+            <input
+              type="number"
+              value={paymentAmount}
+              onChange={(event) => setPaymentAmount(event.target.value)}
+              placeholder="Số tiền"
+              aria-label="Số tiền thu"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Mã tham chiếu / Ghi chú</label>
+            <input
+              type="text"
+              value={paymentReference}
+              onChange={(event) => setPaymentReference(event.target.value)}
+              placeholder="VD: CKS-123456 hoặc Phiếu thu #01"
+              aria-label="Mã tham chiếu thanh toán"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => setIsPaymentModalOpen(false)}>
               Đóng
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Đang ghi nhận..." : "Xác nhận thu tiền"}
+              {isSubmitting ? "Đang xử lý..." : "Thu tiền"}
             </Button>
           </div>
         </form>
       </Modal>
 
+      {/* MODAL GATEWAY */}
       <Modal
         isOpen={isGatewayModalOpen}
         onClose={() => setIsGatewayModalOpen(false)}
-        title="Tạo giao dịch gateway"
+        title="Tạo giao dịch"
       >
         <form className="space-y-4" onSubmit={handleCreateGatewayIntent}>
           <select
@@ -623,9 +734,9 @@ export default function BillingPage() {
             aria-label="Phương thức gateway"
             className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
           >
-            <option value="Transfer">Chuyển khoản gateway</option>
-            <option value="Card">Thẻ / cổng thanh toán</option>
-            <option value="EWallet">Ví điện tử</option>
+            <option value="Transfer">Chuyển khoản QR Gateway</option>
+            <option value="Card">Thẻ quốc tế / Cổng Online</option>
+            <option value="EWallet">Ví điện tử (MoMo/ZaloPay)</option>
           </select>
           <input
             type="number"
@@ -636,7 +747,7 @@ export default function BillingPage() {
             className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
           />
           <div className="rounded-2xl border border-violet-100 bg-violet-50/70 px-4 py-4 text-sm text-slate-700">
-            Tạo giao dịch `Pending` để mô phỏng luồng gateway callback vào API.
+            Giao dịch sẽ ở trạng thái chờ xác nhận.
           </div>
           <div className="flex justify-end gap-3">
             <Button type="button" variant="secondary" onClick={() => setIsGatewayModalOpen(false)}>
@@ -649,10 +760,11 @@ export default function BillingPage() {
         </form>
       </Modal>
 
+      {/* MODAL CALLBACK */}
       <Modal
         isOpen={isGatewayCallbackModalOpen}
         onClose={() => setIsGatewayCallbackModalOpen(false)}
-        title="Mô phỏng callback thanh toán"
+        title="Xác nhận giao dịch"
       >
         <form className="space-y-4" onSubmit={handleConfirmGatewayCallback}>
           <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm text-slate-700">
@@ -675,12 +787,11 @@ export default function BillingPage() {
             aria-label="Trạng thái callback gateway"
             className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
           >
-            <option value="Captured">Captured / Success</option>
-            <option value="Failed">Failed</option>
+            <option value="Captured">Captured / Thành công</option>
+            <option value="Failed">Failed / Thất bại</option>
           </select>
           <div className="rounded-2xl border border-amber-100 bg-amber-50/80 px-4 py-4 text-sm text-slate-700">
-            Luồng này gọi endpoint mô phỏng nội bộ. Webhook public của gateway hiện đã tách riêng
-            và yêu cầu chữ ký hợp lệ.
+            Xác nhận trạng thái thanh toán từ cổng giao dịch.
           </div>
           <div className="flex justify-end gap-3">
             <Button
@@ -691,59 +802,122 @@ export default function BillingPage() {
               Đóng
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Đang xử lý..." : "Gửi callback mô phỏng"}
+              {isSubmitting ? "Đang xử lý..." : "Xác nhận"}
             </Button>
           </div>
         </form>
       </Modal>
 
+      {/* MODAL CHI TIẾT HÓA ĐƠN */}
       <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title="Chi tiết hóa đơn">
         {!selectedInvoice ? (
           <div className="py-8 text-sm text-slate-500">Đang tải chi tiết...</div>
         ) : (
-          <div className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-2">
-              <InfoLine label="Hóa đơn" value={selectedInvoice.invoiceNumber} />
+          <div className="space-y-5">
+            <div className="grid gap-3 md:grid-cols-3">
+              <InfoLine label="Mã Hóa đơn" value={selectedInvoice.invoiceNumber} />
               <InfoLine label="Bệnh nhân" value={selectedInvoice.patientName} />
+              <InfoLine label="Mã bệnh án" value={selectedInvoice.medicalRecordNumber} />
               <InfoLine label="Hồ sơ khám" value={selectedInvoice.encounterNumber || "--"} />
-              <InfoLine label="Bác sĩ" value={selectedInvoice.doctorName || "--"} />
+              <InfoLine label="Bác sĩ chỉ định" value={selectedInvoice.doctorName || "--"} />
               <InfoLine label="Trạng thái" value={getStatusLabel(selectedInvoice.invoiceStatus)} />
-              <InfoLine label="Còn lại" value={formatCurrency(selectedInvoice.balanceAmount)} />
             </div>
 
-            <div>
-              <p className="mb-2 text-sm font-semibold text-slate-800">Dòng hóa đơn</p>
-              <div className="space-y-2">
-                {selectedInvoice.items.map((item) => (
-                  <div key={item.invoiceItemId} className="rounded-2xl border border-slate-100 px-4 py-3">
-                    <div className="font-medium text-slate-900">{item.description}</div>
-                    <div className="mt-1 text-sm text-slate-600">
-                      {item.quantity} x {formatCurrency(item.unitPrice)} ={" "}
-                      {formatCurrency(item.lineAmount)}
-                    </div>
-                  </div>
-                ))}
+            {/* BẢNG TỔNG HỢP CÔNG THỨC CHI PHÍ */}
+            <div className="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 p-4">
+              <div className="mb-2 text-xs font-bold uppercase tracking-wider text-emerald-800">
+                Tổng hợp chi phí
+              </div>
+              <div className="grid gap-2 text-sm sm:grid-cols-2">
+                <div className="flex justify-between rounded-xl bg-white/90 px-3 py-2 shadow-xs">
+                  <span className="text-slate-600">Tiền thuốc:</span>
+                  <span className="font-bold text-slate-900">{formatCurrency(detailBreakdown.medTotal)}</span>
+                </div>
+                <div className="flex justify-between rounded-xl bg-white/90 px-3 py-2 shadow-xs">
+                  <span className="text-slate-600">Tiền khám & dịch vụ:</span>
+                  <span className="font-bold text-slate-900">{formatCurrency(detailBreakdown.otherTotal)}</span>
+                </div>
+                <div className="flex justify-between rounded-xl bg-emerald-100/90 px-3 py-2 shadow-xs sm:col-span-2 font-bold text-emerald-950">
+                  <span>Tổng cộng:</span>
+                  <span className="text-emerald-700 text-base">{formatCurrency(selectedInvoice.totalAmount)}</span>
+                </div>
+                <div className="flex justify-between rounded-xl bg-white/90 px-3 py-2 text-emerald-700">
+                  <span>Đã thanh toán:</span>
+                  <span className="font-bold">{formatCurrency(selectedInvoice.paidAmount)}</span>
+                </div>
+                <div className="flex justify-between rounded-xl bg-white/90 px-3 py-2 text-rose-600">
+                  <span>Còn nợ:</span>
+                  <span className="font-bold">{formatCurrency(selectedInvoice.balanceAmount)}</span>
+                </div>
               </div>
             </div>
 
+            {/* DANH SÁCH CHI TIẾT THUỐC */}
+            {detailBreakdown.medItems.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Thuốc ({detailBreakdown.medItems.length} mục)
+                </p>
+                <div className="space-y-2">
+                  {detailBreakdown.medItems.map((item) => (
+                    <div key={item.invoiceItemId} className="flex items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-50/30 px-4 py-3">
+                      <div>
+                        <div className="font-semibold text-slate-900">{item.description}</div>
+                        <div className="mt-0.5 text-xs text-slate-500">
+                          {item.quantity} x {formatCurrency(item.unitPrice)}
+                        </div>
+                      </div>
+                      <div className="font-bold text-emerald-700">
+                        {formatCurrency(item.lineAmount)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* DANH SÁCH KHÁM VÀ DỊCH VỤ KHÁC */}
+            {detailBreakdown.otherItems.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Khám & dịch vụ khác ({detailBreakdown.otherItems.length} mục)
+                </p>
+                <div className="space-y-2">
+                  {detailBreakdown.otherItems.map((item) => (
+                    <div key={item.invoiceItemId} className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3">
+                      <div>
+                        <div className="font-semibold text-slate-900">{item.description}</div>
+                        <div className="mt-0.5 text-xs text-slate-500">
+                          Loại: {item.itemType} | {item.quantity} x {formatCurrency(item.unitPrice)}
+                        </div>
+                      </div>
+                      <div className="font-bold text-slate-900">
+                        {formatCurrency(item.lineAmount)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* LỊCH SỬ THANH TOÁN */}
             <div>
-              <p className="mb-2 text-sm font-semibold text-slate-800">Lịch sử thanh toán</p>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-700">Lịch sử thanh toán</p>
               {selectedInvoice.payments.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-6 text-sm text-slate-500">
-                  Chưa có thanh toán nào.
+                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-4 text-center text-sm text-slate-500">
+                  Chưa có thanh toán.
                 </div>
               ) : (
                 <div className="space-y-2">
                   {selectedInvoice.payments.map((payment) => (
                     <div key={payment.paymentId} className="rounded-2xl border border-slate-100 px-4 py-3">
-                      <div className="font-medium text-slate-900">{payment.paymentReference}</div>
-                      <div className="mt-1 text-sm text-slate-600">
-                        {payment.paymentMethod} - {formatCurrency(payment.amount)} -{" "}
-                        {formatDateTime(payment.paidAtLocal)}
+                      <div className="flex justify-between font-medium text-slate-900">
+                        <span>{payment.paymentReference} ({payment.paymentMethod})</span>
+                        <span className="font-bold text-emerald-600">{formatCurrency(payment.amount)}</span>
                       </div>
                       <div className="mt-1 text-xs text-slate-500">
-                        {payment.paymentStatus}
-                        {payment.externalTransactionId ? ` / ${payment.externalTransactionId}` : ""}
+                        Thời gian: {formatDateTime(payment.paidAtLocal)} | Trạng thái: {payment.paymentStatus}
+                        {payment.externalTransactionId ? ` | TxID: ${payment.externalTransactionId}` : ""}
                       </div>
                     </div>
                   ))}
@@ -766,37 +940,35 @@ function MetricCard({
   value: number;
   tone: "cyan" | "amber" | "emerald" | "slate";
 }) {
-  const toneClass = {
-    cyan: "border-cyan-200 bg-cyan-50 text-cyan-700",
-    amber: "border-amber-200 bg-amber-50 text-amber-700",
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    slate: "border-slate-200 bg-slate-50 text-slate-700",
-  }[tone];
+  const toneClasses = {
+    cyan: "border-cyan-100 bg-cyan-50/70 text-cyan-900",
+    amber: "border-amber-100 bg-amber-50/70 text-amber-900",
+    emerald: "border-emerald-100 bg-emerald-50/70 text-emerald-900",
+    slate: "border-slate-200 bg-slate-50 text-slate-900",
+  };
 
   return (
-    <Card className={`border p-5 shadow-sm ${toneClass}`}>
-      <p className="text-xs font-bold uppercase tracking-[0.24em]">{label}</p>
-      <p className="mt-3 text-3xl font-bold">{value}</p>
+    <Card className={`border p-5 ${toneClasses[tone]}`}>
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] opacity-75">{label}</p>
+      <p className="mt-3 text-3xl font-extrabold">{value}</p>
     </Card>
   );
 }
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/80 bg-white/80 px-4 py-4">
-      <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
-        {label}
-      </div>
-      <div className="mt-2 text-sm font-semibold text-slate-900">{value}</div>
+    <div className="rounded-2xl border border-violet-200/60 bg-white/90 px-3 py-2 text-center">
+      <p className="text-[11px] font-semibold text-slate-500">{label}</p>
+      <p className="mt-1 text-base font-bold text-slate-900">{value}</p>
     </div>
   );
 }
 
 function InfoLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-      <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">{label}</div>
-      <div className="mt-2 text-sm font-medium text-slate-800">{value}</div>
+    <div>
+      <div className="text-xs text-slate-400">{label}</div>
+      <div className="font-medium text-slate-800">{value}</div>
     </div>
   );
 }

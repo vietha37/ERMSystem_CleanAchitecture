@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -412,21 +412,19 @@ export default function ClinicalOrdersPage() {
       setIsSubmitting(false);
     }
   };
-
-  return (
+  return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="rounded-[2rem] border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-cyan-50 p-6 shadow-sm">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.26em] text-violet-700">
-              Cận lâm sàng
+              Chỉ định
             </p>
             <h1 className="mt-3 text-3xl font-bold text-slate-950">
               Chỉ định cận lâm sàng
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-              Quản lý danh sách xét nghiệm và chẩn đoán hình ảnh theo hospital database
-              mới, bám theo hồ sơ khám và phiếu chỉ định.
+              Xét nghiệm và chẩn đoán hình ảnh theo hồ sơ khám.
             </p>
           </div>
 
@@ -438,7 +436,6 @@ export default function ClinicalOrdersPage() {
               placeholder="Tìm theo mã chỉ định, bệnh nhân, dịch vụ..."
               className="min-w-[260px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
             />
-
             <select
               value={categoryFilter}
               onChange={(event) => {
@@ -523,7 +520,7 @@ export default function ClinicalOrdersPage() {
         ) : orders.length === 0 ? (
           <EmptyState
             title="Chưa có chỉ định nào khớp bộ lọc hiện tại."
-            description="Thử đổi phân loại, trạng thái hoặc từ khóa để mở rộng danh sách chỉ định."
+            description="Thay đổi bộ lọc để xem chỉ định khác."
             tone="violet"
           />
         ) : (

@@ -873,6 +873,30 @@ export type HospitalBillingEligibleEncounter = {
   startedAtLocal: string;
 };
 
+export type HospitalBillableLine = {
+  serviceCatalogId?: Id | null;
+  itemType: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  lineAmount: number;
+  referenceType?: string | null;
+  referenceId?: Id | null;
+};
+
+export type HospitalBillingEncounterPreview = {
+  encounterId: Id;
+  encounterNumber: string;
+  patientId: Id;
+  patientName: string;
+  medicalRecordNumber: string;
+  doctorName: string;
+  specialtyName: string;
+  clinicName: string;
+  consultationFee: number;
+  billableLines: HospitalBillableLine[];
+};
+
 export type HospitalInvoiceWorklistQuery = {
   pageNumber?: number;
   pageSize?: number;

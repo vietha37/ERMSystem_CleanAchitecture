@@ -245,7 +245,7 @@ public class HospitalBillingRepository : IHospitalBillingRepository
             .Include(x => x.Medicine)
             .Where(x =>
                 x.Prescription.OrderHeader.EncounterId == encounterId &&
-                x.Prescription.Status == "Dispensed" &&
+                (x.Prescription.Status == "Dispensed" || x.Prescription.Status == "Issued") &&
                 x.UnitPrice.HasValue &&
                 x.UnitPrice > 0)
             .ToListAsync(ct);

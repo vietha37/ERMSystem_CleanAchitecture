@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -120,13 +120,13 @@ export default function DoctorWorklistPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.26em] text-blue-700">
-              Vận hành lâm sàng
+              Lâm sàng
             </p>
             <h1 className="mt-3 text-3xl font-bold text-slate-950">
-              Công việc bác sĩ trong ngày
+              Danh sách công việc
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-              Theo dõi luồng khám theo từng bác sĩ: lịch hẹn, hồ sơ khám và đơn thuốc.
+              Lịch hẹn, hồ sơ khám và đơn thuốc của bác sĩ.
             </p>
           </div>
 
@@ -226,8 +226,8 @@ export default function DoctorWorklistPage() {
           />
         ) : items.length === 0 ? (
           <EmptyState
-            title="Không có ca khám nào cho bộ lọc hiện tại."
-            description="Thử đổi ngày làm việc hoặc bộ lọc bác sĩ để xem thêm ca khám."
+            title="Không tìm thấy ca khám."
+            description="Thay đổi bộ lọc để tìm ca khám."
             tone="blue"
           />
         ) : (

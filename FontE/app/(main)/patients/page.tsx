@@ -433,8 +433,8 @@ export default function PatientsPage() {
             </h1>
             <p className="mt-1 text-sm text-gray-500">
               {isDoctor
-                ? "Chỉ hiển thị bệnh nhân có lịch khám hoặc hồ sơ khám thuộc phạm vi bác sĩ hiện tại."
-                : "Quản lý hồ sơ bệnh nhân và theo dõi lịch sử chăm sóc tập trung."}
+                ? ""
+                : "Danh sách bệnh nhân và hồ sơ khám."}
             </p>
           </div>
 
@@ -501,7 +501,7 @@ export default function PatientsPage() {
               <thead className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 shadow-sm backdrop-blur-md">
                 <tr>
                   <th className="p-4 text-xs font-bold uppercase tracking-wider text-gray-500">
-                    Nhận diện
+                    <span className="sr-only">Ảnh</span>
                   </th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wider text-gray-500">
                     Họ và tên
@@ -569,7 +569,7 @@ export default function PatientsPage() {
                 ) : patients.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="p-16 text-center text-gray-500">
-                      <div className="mb-3 text-4xl">Ho so</div>
+                      <div className="mb-3 font-semibold text-gray-400">Hồ sơ trống</div>
                       <p className="font-medium">
                         {debouncedSearch
                           ? "Không có bệnh nhân nào khớp điều kiện tìm kiếm."

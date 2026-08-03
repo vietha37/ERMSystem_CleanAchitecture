@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -449,14 +449,13 @@ export default function MedicalRecordsPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.26em] text-emerald-700">
-              Hồ sơ lâm sàng
+              Hồ sơ khám
             </p>
             <h1 className="mt-3 text-3xl font-bold text-slate-950">
-              Hồ sơ khám bệnh hospital
+              Hồ sơ khám bệnh
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-              Module này đã chuyển sang hospital database mới. Mỗi hồ sơ được lưu
-              theo mô hình hồ sơ khám, gồm chẩn đoán, ghi chú lâm sàng và dấu hiệu sinh tồn.
+              Xem và quản lý hồ sơ khám bệnh, chẩn đoán và ghi chú lâm sàng.
             </p>
           </div>
 
@@ -997,7 +996,7 @@ export default function MedicalRecordsPage() {
               </div>
 
               <div className="space-y-3">
-                <p className="text-sm font-bold text-slate-900">Dòng thời gian workflow</p>
+                <p className="text-sm font-bold text-slate-900">Tiến trình xử lý</p>
                 {editingDetail.workflowEvents.length > 0 ? (
                   editingDetail.workflowEvents.map((event, index) => (
                     <div
@@ -1025,7 +1024,7 @@ export default function MedicalRecordsPage() {
                   ))
                 ) : (
                   <div className="rounded-2xl border border-dashed border-emerald-200 bg-white/70 px-4 py-4 text-sm text-slate-500">
-                    Chưa có sự kiện workflow nào ngoài trạng thái cơ bản của hồ sơ.
+                    Chưa có cập nhật tiến trình.
                   </div>
                 )}
               </div>

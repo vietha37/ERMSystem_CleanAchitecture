@@ -4,6 +4,7 @@ import {
   CreateHospitalPaymentIntentPayload,
   CreateHospitalInvoicePayload,
   HospitalBillingEligibleEncounter,
+  HospitalBillingEncounterPreview,
   HospitalInvoiceDetail,
   HospitalPaymentIntent,
   HospitalPaymentReconciliationSummary,
@@ -44,6 +45,13 @@ export const hospitalBillingService = {
   getEligibleEncounters: async (): Promise<HospitalBillingEligibleEncounter[]> => {
     const response = await api.get<HospitalBillingEligibleEncounter[]>(
       "/hospital-billing/eligible-encounters"
+    );
+    return response.data;
+  },
+
+  getEncounterPreview: async (encounterId: string): Promise<HospitalBillingEncounterPreview> => {
+    const response = await api.get<HospitalBillingEncounterPreview>(
+      `/hospital-billing/encounter-preview/${encounterId}`
     );
     return response.data;
   },

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -138,7 +138,26 @@ export default function NotificationsPage() {
       toast.success("Đã đưa thông báo về hàng đợi gửi lại.");
       await fetchDeliveries(true);
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, "Không thể retry thông báo."));
+      toast.error(getApiErrorMessage(error, "Không thể gửi lại thông báo."));
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  const handleStatusChange = (nextStatus: DeliveryStatusFilter) => {
+    setStatusFilter(nextStatus);
+    setPageNumber(1);
+  };
+
+  const handleRetry = async (delivery: NotificationDelivery) => {
+    setRetryingId(delivery.id);
+
+    try {
+      await hospitalNotificationDeliveryService.retry(delivery.id);
+      toast.success("Đã đưa thông báo về hàng đợi gửi lại.");
+      await fetchDeliveries(true);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể gửi lại thông báo."));
     } finally {
       setRetryingId(null);
     }
@@ -155,15 +174,13 @@ export default function NotificationsPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-700">
-              Vận hành thông báo
+              Thông báo
             </p>
             <h1 className="mt-3 text-3xl font-bold text-slate-900">
-              Theo dõi gửi thông báo
+              Quản lý thông báo
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              Giám sát trạng thái gửi Email và SMS từ pipeline notification.
-              Trang này tự động làm mới 15 giây để lễ tân và admin theo dõi
-              sự cố delivery ngay trong ca trực.
+              Theo dõi trạng thái gửi Email và SMS. Trang tự động cập nhật mỗi 15 giây.
             </p>
           </div>
 
@@ -215,7 +232,7 @@ export default function NotificationsPage() {
             {metrics.Queued}
           </p>
           <p className="mt-2 text-sm text-amber-800">
-            Cần publisher/worker xử lý tiếp.
+            Đang chờ xử lý.
           </p>
         </Card>
 
@@ -227,7 +244,7 @@ export default function NotificationsPage() {
             {metrics.Delivered}
           </p>
           <p className="mt-2 text-sm text-emerald-800">
-            Đã có provider message id hoặc đã xác nhận gửi.
+            Đã gửi thành công.
           </p>
         </Card>
 
@@ -239,7 +256,7 @@ export default function NotificationsPage() {
             {metrics.Failed}
           </p>
           <p className="mt-2 text-sm text-rose-800">
-            Cần kiểm tra lỗi và retry nếu phù hợp.
+            Gửi thất bại, cần kiểm tra.
           </p>
         </Card>
 
@@ -251,44 +268,12 @@ export default function NotificationsPage() {
             {metrics.Skipped}
           </p>
           <p className="mt-2 text-sm text-slate-600">
-            Thường do thiếu template hoặc không đủ dữ liệu người nhận.
+            Bị bỏ qua do thiếu thông tin.
           </p>
         </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border border-violet-100 bg-violet-50/70 p-5 shadow-sm hover:shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-violet-700">
-            Cần can thiệp
-          </p>
-          <p className="mt-3 text-3xl font-bold text-violet-950">
-            {summary?.actionRequiredCount ?? 0}
-          </p>
-          <p className="mt-2 text-sm text-violet-800">
-            Failed + Skipped cần operator kiểm tra hoặc retry.
-          </p>
-        </Card>
-
-        <Card className="border border-orange-100 bg-orange-50/70 p-5 shadow-sm hover:shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-700">
-            Queued quá 15 phút
-          </p>
-          <p className="mt-3 text-3xl font-bold text-orange-950">
-            {summary?.staleQueuedCount ?? 0}
-          </p>
-          <p className="mt-2 text-sm text-orange-800">
-            Dùng như backlog monitor cơ bản cho queue dispatch.
-          </p>
-        </Card>
-
-        <Card className="border border-cyan-100 bg-cyan-50/70 p-5 shadow-sm hover:shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">
-            Queued lâu nhất
-          </p>
-          <p className="mt-3 text-lg font-bold text-cyan-950">
-            {formatDateTime(summary?.oldestQueuedAtUtc)}
-          </p>
-          <p className="mt-2 text-sm text-cyan-800">
             Cập nhật gần nhất: {formatDateTime(summary?.generatedAtUtc)}
           </p>
         </Card>
@@ -299,14 +284,13 @@ export default function NotificationsPage() {
           <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">
-                CRM / patient engagement
+                Chăm sóc bệnh nhân
               </p>
               <h2 className="mt-2 text-xl font-bold text-slate-900">
-                Điều phối chăm sóc sau khám
+                Theo dõi sau khám
               </h2>
               <p className="mt-1 max-w-3xl text-sm text-slate-600">
-                Theo dõi 3 nhánh chiến dịch đã có trong backend: nhắc tái khám,
-                khảo sát hài lòng và CSKH follow-up.
+                Nhắc tái khám, khảo sát hài lòng và chăm sóc sau khám.
               </p>
             </div>
 
@@ -325,7 +309,7 @@ export default function NotificationsPage() {
               {engagementSummary?.totalCampaignMessages ?? 0}
             </p>
             <p className="mt-2 text-sm text-slate-600">
-              Tổng số outbox CRM đã được tạo.
+              Tổng số đã tạo.
             </p>
           </div>
 
@@ -337,7 +321,7 @@ export default function NotificationsPage() {
               {engagementSummary?.deliveredDeliveries ?? 0}
             </p>
             <p className="mt-2 text-sm text-slate-600">
-              Tổng delivery CRM đã xác nhận gửi.
+              Đã gửi thành công.
             </p>
           </div>
 
@@ -350,7 +334,7 @@ export default function NotificationsPage() {
                 (engagementSummary?.actionRequiredDeliveries ?? 0)}
             </p>
             <p className="mt-2 text-sm text-slate-600">
-              Gồm queued và failed/skipped cần theo dõi.
+              Đang chờ hoặc cần xử lý.
             </p>
           </div>
 
@@ -362,7 +346,7 @@ export default function NotificationsPage() {
               {engagementSummary?.totalRecipients ?? 0}
             </p>
             <p className="mt-2 text-sm text-slate-600">
-              Tổng Email/SMS được sinh ra từ chiến dịch CRM.
+              Tổng Email/SMS đã tạo.
             </p>
           </div>
         </div>
@@ -504,7 +488,7 @@ export default function NotificationsPage() {
         </div>
 
         {isLoading ? (
-          <LoadingState title="Đang tải dữ liệu notification..." tone="cyan" />
+          <LoadingState title="Đang tải..." tone="cyan" />
         ) : listError ? (
           <ErrorState
             title="Không thể tải hàng đợi gửi"
@@ -513,8 +497,8 @@ export default function NotificationsPage() {
           />
         ) : deliveries.length === 0 ? (
           <EmptyState
-            title="Không có delivery nào khớp bộ lọc hiện tại."
-            description="Thử đổi trạng thái lọc hoặc chờ worker tạo thêm dữ liệu."
+            title="Không có thông báo nào khớp bộ lọc hiện tại."
+            description="Thay đổi bộ lọc để xem thông báo khác."
             tone="cyan"
           />
         ) : (

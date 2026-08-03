@@ -63,13 +63,15 @@ public class HospitalBillingService : IHospitalBillingService
         return MapDetail(invoice);
     }
 
-    public async Task<HospitalBillingEligibleEncounterDto[]> GetEligibleEncountersAsync(
-        string currentRole,
-        string? currentUsername,
-        CancellationToken ct = default)
+    public async Task<HospitalBillingEligibleEncounterDto[]> GetEligibleEncountersAsync(string currentRole, string? currentUsername, CancellationToken ct = default)
     {
         var doctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
         return await _hospitalBillingRepository.GetEligibleEncountersAsync(doctorProfileId, ct);
+    }
+
+    public Task<HospitalBillingEncounterSnapshot?> GetEncounterPreviewAsync(Guid encounterId, CancellationToken ct = default)
+    {
+        return _hospitalBillingRepository.GetEncounterForInvoiceAsync(encounterId, ct);
     }
 
     public async Task<HospitalInvoiceDetailDto> CreateInvoiceAsync(CreateHospitalInvoiceDto request, CancellationToken ct = default)
@@ -89,8 +91,8 @@ public class HospitalBillingService : IHospitalBillingService
 
         var subtotal = encounter.BillableLines.Sum(x => x.LineAmount);
         var discount = Math.Max(0, request.DiscountAmount);
-        var insurance = Math.Max(0, request.InsuranceAmount);
-        var total = Math.Max(0, subtotal - discount - insurance);
+        var insurance = 0m;
+        var total = Math.Max(0, subtotal - discount);
         var nowUtc = DateTime.UtcNow;
         var invoiceId = Guid.NewGuid();
 

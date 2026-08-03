@@ -306,13 +306,13 @@ export default function AppointmentsPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.26em] text-cyan-700">
-              Dịch vụ lịch hẹn
+              Lịch hẹn
             </p>
             <h1 className="mt-3 text-3xl font-bold text-slate-950">
-              Điều phối lịch hẹn nội bộ
+              Quản lý lịch hẹn
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-              Tách rõ nhánh check-in, hoàn thành, hủy lịch và đổi lịch để lễ tân thao tác đúng chính sách.
+              Đặt lịch, check-in, hoàn thành và hủy lịch hẹn.
             </p>
           </div>
 
@@ -397,8 +397,8 @@ export default function AppointmentsPage() {
           />
         ) : appointments.length === 0 ? (
           <EmptyState
-            title="Không có lịch hẹn nào khớp bộ lọc hiện tại."
-            description="Thử đổi ngày, trạng thái hoặc từ khóa tìm kiếm để mở rộng kết quả."
+            title="Không tìm thấy lịch hẹn."
+            description="Thay đổi bộ lọc để tìm lịch hẹn."
             tone="cyan"
           />
         ) : (
@@ -599,7 +599,7 @@ export default function AppointmentsPage() {
           </div>
 
           <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            Chính sách hiện tại: chỉ hủy được lịch đang Scheduled. Lịch đã check-in sẽ phải xử lý tiếp ở quầy thay vì hủy trực tiếp.
+            Chỉ hủy được lịch ở trạng thái chờ khám. Lịch đã check-in không thể hủy.
           </div>
 
           <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
@@ -657,7 +657,7 @@ export default function AppointmentsPage() {
           </div>
 
           <div className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-700">
-            Chính sách hiện tại: chỉ đổi được lịch đang Scheduled, giữ nguyên bác sĩ, phải khớp lịch làm việc và không trùng slot hiện có.
+            Chỉ đổi được lịch ở trạng thái chờ khám, giữ nguyên bác sĩ và không trùng giờ.
           </div>
 
           <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">

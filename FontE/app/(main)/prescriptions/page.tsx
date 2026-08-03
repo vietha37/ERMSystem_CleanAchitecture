@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -251,82 +251,6 @@ export default function PrescriptionsPage() {
       await fetchData(true);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Không thể tạo đơn thuốc."));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const openDetail = async (prescriptionId: string) => {
-    try {
-      const detail = await hospitalPrescriptionService.getById(prescriptionId);
-      setSelectedPrescription(detail);
-      setIsDetailModalOpen(true);
-    } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, "Không thể tải chi tiết đơn thuốc."));
-    }
-  };
-
-  const handleDelete = async (prescriptionId: string) => {
-    if (role === "Doctor") {
-      toast.error("Bác sĩ không có quyền xóa đơn thuốc.");
-      return;
-    }
-
-    if (!confirm("Bạn có chắc muốn xóa đơn thuốc này?")) {
-      return;
-    }
-
-    try {
-      await hospitalPrescriptionService.delete(prescriptionId);
-      toast.success("Đã xóa đơn thuốc.");
-      await fetchData(true);
-    } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, "Không thể xóa đơn thuốc."));
-    }
-  };
-
-  return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div className="rounded-[2rem] border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-sky-50 p-6 shadow-sm">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.26em] text-cyan-700">
-              Dược lâm sàng
-            </p>
-            <h1 className="mt-3 text-3xl font-bold text-slate-950">Đơn thuốc hospital</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-              Module đơn thuốc đã chuyển sang hospital database mới, bám theo hồ sơ khám
-              và danh mục thuốc `pharmacy.Medicines`.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Tìm theo mã đơn, hồ sơ khám, bệnh nhân..."
-              className="min-w-[260px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-            />
-
-            <select
-              value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value as HospitalPrescriptionStatus | "All");
-                setPageNumber(1);
-              }}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
-            >
-              {STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-
-            <Button
-              variant="secondary"
-              onClick={() => void fetchData(true)}
               disabled={isRefreshing}
             >
               {isRefreshing ? "Đang làm mới..." : "Làm mới"}
@@ -381,7 +305,7 @@ export default function PrescriptionsPage() {
         ) : prescriptions.length === 0 ? (
           <EmptyState
             title="Chưa có đơn thuốc nào khớp bộ lọc hiện tại."
-            description="Thử đổi trạng thái, từ khóa hoặc phát hành đơn thuốc mới từ hồ sơ khám đủ điều kiện."
+            description="Thay đổi bộ lọc hoặc tạo đơn thuốc mới."
             tone="cyan"
           />
         ) : (
