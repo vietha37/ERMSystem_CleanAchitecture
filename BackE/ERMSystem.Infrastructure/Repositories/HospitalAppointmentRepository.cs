@@ -162,40 +162,32 @@ public class HospitalAppointmentRepository : IHospitalAppointmentRepository
         var pageNumber = Math.Max(1, request.PageNumber);
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
 
-        var query = _hospitalDbContext.Appointments
+        var baseQuery = _hospitalDbContext.Appointments
             .AsNoTracking()
-            .Include(x => x.Patient)
-            .Include(x => x.DoctorProfile)
-                .ThenInclude(x => x.StaffProfile)
-            .Include(x => x.DoctorProfile)
-                .ThenInclude(x => x.Specialty)
-            .Include(x => x.Clinic)
-            .Include(x => x.CheckIn)
-            .Include(x => x.QueueTickets)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.Status))
         {
             var normalizedStatus = request.Status.Trim();
-            query = query.Where(x => x.Status == normalizedStatus);
+            baseQuery = baseQuery.Where(x => x.Status == normalizedStatus);
         }
 
         if (request.AppointmentDate.HasValue)
         {
             var (fromUtc, toUtc) = BuildUtcRange(request.AppointmentDate.Value);
-            query = query.Where(x => x.AppointmentStartUtc >= fromUtc && x.AppointmentStartUtc < toUtc);
+            baseQuery = baseQuery.Where(x => x.AppointmentStartUtc >= fromUtc && x.AppointmentStartUtc < toUtc);
         }
 
         if (request.DoctorProfileId.HasValue)
         {
-            query = query.Where(x => x.DoctorProfileId == request.DoctorProfileId.Value);
+            baseQuery = baseQuery.Where(x => x.DoctorProfileId == request.DoctorProfileId.Value);
         }
 
         if (!string.IsNullOrWhiteSpace(request.TextSearch))
         {
             var keyword = request.TextSearch.Trim();
             var pattern = $"%{keyword}%";
-            query = query.Where(x =>
+            baseQuery = baseQuery.Where(x =>
                 EF.Functions.Like(x.AppointmentNumber, pattern) ||
                 EF.Functions.Like(x.Patient.FullName, pattern) ||
                 (x.Patient.Phone != null && EF.Functions.Like(x.Patient.Phone, pattern)) ||
@@ -204,8 +196,17 @@ public class HospitalAppointmentRepository : IHospitalAppointmentRepository
                 EF.Functions.Like(x.Clinic.Name, pattern));
         }
 
-        var totalCount = await query.CountAsync(ct);
-        var items = await query
+        var totalCount = await baseQuery.CountAsync(ct);
+        var items = await baseQuery
+            .AsSplitQuery()
+            .Include(x => x.Patient)
+            .Include(x => x.DoctorProfile)
+                .ThenInclude(x => x.StaffProfile)
+            .Include(x => x.DoctorProfile)
+                .ThenInclude(x => x.Specialty)
+            .Include(x => x.Clinic)
+            .Include(x => x.CheckIn)
+            .Include(x => x.QueueTickets)
             .OrderByDescending(x => x.CreatedAtUtc)
             .ThenByDescending(x => x.AppointmentStartUtc)
             .Skip((pageNumber - 1) * pageSize)

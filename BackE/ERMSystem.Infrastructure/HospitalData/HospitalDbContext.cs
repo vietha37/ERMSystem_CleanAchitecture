@@ -455,5 +455,25 @@ public class HospitalDbContext : DbContext
             .WithMany()
             .HasForeignKey(x => x.OutboxMessageId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<HospitalAppointmentEntity>().HasIndex(x => x.CreatedAtUtc);
+        modelBuilder.Entity<HospitalAppointmentEntity>().HasIndex(x => new { x.Status, x.AppointmentStartUtc });
+
+        modelBuilder.Entity<HospitalEncounterEntity>().HasIndex(x => x.CreatedAtUtc);
+        modelBuilder.Entity<HospitalEncounterEntity>().HasIndex(x => new { x.PatientId, x.CreatedAtUtc });
+        modelBuilder.Entity<HospitalEncounterEntity>().HasIndex(x => new { x.DoctorProfileId, x.CreatedAtUtc });
+
+        modelBuilder.Entity<HospitalInvoiceEntity>().HasIndex(x => x.IssuedAtUtc);
+        modelBuilder.Entity<HospitalInvoiceEntity>().HasIndex(x => new { x.InvoiceStatus, x.IssuedAtUtc });
+
+        modelBuilder.Entity<HospitalPatientEntity>().HasIndex(x => x.CreatedAtUtc);
+        modelBuilder.Entity<HospitalPatientEntity>().HasIndex(x => new { x.MedicalRecordNumber, x.Phone, x.FullName });
+
+        modelBuilder.Entity<HospitalOrderHeaderEntity>().HasIndex(x => x.EncounterId);
+        modelBuilder.Entity<HospitalLabOrderEntity>().HasIndex(x => new { x.OrderHeaderId, x.OrderStatus });
+        modelBuilder.Entity<HospitalImagingOrderEntity>().HasIndex(x => new { x.OrderHeaderId, x.OrderStatus });
+        modelBuilder.Entity<HospitalPrescriptionEntity>().HasIndex(x => new { x.OrderHeaderId, x.Status });
+        modelBuilder.Entity<HospitalPrescriptionItemEntity>().HasIndex(x => x.PrescriptionId);
+        modelBuilder.Entity<HospitalNotificationDeliveryEntity>().HasIndex(x => new { x.DeliveryStatus, x.LastAttemptAtUtc });
     }
 }

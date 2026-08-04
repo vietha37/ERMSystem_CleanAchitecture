@@ -25,40 +25,34 @@ public class HospitalEncounterRepository : IHospitalEncounterRepository
         var pageNumber = Math.Max(1, request.PageNumber);
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
 
-        var query = _hospitalDbContext.Encounters
+        var baseQuery = _hospitalDbContext.Encounters
             .AsNoTracking()
-            .Include(x => x.Patient)
-            .Include(x => x.Appointment)
-            .Include(x => x.DoctorProfile).ThenInclude(x => x.StaffProfile)
-            .Include(x => x.DoctorProfile).ThenInclude(x => x.Specialty)
-            .Include(x => x.Clinic)
-            .Include(x => x.Diagnoses)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.EncounterStatus))
         {
             var normalizedStatus = request.EncounterStatus.Trim();
-            query = query.Where(x => x.EncounterStatus == normalizedStatus);
+            baseQuery = baseQuery.Where(x => x.EncounterStatus == normalizedStatus);
         }
 
         if (request.AppointmentDate.HasValue)
         {
             var (fromUtc, toUtc) = BuildUtcRange(request.AppointmentDate.Value);
-            query = query.Where(x =>
+            baseQuery = baseQuery.Where(x =>
                 (x.Appointment != null && x.Appointment.AppointmentStartUtc >= fromUtc && x.Appointment.AppointmentStartUtc < toUtc) ||
                 (x.Appointment == null && x.StartedAtUtc >= fromUtc && x.StartedAtUtc < toUtc));
         }
 
         if (request.DoctorProfileId.HasValue)
         {
-            query = query.Where(x => x.DoctorProfileId == request.DoctorProfileId.Value);
+            baseQuery = baseQuery.Where(x => x.DoctorProfileId == request.DoctorProfileId.Value);
         }
 
         if (!string.IsNullOrWhiteSpace(request.TextSearch))
         {
             var keyword = request.TextSearch.Trim();
             var pattern = $"%{keyword}%";
-            query = query.Where(x =>
+            baseQuery = baseQuery.Where(x =>
                 EF.Functions.Like(x.EncounterNumber, pattern) ||
                 (x.Appointment != null && EF.Functions.Like(x.Appointment.AppointmentNumber, pattern)) ||
                 EF.Functions.Like(x.Patient.FullName, pattern) ||
@@ -68,8 +62,15 @@ public class HospitalEncounterRepository : IHospitalEncounterRepository
                 x.Diagnoses.Any(d => EF.Functions.Like(d.DiagnosisName, pattern)));
         }
 
-        var totalCount = await query.CountAsync(ct);
-        var items = await query
+        var totalCount = await baseQuery.CountAsync(ct);
+        var items = await baseQuery
+            .AsSplitQuery()
+            .Include(x => x.Patient)
+            .Include(x => x.Appointment)
+            .Include(x => x.DoctorProfile).ThenInclude(x => x.StaffProfile)
+            .Include(x => x.DoctorProfile).ThenInclude(x => x.Specialty)
+            .Include(x => x.Clinic)
+            .Include(x => x.Diagnoses)
             .OrderByDescending(x => x.CreatedAtUtc)
             .ThenByDescending(x => x.UpdatedAtUtc)
             .Skip((pageNumber - 1) * pageSize)

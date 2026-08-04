@@ -23,25 +23,20 @@ public class HospitalBillingRepository : IHospitalBillingRepository
         var pageNumber = Math.Max(1, request.PageNumber);
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
 
-        var query = _hospitalDbContext.Invoices
+        var baseQuery = _hospitalDbContext.Invoices
             .AsNoTracking()
-            .Include(x => x.Patient)
-            .Include(x => x.Encounter)
-            .Include(x => x.InvoiceItems)
-            .Include(x => x.Payments)
-            .AsSplitQuery()
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.InvoiceStatus))
         {
             var status = request.InvoiceStatus.Trim();
-            query = query.Where(x => x.InvoiceStatus == status);
+            baseQuery = baseQuery.Where(x => x.InvoiceStatus == status);
         }
 
         if (!string.IsNullOrWhiteSpace(request.TextSearch))
         {
             var pattern = $"%{request.TextSearch.Trim()}%";
-            query = query.Where(x =>
+            baseQuery = baseQuery.Where(x =>
                 EF.Functions.Like(x.InvoiceNumber, pattern) ||
                 EF.Functions.Like(x.Patient.FullName, pattern) ||
                 EF.Functions.Like(x.Patient.MedicalRecordNumber, pattern) ||
@@ -50,11 +45,16 @@ public class HospitalBillingRepository : IHospitalBillingRepository
 
         if (request.DoctorProfileId.HasValue)
         {
-            query = query.Where(x => x.Encounter != null && x.Encounter.DoctorProfileId == request.DoctorProfileId.Value);
+            baseQuery = baseQuery.Where(x => x.Encounter != null && x.Encounter.DoctorProfileId == request.DoctorProfileId.Value);
         }
 
-        var totalCount = await query.CountAsync(ct);
-        var invoices = await query
+        var totalCount = await baseQuery.CountAsync(ct);
+        var invoices = await baseQuery
+            .AsSplitQuery()
+            .Include(x => x.Patient)
+            .Include(x => x.Encounter)
+            .Include(x => x.InvoiceItems)
+            .Include(x => x.Payments)
             .OrderByDescending(x => x.IssuedAtUtc)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
