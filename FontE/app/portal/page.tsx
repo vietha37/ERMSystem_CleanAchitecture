@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -165,7 +165,7 @@ export default function PatientPortalPage() {
   const [qrLoadingInvoiceId, setQrLoadingInvoiceId] = useState<string | null>(null);
   const [isQrSubmitting, setIsQrSubmitting] = useState(false);
   const [dismissedReminderIds, setDismissedReminderIds] = useState<Set<string>>(new Set());
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState<Date | null>(null);
 
   const visitHistoryPageSize = 5;
 
@@ -203,8 +203,9 @@ export default function PatientPortalPage() {
     void loadPortalData();
   }, [loadPortalData]);
 
-  // Cập nhật "now" mỗi phút để countdown tự refresh
+  // Cập nhật "now" trên client sau khi mount để tránh lệch Hydration SSR
   useEffect(() => {
+    setNow(new Date());
     const timer = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(timer);
   }, []);
@@ -222,6 +223,7 @@ export default function PatientPortalPage() {
 
   // Lịch hẹn cần nhắc nhở: trong vòng 24 giờ, chưa bị dismiss
   const reminderAppointments = useMemo(() => {
+    if (!now) return [];
     const cutoff = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     return upcomingAppointments
       .filter((appt) => {

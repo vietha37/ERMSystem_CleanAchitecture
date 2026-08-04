@@ -152,7 +152,7 @@ export function Header() {
         <h2 className="text-xl font-bold tracking-tight text-gray-800">
           Trung tâm điều hành
         </h2>
-        <p className="text-sm font-medium text-gray-500">
+        <p className="text-sm font-medium text-gray-500" suppressHydrationWarning>
           {accountName}
           {username ? ` - ${username}` : ""}
         </p>
@@ -174,7 +174,7 @@ export function Header() {
           >
             <span className="text-xl">🔔</span>
             {unreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-blue-600 px-1 text-[10px] font-bold text-white">
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-blue-600 px-1 text-[10px] font-bold text-white" suppressHydrationWarning>
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
@@ -184,7 +184,7 @@ export function Header() {
             <div className="absolute right-0 z-40 mt-2 max-h-[420px] w-[380px] overflow-auto rounded-2xl border border-gray-200 bg-white shadow-xl">
               <div className="sticky top-0 border-b border-gray-100 bg-white px-4 py-3">
                 <p className="text-sm font-bold text-gray-800">{title}</p>
-                <p className="text-xs text-gray-500">{unreadCount} thông báo mới</p>
+                <p className="text-xs text-gray-500" suppressHydrationWarning>{unreadCount} thông báo mới</p>
               </div>
 
               {isLoadingNotifications ? (
@@ -221,11 +221,11 @@ export function Header() {
         </div>
 
         <div className="flex cursor-pointer items-center gap-3 transition-opacity hover:opacity-80">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 font-bold text-white shadow-md ring-2 ring-blue-50">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 font-bold text-white shadow-md ring-2 ring-blue-50" suppressHydrationWarning>
             {accountInitial}
           </div>
           <div className="hidden text-left md:block">
-            <p className="text-sm font-bold leading-tight text-gray-800">
+            <p className="text-sm font-bold leading-tight text-gray-800" suppressHydrationWarning>
               {accountName}
             </p>
             <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600">
