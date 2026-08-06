@@ -1,21 +1,15 @@
 param(
     [string]$ServerInstance = "localhost\MSSQLSERVER01",
     [string]$DatabaseName = "ERMSystemHospitalDb",
-    [switch]$DropAndRecreate
+    [switch]$DropAndRecreate = $true
 )
 
 $ErrorActionPreference = "Stop"
 
-$root = Split-Path -Parent $PSScriptRoot
-$schemaFile = Join-Path $PSScriptRoot "erm_private_hospital_schema.sql"
-$seedFile = Join-Path $PSScriptRoot "erm_private_hospital_seed.sql"
+$masterSeedFile = Join-Path $PSScriptRoot "seed_full_database.sql"
 
-if (-not (Test-Path $schemaFile)) {
-    throw "Khong tim thay file schema: $schemaFile"
-}
-
-if (-not (Test-Path $seedFile)) {
-    throw "Khong tim thay file seed: $seedFile"
+if (-not (Test-Path $masterSeedFile)) {
+    throw "Khong tim thay file SQL master seed: $masterSeedFile"
 }
 
 if ($DropAndRecreate) {
@@ -32,19 +26,26 @@ else {
     sqlcmd -b -S $ServerInstance -E -Q "IF DB_ID('$DatabaseName') IS NULL CREATE DATABASE [$DatabaseName];"
 }
 
-sqlcmd -b -f 65001 -S $ServerInstance -E -d $DatabaseName -i $schemaFile
-sqlcmd -b -f 65001 -S $ServerInstance -E -d $DatabaseName -i $seedFile
+Write-Host "Executing master seed SQL script ($masterSeedFile)..." -ForegroundColor Cyan
+sqlcmd -b -f 65001 -S $ServerInstance -E -d $DatabaseName -i $masterSeedFile
 
-# In ra so bang theo tung schema nghiep vu de xac nhan bootstrap thanh cong.
+Write-Host ""
+Write-Host "Database bootstrap complete. Summary:" -ForegroundColor Green
 sqlcmd -b -S $ServerInstance -E -d $DatabaseName -Q @"
-SELECT s.name AS SchemaName, COUNT(t.object_id) AS TableCount
-FROM sys.schemas s
-LEFT JOIN sys.tables t ON t.schema_id = s.schema_id
-WHERE s.name IN ('identity','org','patient','scheduling','emr','lab','imaging','pharmacy','billing','notification','integration','audit')
-GROUP BY s.name
-ORDER BY s.name;
-
-SELECT 'identity.Roles' AS Metric, COUNT(*) AS Value FROM [identity].Roles
+SET NOCOUNT ON;
+SELECT 'identity.Users' AS Metric, COUNT(*) AS Value FROM [identity].Users
 UNION ALL
-SELECT 'org.Specialties', COUNT(*) FROM org.Specialties;
+SELECT 'org.StaffProfiles', COUNT(*) FROM org.StaffProfiles
+UNION ALL
+SELECT 'patient.Patients', COUNT(*) FROM patient.Patients
+UNION ALL
+SELECT 'scheduling.Appointments', COUNT(*) FROM scheduling.Appointments
+UNION ALL
+SELECT 'emr.Encounters', COUNT(*) FROM emr.Encounters
+UNION ALL
+SELECT 'pharmacy.Prescriptions', COUNT(*) FROM pharmacy.Prescriptions
+UNION ALL
+SELECT 'billing.Invoices', COUNT(*) FROM billing.Invoices
+UNION ALL
+SELECT 'billing.Payments', COUNT(*) FROM billing.Payments;
 "@
