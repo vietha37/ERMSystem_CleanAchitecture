@@ -149,25 +149,6 @@ export default function NotificationsPage() {
     setPageNumber(1);
   };
 
-  const handleRetry = async (delivery: NotificationDelivery) => {
-    setRetryingId(delivery.id);
-
-    try {
-      await hospitalNotificationDeliveryService.retry(delivery.id);
-      toast.success("Đã đưa thông báo về hàng đợi gửi lại.");
-      await fetchDeliveries(true);
-    } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, "Không thể gửi lại thông báo."));
-    } finally {
-      setRetryingId(null);
-    }
-  };
-
-  const handleStatusChange = (nextStatus: DeliveryStatusFilter) => {
-    setStatusFilter(nextStatus);
-    setPageNumber(1);
-  };
-
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="rounded-3xl border border-sky-100 bg-gradient-to-br from-cyan-50 via-white to-blue-50 p-6 shadow-sm">
@@ -269,12 +250,6 @@ export default function NotificationsPage() {
           </p>
           <p className="mt-2 text-sm text-slate-600">
             Bị bỏ qua do thiếu thông tin.
-          </p>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-            Cập nhật gần nhất: {formatDateTime(summary?.generatedAtUtc)}
           </p>
         </Card>
       </div>

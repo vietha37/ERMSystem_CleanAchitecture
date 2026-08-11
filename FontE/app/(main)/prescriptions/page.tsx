@@ -221,6 +221,27 @@ export default function PrescriptionsPage() {
     );
   };
 
+  const handleOpenDetail = async (prescriptionId: string) => {
+    try {
+      const detail = await hospitalPrescriptionService.getById(prescriptionId);
+      setSelectedPrescription(detail);
+      setIsDetailModalOpen(true);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể tải chi tiết đơn thuốc."));
+    }
+  };
+
+  const handleDelete = async (prescriptionId: string) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa đơn thuốc này?")) return;
+    try {
+      await hospitalPrescriptionService.delete(prescriptionId);
+      toast.success("Đã xóa đơn thuốc.");
+      await fetchData(true);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Không thể xóa đơn thuốc."));
+    }
+  };
+
   const handleCreatePrescription = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -251,6 +272,29 @@ export default function PrescriptionsPage() {
       await fetchData(true);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Không thể tạo đơn thuốc."));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div className="rounded-3xl border border-sky-100 bg-gradient-to-br from-cyan-50 via-white to-blue-50 p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-700">
+              Quản lý dược
+            </p>
+            <h1 className="mt-3 text-3xl font-bold text-slate-900">Đơn thuốc bệnh viện</h1>
+            <p className="mt-2 text-sm text-slate-600">
+              Phát hành, theo dõi cấp phát và quản lý danh mục đơn thuốc khám chữa bệnh.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => void fetchData(true)}
               disabled={isRefreshing}
             >
               {isRefreshing ? "Đang làm mới..." : "Làm mới"}
@@ -395,7 +439,7 @@ export default function PrescriptionsPage() {
                         <Button
                           variant="secondary"
                           className="border-cyan-200 text-cyan-700 hover:bg-cyan-50"
-                          onClick={() => void openDetail(prescription.prescriptionId)}
+                          onClick={() => void handleOpenDetail(prescription.prescriptionId)}
                         >
                           Xem
                         </Button>

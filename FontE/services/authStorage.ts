@@ -3,28 +3,26 @@ import { AuthResponse } from "./types";
 const ACCESS_TOKEN_KEY = "emr_auth_token";
 const REFRESH_TOKEN_KEY = "emr_refresh_token";
 
-function canUseStorage() {
-  return typeof window !== "undefined";
+function getStorage(): Storage | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  // Sử dụng sessionStorage thay cho localStorage
+  // Giúp mỗi TAB trình duyệt có bộ nhớ phiên làm việc độc lập (Multi-role tab isolation)
+  return window.sessionStorage;
 }
 
 export function getAccessToken(): string | null {
-  if (!canUseStorage()) {
-    return null;
-  }
-
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return getStorage()?.getItem(ACCESS_TOKEN_KEY) ?? null;
 }
 
 export function getRefreshToken(): string | null {
-  if (!canUseStorage()) {
-    return null;
-  }
-
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  return getStorage()?.getItem(REFRESH_TOKEN_KEY) ?? null;
 }
 
 export function setAuthSession(auth: AuthResponse) {
-  if (!canUseStorage()) {
+  const storage = getStorage();
+  if (!storage) {
     return;
   }
 
@@ -33,16 +31,16 @@ export function setAuthSession(auth: AuthResponse) {
     throw new Error("Authentication response is missing token data.");
   }
 
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, auth.refreshToken);
+  storage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  storage.setItem(REFRESH_TOKEN_KEY, auth.refreshToken);
 }
 
 export function clearAuthSession() {
-  if (!canUseStorage()) {
+  const storage = getStorage();
+  if (!storage) {
     return;
   }
 
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  storage.removeItem(ACCESS_TOKEN_KEY);
+  storage.removeItem(REFRESH_TOKEN_KEY);
 }
-

@@ -355,7 +355,7 @@ export default function PatientPortalPage() {
           {!isLoading && reminderAppointments.length > 0 && (
             <AppointmentReminderBanner
               appointments={reminderAppointments}
-              now={now}
+              now={now ?? new Date()}
               onDismiss={(id) =>
                 setDismissedReminderIds((prev) => new Set([...prev, id]))
               }

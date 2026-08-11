@@ -11,5 +11,9 @@
 FontE/.next/
 BackE/ERMSystem.API/App_Data/DataProtectionKeys/
 
-# Keep local notes/handoff docs out of git
+# Keep local notes/handoff docs out of git except project guides and test evaluation
 *.md
+!README.md
+!DEMO_GUIDE.md
+!HUONG_DAN_DEMO_HOI_DONG.md
+!test_evaluation.md
