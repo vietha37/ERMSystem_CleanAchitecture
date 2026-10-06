@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ERMSystem.Application.DTOs;
 using ERMSystem.Application.DTOs.Common;
 using ERMSystem.Application.Interfaces;
+using ERMSystem.Domain.Constants;
 using ERMSystem.Domain.Entities;
 
 namespace ERMSystem.Application.Services
@@ -13,7 +14,7 @@ namespace ERMSystem.Application.Services
     public class AppointmentService : IAppointmentService
     {
         private static readonly HashSet<string> ValidStatuses =
-            new HashSet<string>(StringComparer.Ordinal) { "Pending", "Completed", "Cancelled" };
+            new HashSet<string>(AppointmentStatuses.All, StringComparer.Ordinal);
 
         private readonly IAppointmentRepository _appointmentRepository;
         private readonly IDashboardQueryCache _dashboardQueryCache;

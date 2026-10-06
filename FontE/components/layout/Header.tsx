@@ -1,11 +1,15 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { formatTimeValue } from "@/lib/dateFormatting";
 import { normalizeVietnameseText } from "@/lib/textEncoding";
 import { notificationService } from "@/services/notificationService";
 import { AppointmentNotification } from "@/services/types";
+import { LanguageToggle } from "./LanguageToggle";
+import { resolvePageTitle } from "./navigation";
 
 function formatTime(value: string): string {
   return formatTimeValue(value);
@@ -18,16 +22,17 @@ function computeUnreadCount(
 ): number {
   if (viewedAt <= 0) return fallbackUnread;
 
-  const unseenByTime = items.filter((item) => {
+  return items.filter((item) => {
     const t = new Date(item.appointmentDate).getTime();
     return Number.isFinite(t) && t > viewedAt;
   }).length;
-
-  return unseenByTime;
 }
 
 export function Header() {
   const { logout, role, username, displayName, isAuthenticated } = useAuth();
+  const { t } = useTranslation();
+  const pathname = usePathname();
+
   const [notifications, setNotifications] = useState<AppointmentNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -39,11 +44,17 @@ export function Header() {
     () => `emr_notifications_seen_at_${username ?? "anonymous"}`,
     [username]
   );
-  const accountName = useMemo(
-    () => normalizeVietnameseText(displayName) ?? role ?? "Người dùng",
-    [displayName, role]
-  );
-  const accountInitial = accountName.charAt(0) || "U";
+
+  const pageMeta = useMemo(() => resolvePageTitle(pathname), [pathname]);
+
+  const accountName = useMemo(() => {
+    const raw = displayName ? normalizeVietnameseText(displayName) : null;
+    if (raw) return raw;
+    if (role) return t(`auth.roles.${role}`) || role;
+    return "User";
+  }, [displayName, role, t]);
+
+  const accountInitial = accountName.charAt(0).toUpperCase() || "U";
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -140,99 +151,135 @@ export function Header() {
     });
   };
 
-  const title = useMemo(() => {
-    if (role === "Admin") return "Tất cả lịch khám hôm nay";
-    if (role === "Doctor") return "Lịch khám của bạn hôm nay";
-    return "Thông báo hôm nay";
-  }, [role]);
-
   return (
-    <header className="relative z-20 flex h-20 items-center justify-between border-b border-gray-100 bg-white/90 px-8 shadow-sm backdrop-blur-md transition-all duration-300">
-      <div>
-        <h2 className="text-xl font-bold tracking-tight text-gray-800">
-          Trung tâm điều hành
+    <header className="relative z-20 flex h-18 items-center justify-between border-b border-slate-200 bg-white px-6 transition-all duration-200">
+      {/* Current Page Title / Hierarchy */}
+      <div className="min-w-0">
+        <h2 className="truncate text-base font-semibold tracking-tight text-slate-900">
+          {pageMeta.title}
         </h2>
-        <p className="text-sm font-medium text-gray-500" suppressHydrationWarning>
-          {accountName}
-          {username ? ` - ${username}` : ""}
+        <p className="hidden truncate text-xs text-slate-500 sm:block">
+          {pageMeta.subtitle}
         </p>
       </div>
 
-      <div className="flex items-center gap-5">
-        <button
-          onClick={logout}
-          className="rounded-xl bg-red-50 px-4 py-2 text-sm font-bold text-red-500 shadow-sm transition-colors hover:bg-red-100 hover:text-red-600"
-        >
-          Đăng xuất
-        </button>
+      {/* Header Actions */}
+      <div className="flex items-center gap-3">
+        {/* Language Switcher */}
+        <LanguageToggle />
 
-        <div ref={notificationRef} className="relative z-30">
+        {/* Notifications Popover */}
+        <div ref={notificationRef} className="relative">
           <button
+            type="button"
             onClick={handleToggleNotifications}
-            className="relative rounded-full bg-gray-50 p-2.5 text-gray-500 shadow-sm transition-colors hover:bg-gray-100"
+            className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-slate-400"
             aria-label="Thông báo"
           >
-            <span className="text-xl">🔔</span>
+            <svg
+              className="h-4.5 w-4.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.75}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
+              />
+            </svg>
             {unreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-blue-600 px-1 text-[10px] font-bold text-white" suppressHydrationWarning>
+              <span
+                className="absolute -right-1 -top-1 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white shadow-xs"
+                suppressHydrationWarning
+              >
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
           </button>
 
           {isOpen && (
-            <div className="absolute right-0 z-40 mt-2 max-h-[420px] w-[380px] overflow-auto rounded-2xl border border-gray-200 bg-white shadow-xl">
-              <div className="sticky top-0 border-b border-gray-100 bg-white px-4 py-3">
-                <p className="text-sm font-bold text-gray-800">{title}</p>
-                <p className="text-xs text-gray-500" suppressHydrationWarning>{unreadCount} thông báo mới</p>
+            <div className="absolute right-0 z-40 mt-2 max-h-[420px] w-80 sm:w-96 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  {t("nav.notifications")}
+                </p>
+                <span className="text-xs text-slate-500" suppressHydrationWarning>
+                  {unreadCount > 0 ? `${unreadCount} mới` : ""}
+                </span>
               </div>
 
-              {isLoadingNotifications ? (
-                <div className="p-4 text-sm text-gray-500">Đang tải thông báo...</div>
-              ) : notifications.length === 0 ? (
-                <div className="p-4 text-sm text-gray-500">
-                  Không có lịch khám nào hôm nay.
-                </div>
-              ) : (
-                <ul className="divide-y divide-gray-100">
-                  {notifications.map((item) => (
-                    <li
-                      key={item.appointmentId}
-                      className="px-4 py-3 transition-colors hover:bg-blue-50/60"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-sm font-semibold text-gray-800">
-                          {item.patientName}
+              <div className="max-h-[340px] overflow-y-auto">
+                {isLoadingNotifications ? (
+                  <div className="p-6 text-center text-xs text-slate-500">
+                    {t("common.actions.loading")}
+                  </div>
+                ) : notifications.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-500">
+                    {t("common.labels.empty")}
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {notifications.map((item) => (
+                      <li
+                        key={item.appointmentId}
+                        className="px-4 py-3 transition-colors hover:bg-slate-50"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate text-xs font-semibold text-slate-900">
+                            {item.patientName}
+                          </p>
+                          <span className="text-[11px] font-semibold text-sky-700">
+                            {formatTime(item.appointmentDate)}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-slate-600">
+                          {item.doctorName}
                         </p>
-                        <span className="text-xs font-bold text-blue-700">
-                          {formatTime(item.appointmentDate)}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-gray-600">
-                        Bác sĩ: {item.doctorName}
-                      </p>
-                      <p className="mt-1 truncate text-xs text-gray-500">{item.message}</p>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                        <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                          {item.message}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
         </div>
 
-        <div className="flex cursor-pointer items-center gap-3 transition-opacity hover:opacity-80">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 font-bold text-white shadow-md ring-2 ring-blue-50" suppressHydrationWarning>
+        {/* User Profile Badge */}
+        <div className="flex items-center gap-2.5 border-l border-slate-200 pl-3">
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-xs font-bold text-white shadow-2xs"
+            suppressHydrationWarning
+          >
             {accountInitial}
           </div>
           <div className="hidden text-left md:block">
-            <p className="text-sm font-bold leading-tight text-gray-800" suppressHydrationWarning>
+            <p className="truncate text-xs font-semibold leading-tight text-slate-900" suppressHydrationWarning>
               {accountName}
             </p>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600">
-              Đang hoạt động
+            <p className="text-[10px] font-medium text-emerald-600">
+              {t("common.status.active")}
             </p>
           </div>
         </div>
+
+        {/* Logout Quick Button */}
+        <button
+          type="button"
+          onClick={logout}
+          aria-label={t("common.actions.logout")}
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 focus-visible:ring-2 focus-visible:ring-rose-400"
+          title={t("common.actions.logout")}
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+          </svg>
+        </button>
       </div>
     </header>
   );

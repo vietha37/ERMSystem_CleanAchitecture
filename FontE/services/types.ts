@@ -1042,6 +1042,11 @@ export type StaffUser = {
   role: Exclude<UserRole, "Admin">;
 };
 
+export type HospitalInternalUserSyncResult = {
+  totalUsers: number;
+  syncedUsers: number;
+};
+
 export type CreateStaffUserPayload = {
   username: string;
   name: string;

@@ -291,15 +291,39 @@ export default function PrescriptionsPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Tìm theo mã đơn, bệnh nhân, bác sĩ..."
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-2xs outline-none focus:border-slate-500"
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as HospitalPrescriptionStatus | "All");
+                setPageNumber(1);
+              }}
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 shadow-2xs outline-none focus:border-slate-500"
+            >
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
             <Button
               variant="secondary"
+              size="sm"
               onClick={() => void fetchData(true)}
               disabled={isRefreshing}
             >
               {isRefreshing ? "Đang làm mới..." : "Làm mới"}
             </Button>
-            <Button onClick={() => setIsCreateModalOpen(true)}>Phát hành đơn thuốc</Button>
+            <Button size="sm" onClick={() => setIsCreateModalOpen(true)}>
+              + Phát hành đơn thuốc
+            </Button>
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@ using ERMSystem.Application.DTOs;
 using ERMSystem.Application.DTOs.Common;
 using ERMSystem.Application.Interfaces;
 using ERMSystem.Application.Utilities;
+using ERMSystem.Domain.Constants;
 
 namespace ERMSystem.Application.Services;
 
@@ -1035,34 +1036,18 @@ public class HospitalBillingService : IHospitalBillingService
         return await _hospitalBillingRepository.GetWorklistAsync(request, ct);
     }
 
-    private async Task<Guid?> ResolveScopedDoctorProfileIdAsync(
+    private Task<Guid?> ResolveScopedDoctorProfileIdAsync(
         string currentRole,
         string? currentUsername,
         CancellationToken ct)
-    {
-        if (!string.Equals(currentRole, "Doctor", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
+        => DoctorAccessScopeHelper.ResolveScopedDoctorProfileIdAsync(_hospitalDoctorWorklistRepository, currentRole, currentUsername, ct);
 
-        if (string.IsNullOrWhiteSpace(currentUsername))
-        {
-            return null;
-        }
-
-        var doctorProfile = await _hospitalDoctorWorklistRepository.ResolveDoctorByUsernameAsync(currentUsername, ct);
-        return doctorProfile?.DoctorProfileId;
-    }
-
-    private async Task<bool> CanAccessDoctorScopedDataAsync(
+    private Task<bool> CanAccessDoctorScopedDataAsync(
         Guid? doctorProfileId,
         string currentRole,
         string? currentUsername,
         CancellationToken ct)
-    {
-        var scopedDoctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
-        return !scopedDoctorProfileId.HasValue || (doctorProfileId.HasValue && scopedDoctorProfileId.Value == doctorProfileId.Value);
-    }
+        => DoctorAccessScopeHelper.CanAccessDoctorScopedDataAsync(_hospitalDoctorWorklistRepository, doctorProfileId, currentRole, currentUsername, ct);
 
     private static HospitalInvoiceDetailDto MapDetail(HospitalInvoiceAggregateSnapshot invoice)
     {
@@ -1128,15 +1113,15 @@ public class HospitalBillingService : IHospitalBillingService
     {
         if (netPaidAmount >= totalAmount)
         {
-            return "Paid";
+            return InvoiceStatuses.Paid;
         }
 
         if (netPaidAmount > 0)
         {
-            return "PartiallyPaid";
+            return InvoiceStatuses.PartiallyPaid;
         }
 
-        return "Issued";
+        return InvoiceStatuses.Issued;
     }
 
     private static string? NormalizeText(string? value)
@@ -1180,18 +1165,6 @@ public class HospitalBillingService : IHospitalBillingService
         return NormalizeText(fallbackProvider) ?? "ManualExternal";
     }
 
-    private static TimeZoneInfo ResolveClinicTimeZone()
-    {
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
-        }
-        catch
-        {
-            return TimeZoneInfo.Utc;
-        }
-    }
-
     private static DateTime ConvertUtcToClinicLocal(DateTime utcDateTime)
-        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), ResolveClinicTimeZone());
+        => ClinicDateTimeHelper.ConvertUtcToClinicLocal(utcDateTime);
 }

@@ -329,10 +329,20 @@ namespace ERMSystem.Infrastructure.Services
                     AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(ttlMinutes)
                 });
 
-            _logger.LogInformation(
-                "Password reset token cho username {Username}: {ResetToken}",
-                normalizedUsername,
-                resetToken);
+            if (string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(_configuration["DOTNET_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation(
+                    "Password reset token cho username {Username}: {ResetToken}",
+                    normalizedUsername,
+                    resetToken);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Password reset token da duoc tao va dieu phoi an toan cho username {Username}.",
+                    normalizedUsername);
+            }
 
             await RecordSecurityEventAsync(user.Id, user.Username, "PasswordResetRequested", "Info", "Nguoi dung yeu cau reset password.");
         }

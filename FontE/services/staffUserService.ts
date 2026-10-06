@@ -1,6 +1,7 @@
 import api from "./api";
 import {
   CreateStaffUserPayload,
+  HospitalInternalUserSyncResult,
   PaginatedResult,
   StaffUser,
   UpdateStaffUserPayload,
@@ -44,5 +45,12 @@ export const staffUserService = {
 
   delete: async (id: string): Promise<void> => {
     await api.delete(`/admin/users/${id}`);
+  },
+
+  syncHospitalIdentity: async (): Promise<HospitalInternalUserSyncResult> => {
+    const response = await api.post<HospitalInternalUserSyncResult>(
+      "/admin/users/sync-hospital-identity"
+    );
+    return response.data;
   },
 };

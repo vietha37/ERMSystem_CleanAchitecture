@@ -6,13 +6,14 @@ using ERMSystem.Application.DTOs;
 using ERMSystem.Application.DTOs.Common;
 using ERMSystem.Application.Interfaces;
 using ERMSystem.Application.Utilities;
+using ERMSystem.Domain.Constants;
 
 namespace ERMSystem.Application.Services;
 
 public class HospitalEncounterService : IHospitalEncounterService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly string[] AllowedStatuses = ["InProgress", "Finalized", "Approved"];
+    private static readonly string[] AllowedStatuses = EncounterStatuses.AllowedStatuses;
 
     private readonly IHospitalEncounterRepository _hospitalEncounterRepository;
     private readonly IHospitalIdentityBridgeService _hospitalIdentityBridgeService;
@@ -762,34 +763,18 @@ public class HospitalEncounterService : IHospitalEncounterService
         return await _hospitalEncounterRepository.GetWorklistAsync(request, ct);
     }
 
-    private async Task<Guid?> ResolveScopedDoctorProfileIdAsync(
+    private Task<Guid?> ResolveScopedDoctorProfileIdAsync(
         string currentRole,
         string? currentUsername,
         CancellationToken ct)
-    {
-        if (!string.Equals(currentRole, "Doctor", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
+        => DoctorAccessScopeHelper.ResolveScopedDoctorProfileIdAsync(_hospitalDoctorWorklistRepository, currentRole, currentUsername, ct);
 
-        if (string.IsNullOrWhiteSpace(currentUsername))
-        {
-            return null;
-        }
-
-        var doctorProfile = await _hospitalDoctorWorklistRepository.ResolveDoctorByUsernameAsync(currentUsername, ct);
-        return doctorProfile?.DoctorProfileId;
-    }
-
-    private async Task<bool> CanAccessDoctorScopedEncounterAsync(
+    private Task<bool> CanAccessDoctorScopedEncounterAsync(
         Guid encounterDoctorProfileId,
         string currentRole,
         string? currentUsername,
         CancellationToken ct)
-    {
-        var scopedDoctorProfileId = await ResolveScopedDoctorProfileIdAsync(currentRole, currentUsername, ct);
-        return !scopedDoctorProfileId.HasValue || scopedDoctorProfileId.Value == encounterDoctorProfileId;
-    }
+        => DoctorAccessScopeHelper.CanAccessDoctorScopedDataAsync(_hospitalDoctorWorklistRepository, encounterDoctorProfileId, currentRole, currentUsername, ct);
 
     private static string GenerateEncounterNumber(DateTime nowUtc)
         => CompactCodeGenerator.Generate("EN", nowUtc);
@@ -902,18 +887,6 @@ public class HospitalEncounterService : IHospitalEncounterService
         };
     }
 
-    private static TimeZoneInfo ResolveClinicTimeZone()
-    {
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
-        }
-        catch
-        {
-            return TimeZoneInfo.Utc;
-        }
-    }
-
     private static DateTime ConvertUtcToClinicLocal(DateTime utcDateTime)
-        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), ResolveClinicTimeZone());
+        => ClinicDateTimeHelper.ConvertUtcToClinicLocal(utcDateTime);
 }

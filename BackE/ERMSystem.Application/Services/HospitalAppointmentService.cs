@@ -505,27 +505,11 @@ namespace ERMSystem.Application.Services
             return refreshed == null ? null : MapAggregateToWorklistItem(refreshed);
         }
 
-        private static TimeZoneInfo ResolveClinicTimeZone()
-        {
-            try
-            {
-                return TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
-            }
-            catch
-            {
-                return TimeZoneInfo.Utc;
-            }
-        }
-
         private static DateTime ConvertLocalClinicTimeToUtc(DateTime localDateTime)
-        {
-            return TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localDateTime, DateTimeKind.Unspecified), ResolveClinicTimeZone());
-        }
+            => ClinicDateTimeHelper.ConvertClinicLocalToUtc(localDateTime);
 
         private static DateTime ConvertUtcToClinicLocal(DateTime utcDateTime)
-        {
-            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), ResolveClinicTimeZone());
-        }
+            => ClinicDateTimeHelper.ConvertUtcToClinicLocal(utcDateTime);
 
         private async Task<PaginatedResult<HospitalAppointmentWorklistItemDto>> GetScopedWorklistAsync(
             HospitalAppointmentWorklistRequestDto request,

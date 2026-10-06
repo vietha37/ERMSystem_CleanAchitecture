@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using ERMSystem.Application.DTOs;
 using ERMSystem.Application.Interfaces;
+using ERMSystem.Application.Utilities;
 
 namespace ERMSystem.Application.Services;
 
@@ -136,21 +137,9 @@ public class HospitalDoctorWorklistService : IHospitalDoctorWorklistService
         return "Cho tiep don";
     }
 
-    private static TimeZoneInfo ResolveClinicTimeZone()
-    {
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
-        }
-        catch
-        {
-            return TimeZoneInfo.Utc;
-        }
-    }
-
     private static DateTime ConvertUtcToClinicLocal(DateTime utcDateTime)
-        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), ResolveClinicTimeZone());
+        => ClinicDateTimeHelper.ConvertUtcToClinicLocal(utcDateTime);
 
     private static DateTime GetClinicNow()
-        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, ResolveClinicTimeZone());
+        => ClinicDateTimeHelper.ConvertUtcToClinicLocal(DateTime.UtcNow);
 }

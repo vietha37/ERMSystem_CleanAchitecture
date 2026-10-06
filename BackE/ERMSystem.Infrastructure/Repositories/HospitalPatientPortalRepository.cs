@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ERMSystem.Application.DTOs;
 using ERMSystem.Application.Interfaces;
+using ERMSystem.Application.Utilities;
 using ERMSystem.Infrastructure.HospitalData;
 using Microsoft.EntityFrameworkCore;
 
@@ -458,19 +459,7 @@ namespace ERMSystem.Infrastructure.Repositories
             return string.IsNullOrWhiteSpace(merged) ? null : merged;
         }
 
-        private static TimeZoneInfo ResolveClinicTimeZone()
-        {
-            try
-            {
-                return TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
-            }
-            catch
-            {
-                return TimeZoneInfo.Utc;
-            }
-        }
-
         private static DateTime ConvertUtcToClinicLocal(DateTime utcDateTime)
-            => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), ResolveClinicTimeZone());
+            => ClinicDateTimeHelper.ConvertUtcToClinicLocal(utcDateTime);
     }
 }

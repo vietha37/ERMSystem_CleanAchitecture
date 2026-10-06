@@ -1,42 +1,63 @@
 import { UserRole } from "@/services/types";
 
+export type NavigationIcon =
+  | "dashboard"
+  | "doctorWorklist"
+  | "staff"
+  | "security"
+  | "patients"
+  | "appointments"
+  | "medicalRecords"
+  | "prescriptions"
+  | "clinicalOrders"
+  | "billing"
+  | "notifications"
+  | "portal";
+
 export type NavigationItem = {
+  id: string;
   name: string;
   path: string;
+  icon: NavigationIcon;
+  i18nKey: string;
   shortLabel: string;
 };
 
 export const menuItemsByRole: Record<UserRole, NavigationItem[]> = {
   Admin: [
-    { name: "Tổng quan", path: "/dashboard", shortLabel: "HQ" },
-    { name: "Công việc bác sĩ", path: "/doctor-worklist", shortLabel: "BS" },
-    { name: "Nhân sự", path: "/staff", shortLabel: "NS" },
-    { name: "Bệnh nhân", path: "/patients", shortLabel: "BN" },
-    { name: "Lịch hẹn", path: "/appointments", shortLabel: "LH" },
-    { name: "Hồ sơ bệnh án", path: "/medical-records", shortLabel: "BA" },
-    { name: "Đơn thuốc", path: "/prescriptions", shortLabel: "DT" },
-    { name: "Cận lâm sàng", path: "/clinical-orders", shortLabel: "CLS" },
-    { name: "Hóa đơn", path: "/billing", shortLabel: "HD" },
-    { name: "Thông báo", path: "/notifications", shortLabel: "TB" },
+    { id: "dashboard", name: "Tổng quan", path: "/dashboard", icon: "dashboard", i18nKey: "nav.dashboard", shortLabel: "HQ" },
+    { id: "doctorWorklist", name: "Công việc bác sĩ", path: "/doctor-worklist", icon: "doctorWorklist", i18nKey: "nav.doctorWorklist", shortLabel: "BS" },
+    { id: "staff", name: "Nhân sự", path: "/staff", icon: "staff", i18nKey: "nav.staff", shortLabel: "NS" },
+    { id: "security", name: "Bảo mật", path: "/security", icon: "security", i18nKey: "nav.security", shortLabel: "BM" },
+    { id: "patients", name: "Bệnh nhân", path: "/patients", icon: "patients", i18nKey: "nav.patients", shortLabel: "BN" },
+    { id: "appointments", name: "Lịch hẹn", path: "/appointments", icon: "appointments", i18nKey: "nav.appointments", shortLabel: "LH" },
+    { id: "medicalRecords", name: "Hồ sơ bệnh án", path: "/medical-records", icon: "medicalRecords", i18nKey: "nav.medicalRecords", shortLabel: "BA" },
+    { id: "prescriptions", name: "Đơn thuốc", path: "/prescriptions", icon: "prescriptions", i18nKey: "nav.prescriptions", shortLabel: "DT" },
+    { id: "clinicalOrders", name: "Cận lâm sàng", path: "/clinical-orders", icon: "clinicalOrders", i18nKey: "nav.clinicalOrders", shortLabel: "CLS" },
+    { id: "billing", name: "Hóa đơn & Viện phí", path: "/billing", icon: "billing", i18nKey: "nav.billing", shortLabel: "HD" },
+    { id: "notifications", name: "Thông báo", path: "/notifications", icon: "notifications", i18nKey: "nav.notifications", shortLabel: "TB" },
   ],
   Doctor: [
-    { name: "Tổng quan", path: "/dashboard", shortLabel: "HQ" },
-    { name: "Công việc bác sĩ", path: "/doctor-worklist", shortLabel: "BS" },
-    { name: "Bệnh nhân", path: "/patients", shortLabel: "BN" },
-    { name: "Lịch hẹn", path: "/appointments", shortLabel: "LH" },
-    { name: "Hồ sơ bệnh án", path: "/medical-records", shortLabel: "BA" },
-    { name: "Đơn thuốc", path: "/prescriptions", shortLabel: "DT" },
-    { name: "Cận lâm sàng", path: "/clinical-orders", shortLabel: "CLS" },
+    { id: "dashboard", name: "Tổng quan", path: "/dashboard", icon: "dashboard", i18nKey: "nav.dashboard", shortLabel: "HQ" },
+    { id: "doctorWorklist", name: "Công việc bác sĩ", path: "/doctor-worklist", icon: "doctorWorklist", i18nKey: "nav.doctorWorklist", shortLabel: "BS" },
+    { id: "patients", name: "Bệnh nhân", path: "/patients", icon: "patients", i18nKey: "nav.patients", shortLabel: "BN" },
+    { id: "appointments", name: "Lịch hẹn", path: "/appointments", icon: "appointments", i18nKey: "nav.appointments", shortLabel: "LH" },
+    { id: "medicalRecords", name: "Hồ sơ bệnh án", path: "/medical-records", icon: "medicalRecords", i18nKey: "nav.medicalRecords", shortLabel: "BA" },
+    { id: "prescriptions", name: "Đơn thuốc", path: "/prescriptions", icon: "prescriptions", i18nKey: "nav.prescriptions", shortLabel: "DT" },
+    { id: "clinicalOrders", name: "Cận lâm sàng", path: "/clinical-orders", icon: "clinicalOrders", i18nKey: "nav.clinicalOrders", shortLabel: "CLS" },
+    { id: "security", name: "Bảo mật", path: "/security", icon: "security", i18nKey: "nav.security", shortLabel: "BM" },
   ],
   Cashier: [
-    { name: "Tổng quan", path: "/dashboard", shortLabel: "HQ" },
-    { name: "Bảo mật", path: "/security", shortLabel: "BM" },
-    { name: "Bệnh nhân", path: "/patients", shortLabel: "BN" },
-    { name: "Lịch hẹn", path: "/appointments", shortLabel: "LH" },
-    { name: "Hóa đơn", path: "/billing", shortLabel: "HD" },
-    { name: "Thông báo", path: "/notifications", shortLabel: "TB" },
+    { id: "dashboard", name: "Tổng quan", path: "/dashboard", icon: "dashboard", i18nKey: "nav.dashboard", shortLabel: "HQ" },
+    { id: "patients", name: "Bệnh nhân", path: "/patients", icon: "patients", i18nKey: "nav.patients", shortLabel: "BN" },
+    { id: "appointments", name: "Lịch hẹn", path: "/appointments", icon: "appointments", i18nKey: "nav.appointments", shortLabel: "LH" },
+    { id: "billing", name: "Hóa đơn & Viện phí", path: "/billing", icon: "billing", i18nKey: "nav.billing", shortLabel: "HD" },
+    { id: "notifications", name: "Thông báo", path: "/notifications", icon: "notifications", i18nKey: "nav.notifications", shortLabel: "TB" },
+    { id: "security", name: "Bảo mật", path: "/security", icon: "security", i18nKey: "nav.security", shortLabel: "BM" },
   ],
-  Patient: [{ name: "Cổng thông tin bệnh nhân", path: "/portal", shortLabel: "PT" }],
+  Patient: [
+    { id: "portal", name: "Cổng thông tin bệnh nhân", path: "/portal", icon: "portal", i18nKey: "nav.portal", shortLabel: "PT" },
+  ],
 };
 
 export function resolvePageTitle(pathname: string): { title: string; subtitle: string } {
@@ -78,7 +99,7 @@ export function resolvePageTitle(pathname: string): { title: string; subtitle: s
     },
     {
       match: "/billing",
-      title: "Luồng hóa đơn",
+      title: "Luồng hóa đơn & Viện phí",
       subtitle: "Theo dõi phát hành hóa đơn, thu tiền và công nợ.",
     },
     {
@@ -89,7 +110,12 @@ export function resolvePageTitle(pathname: string): { title: string; subtitle: s
     {
       match: "/staff",
       title: "Vận hành nhân sự",
-      subtitle: "Điều phối tài khoản và vai trò vận hành nội bộ.",
+      subtitle: "Điều phối tài khoản, quyền hạn và đồng bộ danh bạ bệnh viện.",
+    },
+    {
+      match: "/security",
+      title: "An toàn & Bảo mật",
+      subtitle: "Cấu hình xác thực hai yếu tố và quản lý an ninh hệ thống.",
     },
     {
       match: "/portal",
@@ -101,7 +127,7 @@ export function resolvePageTitle(pathname: string): { title: string; subtitle: s
   return (
     map.find((item) => pathname === item.match || pathname.startsWith(`${item.match}/`)) ?? {
       title: "ERM Hospital",
-      subtitle: "Không gian vận hành",
+      subtitle: "Hệ thống Quản lý Bệnh viện",
     }
   );
 }

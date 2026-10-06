@@ -458,18 +458,6 @@ public class HospitalClinicalOrderService : IHospitalClinicalOrderService
     private static string GenerateSpecimenCode(DateTime nowUtc)
         => CompactCodeGenerator.Generate("SP", nowUtc);
 
-    private static TimeZoneInfo ResolveClinicTimeZone()
-    {
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
-        }
-        catch
-        {
-            return TimeZoneInfo.Utc;
-        }
-    }
-
     private static DateTime ConvertUtcToClinicLocal(DateTime utcDateTime)
-        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), ResolveClinicTimeZone());
+        => ClinicDateTimeHelper.ConvertUtcToClinicLocal(utcDateTime);
 }

@@ -2,7 +2,10 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { ErrorState } from "@/components/ui/DataState";
+import { Button } from "@/components/ui/Button";
+import { Card, CardHeader } from "@/components/ui/Card";
+import { ErrorState, LoadingState } from "@/components/ui/DataState";
+import { useTranslation } from "@/hooks/useTranslation";
 import { authService } from "@/services/authService";
 import { getApiErrorMessage } from "@/services/error";
 import { MfaSetupResponse, MfaStatus } from "@/services/types";
@@ -14,6 +17,7 @@ const emptyStatus: MfaStatus = {
 };
 
 export default function SecurityPage() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<MfaStatus>(emptyStatus);
   const [setup, setSetup] = useState<MfaSetupResponse | null>(null);
   const [enableCode, setEnableCode] = useState("");
@@ -29,12 +33,13 @@ export default function SecurityPage() {
       setStatus(nextStatus);
       setStatusError(null);
     } catch (error) {
-      setStatusError(getApiErrorMessage(error, "Không thể tải trạng thái bảo mật."));
-      toast.error(getApiErrorMessage(error, "Không thể tải trạng thái bảo mật."));
+      const message = getApiErrorMessage(error, t("common.messages.error"));
+      setStatusError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadStatus();
@@ -47,9 +52,9 @@ export default function SecurityPage() {
       setSetup(response);
       setEnableCode("");
       setStatus((current) => ({ ...current, isSetupPending: true }));
-      toast.success("Đã tạo phiên thiết lập MFA.");
+      toast.success(t("security.scanQr"));
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Không thể bắt đầu thiết lập MFA."));
+      toast.error(getApiErrorMessage(error, t("common.messages.error")));
     } finally {
       setIsSubmitting(false);
     }
@@ -59,13 +64,13 @@ export default function SecurityPage() {
     event.preventDefault();
     setIsSubmitting(true);
     try {
-      const nextStatus = await authService.enableMfa({ code: enableCode });
-      setStatus(nextStatus);
+      await authService.enableMfa({ code: enableCode.trim() });
+      toast.success(t("common.messages.success"));
       setSetup(null);
       setEnableCode("");
-      toast.success("Đã bật xác thực hai bước.");
+      await loadStatus();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Không thể bật MFA."));
+      toast.error(getApiErrorMessage(error, t("common.messages.error")));
     } finally {
       setIsSubmitting(false);
     }
@@ -75,157 +80,198 @@ export default function SecurityPage() {
     event.preventDefault();
     setIsSubmitting(true);
     try {
-      const nextStatus = await authService.disableMfa({ code: disableCode });
-      setStatus(nextStatus);
-      setSetup(null);
+      await authService.disableMfa({ code: disableCode.trim() });
+      toast.success(t("common.messages.success"));
       setDisableCode("");
-      toast.success("Đã tắt xác thực hai bước.");
+      setSetup(null);
+      await loadStatus();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Không thể tắt MFA."));
+      toast.error(getApiErrorMessage(error, t("common.messages.error")));
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  if (isLoading) {
+    return <LoadingState title={t("common.actions.loading")} />;
+  }
+
+  if (statusError) {
+    return (
+      <ErrorState
+        title={t("common.messages.error")}
+        description={statusError}
+        onAction={() => void loadStatus()}
+      />
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-800">Bảo mật đăng nhập</h1>
-        <p className="mt-2 text-sm leading-7 text-gray-500">
-          Quản lý xác thực hai bước cho tài khoản nội bộ. Khi bật MFA, hệ thống sẽ yêu cầu thêm mã
-          6 số từ ứng dụng xác thực sau bước nhập mật khẩu.
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="border-b border-slate-200 pb-5">
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">
+          {t("security.title")}
+        </h1>
+        <p className="mt-1 text-xs text-slate-500">
+          {t("security.subtitle")}
         </p>
-      </section>
+      </div>
 
-      <section className="grid gap-6 md:grid-cols-2">
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-400">Trạng thái</p>
-          {isLoading ? (
-            <p className="mt-4 text-sm text-gray-500">Đang tải trạng thái...</p>
-          ) : statusError ? (
-            <ErrorState
-              title="Không thể tải trạng thái bảo mật"
-              description={statusError}
-              actionLabel="Tải lại"
-              onAction={() => void loadStatus()}
-            />
-          ) : (
-            <>
-              <div className="mt-4 inline-flex rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-sm font-semibold text-cyan-700">
-                {status.isEnabled ? "MFA đang bật" : "MFA chưa bật"}
-              </div>
-              <p className="mt-4 text-sm text-gray-600">
-                {status.isEnabled && status.enabledAtUtc
-                  ? `Đã kích hoạt lúc ${new Date(status.enabledAtUtc).toLocaleString("vi-VN")}.`
-                  : "Hiện tại bạn vẫn có thể đăng nhập chỉ bằng mật khẩu."}
-              </p>
-            </>
-          )}
-        </div>
-
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-gray-400">Khuyến nghị</p>
-          <ul className="mt-4 space-y-3 text-sm leading-7 text-gray-600">
-            <li>Dùng Google Authenticator, Microsoft Authenticator hoặc ứng dụng TOTP tương đương.</li>
-            <li>Chỉ bật MFA trên thiết bị cá nhân hoặc thiết bị công vụ được kiểm soát.</li>
-            <li>Sau khi tắt MFA, các refresh token hiện tại sẽ bị thu hồi.</li>
-          </ul>
-        </div>
-      </section>
-
-      {!status.isEnabled && (
-        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-800">Thiết lập xác thực hai bước</h2>
-              <p className="mt-2 text-sm text-gray-500">
-                Tạo khóa mới, thêm vào ứng dụng xác thực, rồi nhập mã 6 số để kích hoạt.
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={handleStartSetup}
-              className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-70"
+      {/* 2FA Status Grid */}
+      <div className="grid gap-5 md:grid-cols-2">
+        <Card>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            {t("security.mfaStatus")}
+          </p>
+          <div className="mt-3 flex items-center gap-3">
+            <span
+              className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ${
+                status.isEnabled
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
+              }`}
             >
-              {isSubmitting ? "Đang chuẩn bị..." : "Tạo phiên thiết lập"}
-            </button>
+              {status.isEnabled
+                ? t("security.mfaEnabled")
+                : t("security.mfaDisabled")}
+            </span>
           </div>
+          <p className="mt-3 text-xs leading-relaxed text-slate-600">
+            {status.isEnabled
+              ? status.enabledAtUtc
+                ? `Kích hoạt từ: ${new Date(status.enabledAtUtc).toLocaleString("vi-VN")}`
+                : "Phiên đăng nhập được bảo vệ bởi xác thực hai bước."
+              : "Hiện tại tài khoản đang sử dụng mật khẩu đơn. Khuyến nghị bật 2FA để bảo vệ dữ liệu y tế."}
+          </p>
+        </Card>
+
+        <Card>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Tiêu chuẩn an ninh
+          </p>
+          <ul className="mt-3 space-y-2 text-xs leading-relaxed text-slate-600">
+            <li className="flex items-start gap-2">
+              <span className="text-slate-400 font-bold">&bull;</span>
+              <span>Tương thích Google Authenticator, Microsoft Authenticator hoặc TOTP tương đương.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-slate-400 font-bold">&bull;</span>
+              <span>Chỉ kích hoạt trên thiết bị công vụ hoặc thiết bị cá nhân có cài đặt khóa sinh trắc.</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-slate-400 font-bold">&bull;</span>
+              <span>Khi đổi hoặc hủy 2FA, các phiên đăng nhập khác sẽ tự động bị thu hồi.</span>
+            </li>
+          </ul>
+        </Card>
+      </div>
+
+      {/* Setup Section if Disabled */}
+      {!status.isEnabled && (
+        <Card>
+          <CardHeader
+            title={t("security.enableMfa")}
+            subtitle="Tạo khóa bảo mật và liên kết với ứng dụng xác thực của bạn."
+            action={
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={isSubmitting}
+                onClick={handleStartSetup}
+                isLoading={isSubmitting && !setup}
+              >
+                Khởi tạo phiên thiết lập
+              </Button>
+            }
+          />
 
           {setup && (
-            <div className="mt-6 grid gap-4">
-              <div className="rounded-2xl border border-cyan-100 bg-cyan-50 p-4">
-                <p className="text-sm font-semibold text-cyan-900">Khóa nhập tay</p>
-                <p className="mt-2 break-all font-mono text-sm text-cyan-950">{setup.manualEntryKey}</p>
-                <p className="mt-3 text-xs text-cyan-800">
-                  Hết hạn lúc {new Date(setup.expiresAtUtc).toLocaleString("vi-VN")}.
+            <div className="mt-5 space-y-4">
+              <div className="rounded-lg border border-sky-100 bg-sky-50/70 p-4">
+                <p className="text-xs font-semibold text-sky-900">Mã bí mật (Nhập thủ công nếu không quét được QR)</p>
+                <p className="mt-1 font-mono text-xs font-semibold text-sky-950 select-all">
+                  {setup.manualEntryKey}
+                </p>
+                <p className="mt-2 text-[11px] text-sky-700">
+                  Hết hạn lúc {new Date(setup.expiresAtUtc).toLocaleTimeString("vi-VN")}.
                 </p>
               </div>
 
-              <label className="grid gap-2 text-sm font-medium text-slate-700">
-                Liên kết cấu hình OTP
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">
+                  Liên kết cấu hình OTP Auth URI
+                </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   readOnly
                   value={setup.otpAuthUri}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-xs text-slate-800 outline-none"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2.5 font-mono text-xs text-slate-800 outline-none select-all"
                 />
-              </label>
+              </div>
 
-              <form onSubmit={handleEnable} className="grid gap-4 md:grid-cols-[1fr_auto]">
-                <label className="grid gap-2 text-sm font-medium text-slate-700">
-                  Mã xác thực 6 số
+              <form onSubmit={handleEnable} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="flex-1">
+                  <label className="mb-1 block text-xs font-semibold text-slate-700">
+                    {t("auth.mfaPrompt")} <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={enableCode}
                     onChange={(event) => setEnableCode(event.target.value)}
-                    placeholder="123456"
-                    className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-500 focus:bg-white"
+                    placeholder="000000"
+                    maxLength={6}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono tracking-widest text-slate-900 shadow-2xs outline-none focus:border-slate-500"
                     required
                   />
-                </label>
-                <button
+                </div>
+                <Button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="inline-flex h-12 items-center justify-center self-end rounded-full bg-cyan-700 px-6 text-sm font-semibold text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:opacity-70"
+                  variant="primary"
+                  size="sm"
+                  isLoading={isSubmitting}
                 >
-                  {isSubmitting ? "Đang kích hoạt..." : "Bật MFA"}
-                </button>
+                  {t("auth.verifyMfa")}
+                </Button>
               </form>
             </div>
           )}
-        </section>
+        </Card>
       )}
 
+      {/* Disable Section if Enabled */}
       {status.isEnabled && (
-        <section className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-gray-800">Tắt xác thực hai bước</h2>
-          <p className="mt-2 text-sm text-gray-500">
-            Nhập mã hiện tại từ ứng dụng xác thực để xác nhận thao tác. Sau khi tắt, các phiên đăng
-            nhập đang hoạt động sẽ bị thu hồi.
-          </p>
+        <Card className="border-rose-200">
+          <CardHeader
+            title={t("security.disableMfa")}
+            subtitle="Nhập mã xác thực 6 số hiện tại để xác nhận việc gỡ bỏ xác thực hai lớp."
+          />
 
-          <form onSubmit={handleDisable} className="mt-5 grid gap-4 md:grid-cols-[1fr_auto]">
-            <label className="grid gap-2 text-sm font-medium text-slate-700">
-              Mã xác thực hiện tại
+          <form onSubmit={handleDisable} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <label className="mb-1 block text-xs font-semibold text-slate-700">
+                Mã xác thực 6 số <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="text"
                 value={disableCode}
                 onChange={(event) => setDisableCode(event.target.value)}
-                placeholder="123456"
-                className="h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-red-400 focus:bg-white"
+                placeholder="000000"
+                maxLength={6}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono tracking-widest text-slate-900 shadow-2xs outline-none focus:border-rose-400"
                 required
               />
-            </label>
-            <button
+            </div>
+            <Button
               type="submit"
-              disabled={isSubmitting}
-              className="inline-flex h-12 items-center justify-center self-end rounded-full bg-red-600 px-6 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+              variant="danger"
+              size="sm"
+              isLoading={isSubmitting}
             >
-              {isSubmitting ? "Đang xử lý..." : "Tắt MFA"}
-            </button>
+              Xác nhận tắt 2FA
+            </Button>
           </form>
-        </section>
+        </Card>
       )}
     </div>
   );

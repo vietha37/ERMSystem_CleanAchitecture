@@ -1,0 +1,274 @@
+{
+  "common": {
+    "actions": {
+      "save": "Lưu",
+      "cancel": "Hủy",
+      "create": "Thêm mới",
+      "edit": "Chỉnh sửa",
+      "delete": "Xóa",
+      "confirm": "Xác nhận",
+      "close": "Đóng",
+      "search": "Tìm kiếm",
+      "filter": "Bộ lọc",
+      "reset": "Đặt lại",
+      "refresh": "Làm mới",
+      "reload": "Tải lại",
+      "view": "Xem chi tiết",
+      "export": "Xuất dữ liệu",
+      "import": "Nhập dữ liệu",
+      "back": "Quay lại",
+      "submit": "Gửi yêu cầu",
+      "sync": "Đồng bộ",
+      "syncHospitalIdentity": "Đồng bộ danh bạ bệnh viện",
+      "processing": "Đang xử lý...",
+      "loading": "Đang tải dữ liệu...",
+      "logout": "Đăng xuất"
+    },
+    "status": {
+      "all": "Tất cả trạng thái",
+      "pending": "Chờ xử lý",
+      "completed": "Hoàn thành",
+      "cancelled": "Đã hủy",
+      "active": "Đang hoạt động",
+      "inactive": "Ngưng hoạt động",
+      "inProgress": "Đang tiến hành",
+      "draft": "Bản nháp",
+      "locked": "Đã khóa",
+      "paid": "Đã thanh toán",
+      "unpaid": "Chưa thanh toán",
+      "partial": "Thanh toán một phần",
+      "refunded": "Đã hoàn tiền"
+    },
+    "labels": {
+      "actions": "Thao tác",
+      "status": "Trạng thái",
+      "createdAt": "Ngày tạo",
+      "updatedAt": "Ngày cập nhật",
+      "notes": "Ghi chú",
+      "details": "Chi tiết",
+      "description": "Mô tả",
+      "empty": "Không có dữ liệu",
+      "noResults": "Không tìm thấy kết quả phù hợp",
+      "totalRecords": "Tổng cộng: {{count}} bản ghi",
+      "page": "Trang {{current}} / {{total}}",
+      "previous": "Trước",
+      "next": "Sau",
+      "all": "Tất cả",
+      "required": "Bắt buộc",
+      "optional": "Tùy chọn"
+    },
+    "confirmations": {
+      "deleteTitle": "Xác nhận xóa",
+      "deleteMessage": "Bạn có chắc chắn muốn xóa bản ghi này? Thao tác này không thể hoàn tác.",
+      "discardTitle": "Hủy thay đổi",
+      "discardMessage": "Các thay đổi chưa lưu sẽ bị mất. Bạn có muốn tiếp tục?"
+    },
+    "messages": {
+      "success": "Thao tác thành công",
+      "createSuccess": "Thêm mới thành công",
+      "updateSuccess": "Cập nhật thành công",
+      "deleteSuccess": "Xóa thành công",
+      "syncSuccess": "Đồng bộ danh bạ hoàn tất: {{synced}}/{{total}} người dùng.",
+      "error": "Có lỗi xảy ra, vui lòng thử lại.",
+      "networkError": "Không thể kết nối đến máy chủ.",
+      "unauthorized": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+      "forbidden": "Bạn không có quyền thực hiện thao tác này."
+    }
+  },
+  "nav": {
+    "dashboard": "Tổng quan",
+    "doctorWorklist": "Công việc bác sĩ",
+    "staff": "Nhân sự",
+    "security": "Bảo mật",
+    "patients": "Bệnh nhân",
+    "appointments": "Lịch hẹn",
+    "medicalRecords": "Hồ sơ bệnh án",
+    "prescriptions": "Đơn thuốc",
+    "clinicalOrders": "Chỉ định cận lâm sàng",
+    "billing": "Hóa đơn & Viện phí",
+    "notifications": "Thông báo",
+    "portal": "Cổng thông tin bệnh nhân",
+    "home": "Trang chủ",
+    "services": "Dịch vụ y tế",
+    "doctors": "Đội ngũ bác sĩ",
+    "booking": "Đặt lịch khám"
+  },
+  "auth": {
+    "login": "Đăng nhập",
+    "loginTitle": "Hệ thống Quản lý Bệnh viện ERM",
+    "loginSubtitle": "Đăng nhập tài khoản nội bộ hoặc cổng thông tin bệnh nhân",
+    "username": "Tên đăng nhập / Mã định danh",
+    "password": "Mật khẩu",
+    "usernamePlaceholder": "Nhập tên đăng nhập...",
+    "passwordPlaceholder": "Nhập mật khẩu...",
+    "rememberMe": "Ghi nhớ phiên làm việc",
+    "forgotPassword": "Quên mật khẩu?",
+    "submitLogin": "Đăng nhập vào hệ thống",
+    "mfaRequired": "Yêu cầu xác thực hai yếu tố (2FA)",
+    "mfaPrompt": "Nhập mã xác thực 6 chữ số từ ứng dụng Authenticator của bạn",
+    "mfaPlaceholder": "000000",
+    "verifyMfa": "Xác thực 2FA",
+    "roles": {
+      "Admin": "Quản trị viên",
+      "Doctor": "Bác sĩ điều trị",
+      "Cashier": "Thu ngân & Tiếp đón",
+      "Patient": "Bệnh nhân"
+    }
+  },
+  "dashboard": {
+    "title": "Trung tâm điều hành y tế",
+    "subtitle": "Theo dõi lưu lượng khám bệnh, chỉ số lâm sàng và doanh thu viện phí theo thời gian thực",
+    "stats": {
+      "totalPatients": "Tổng số bệnh nhân",
+      "appointmentsToday": "Lịch hẹn hôm nay",
+      "pendingAppointments": "Chờ tiếp nhận",
+      "completedAppointments": "Đã hoàn thành",
+      "cancelledAppointments": "Lịch đã hủy",
+      "revisitToday": "Tái khám hôm nay",
+      "completionRate": "Tỷ lệ hoàn thành",
+      "cancellationRate": "Tỷ lệ hủy khám",
+      "revisitRate": "Tỷ lệ tái khám",
+      "issuedAmount": "Doanh thu phát sinh",
+      "collectedAmount": "Thực thu tháng này",
+      "outstandingBalance": "Công nợ còn tồn",
+      "collectionRate": "Tỷ lệ thu viện phí"
+    },
+    "sections": {
+      "operationalFlow": "Lưu lượng vận hành hôm nay",
+      "financialOverview": "Tổng quan viện phí & Tài chính",
+      "topDiagnoses": "Bệnh lý chẩn đoán phổ biến",
+      "trend": "Xu hướng tiếp nhận 7 ngày gần nhất",
+      "quickActions": "Thao tác nhanh"
+    }
+  },
+  "staff": {
+    "title": "Quản lý nhân sự & Phân quyền",
+    "subtitle": "Danh sách bác sĩ, điều dưỡng, nhân viên thu ngân và tài khoản nội bộ",
+    "createStaff": "Thêm nhân sự mới",
+    "syncTitle": "Đồng bộ danh bạ",
+    "syncDescription": "Đồng bộ danh sách nhân sự nội bộ sang dịch vụ định danh liên bệnh viện.",
+    "syncButton": "Đồng bộ với Identity Service",
+    "fields": {
+      "username": "Tên đăng nhập",
+      "name": "Họ và tên",
+      "role": "Vai trò hệ thống",
+      "password": "Mật khẩu khởi tạo",
+      "specialty": "Chuyên khoa",
+      "licenseNumber": "Số chứng chỉ hành nghề"
+    },
+    "filterRole": "Lọc theo vai trò",
+    "searchPlaceholder": "Tìm theo tên hoặc tài khoản..."
+  },
+  "appointments": {
+    "title": "Điều phối & Tiếp nhận lịch hẹn",
+    "subtitle": "Xử lý check-in tiếp đón, điều phối phòng khám, đổi lịch và quản lý hàng đợi",
+    "createAppointment": "Đặt lịch hẹn mới",
+    "checkIn": "Check-in tiếp đón",
+    "reschedule": "Đổi ngày khám",
+    "cancelAppointment": "Hủy lịch hẹn",
+    "fields": {
+      "patient": "Bệnh nhân",
+      "doctor": "Bác sĩ phụ trách",
+      "date": "Ngày & giờ hẹn",
+      "reason": "Lý do khám",
+      "status": "Trạng thái"
+    }
+  },
+  "doctorWorklist": {
+    "title": "Bàn làm việc Bác sĩ",
+    "subtitle": "Danh sách bệnh nhân chờ khám, tiếp nhận ca khám lâm sàng và theo dõi chỉ số sinh hiệu",
+    "startEncounter": "Bắt đầu khám",
+    "continueEncounter": "Tiếp tục khám",
+    "vitals": "Chỉ số sinh hiệu",
+    "queueNumber": "Số thứ tự",
+    "waiting": "Đang chờ khám",
+    "examining": "Đang trong phòng khám"
+  },
+  "patients": {
+    "title": "Đăng bộ hồ sơ bệnh nhân",
+    "subtitle": "Tra cứu mã định danh y tế, quản lý thông tin hành chính và lịch sử khám chữa bệnh",
+    "registerPatient": "Đăng bộ bệnh nhân mới",
+    "fields": {
+      "fullName": "Họ và tên",
+      "dob": "Ngày sinh",
+      "gender": "Giới tính",
+      "phone": "Số điện thoại",
+      "address": "Địa chỉ thường trú",
+      "medicalCode": "Mã bệnh nhân",
+      "genderMale": "Nam",
+      "genderFemale": "Nữ",
+      "genderOther": "Khác"
+    }
+  },
+  "medicalRecords": {
+    "title": "Hồ sơ bệnh án điện tử (EMR)",
+    "subtitle": "Ghi nhận triệu chứng lâm sàng, chẩn đoán ICD-10, chỉ định phác đồ và khóa bệnh án",
+    "createRecord": "Mở hồ sơ bệnh án",
+    "lockRecord": "Khóa hồ sơ (Chốt bệnh án)",
+    "fields": {
+      "symptoms": "Triệu chứng ban đầu",
+      "diagnosis": "Chẩn đoán xác định",
+      "notes": "Diễn biến & Ghi chú lâm sàng",
+      "icdCode": "Mã ICD-10"
+    }
+  },
+  "prescriptions": {
+    "title": "Quản lý đơn thuốc điện tử",
+    "subtitle": "Kê đơn thuốc điều trị, quản lý liều dùng, hướng dẫn uống thuốc và tương tác thuốc",
+    "createPrescription": "Kê đơn mới",
+    "addMedicine": "Thêm loại thuốc",
+    "fields": {
+      "medicineName": "Tên thuốc",
+      "dosage": "Liều dùng & Cách dùng",
+      "duration": "Thời gian (ngày)",
+      "instructions": "Lời dặn của bác sĩ"
+    }
+  },
+  "clinicalOrders": {
+    "title": "Chỉ định cận lâm sàng",
+    "subtitle": "Quản lý phiếu xét nghiệm máu, sinh hóa, chẩn đoán hình ảnh và trả kết quả",
+    "createOrder": "Tạo phiếu chỉ định",
+    "fields": {
+      "orderType": "Loại cận lâm sàng",
+      "service": "Dịch vụ chỉ định",
+      "results": "Kết quả xét nghiệm",
+      "status": "Tiến độ xét nghiệm"
+    }
+  },
+  "billing": {
+    "title": "Quản lý viện phí & Hóa đơn",
+    "subtitle": "Xuất hóa đơn khám bệnh, tổng hợp chi phí thuốc, cận lâm sàng và tiếp nhận thanh toán",
+    "createInvoice": "Lập hóa đơn",
+    "payInvoice": "Thu viện phí",
+    "fields": {
+      "invoiceNumber": "Mã hóa đơn",
+      "totalAmount": "Tổng chi phí",
+      "paidAmount": "Số tiền đã trả",
+      "paymentMethod": "Phương thức thanh toán",
+      "cash": "Tiền mặt",
+      "transfer": "Chuyển khoản",
+      "card": "Thẻ ngân hàng",
+      "insurance": "Bảo hiểm y tế"
+    }
+  },
+  "security": {
+    "title": "Trung tâm an toàn & Bảo mật",
+    "subtitle": "Cấu hình xác thực hai lớp (2FA/TOTP), kiểm soát phiên đăng nhập và nhật ký bảo mật",
+    "enableMfa": "Bật xác thực 2FA",
+    "disableMfa": "Tắt xác thực 2FA",
+    "mfaStatus": "Trạng thái xác thực 2 bước",
+    "mfaEnabled": "Đã kích hoạt bảo vệ 2FA",
+    "mfaDisabled": "Chưa kích hoạt 2FA (Khuyến nghị bật)",
+    "scanQr": "Quét mã QR bằng Google Authenticator hoặc ứng dụng TOTP tương đương",
+    "auditLogs": "Nhật ký truy cập hệ thống"
+  },
+  "public": {
+    "hospitalName": "Bệnh viện Quốc tế ERM",
+    "tagline": "Y đức hàng đầu — Tiêu chuẩn lâm sàng chuẩn mực",
+    "emergencyPhone": "Cấp cứu 24/7: 1900 6868",
+    "address": "Tòa nhà Y tế ERM, Quận 1, TP. Hồ Chí Minh",
+    "portalButton": "Cổng Bệnh nhân",
+    "staffLoginButton": "Cổng Nội bộ",
+    "bookAppointment": "Đặt lịch khám ngay"
+  }
+}

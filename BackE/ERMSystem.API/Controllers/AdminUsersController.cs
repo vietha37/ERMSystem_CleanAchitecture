@@ -1,182 +1,137 @@
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ERMSystem.Application.DTOs;
 using ERMSystem.Application.DTOs.Common;
 using ERMSystem.Application.Interfaces;
 using ERMSystem.Application.Authorization;
-using ERMSystem.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace ERMSystem.API.Controllers
+namespace ERMSystem.API.Controllers;
+
+/// <summary>
+/// Controller tiếp nhận yêu cầu quản lý người dùng từ tài khoản Quản trị viên (Admin).
+/// Đã được tái cấu trúc tuân thủ Clean Architecture: chỉ điều phối HTTP request/response,
+/// toàn bộ logic nghiệp vụ, bảo mật và truy xuất dữ liệu được ủy quyền cho IAdminUserService.
+/// </summary>
+[ApiController]
+[Route("api/admin/users")]
+[Authorize]
+public class AdminUsersController : ControllerBase
 {
-    [ApiController]
-    [Route("api/admin/users")]
-    [Authorize]
-    public class AdminUsersController : ControllerBase
+    private readonly IAdminUserService _adminUserService;
+
+    public AdminUsersController(IAdminUserService adminUserService)
     {
-        private readonly IUserRepository _userRepository;
-        private readonly IHospitalIdentityBridgeService _hospitalIdentityBridgeService;
+        _adminUserService = adminUserService;
+    }
 
-        public AdminUsersController(
-            IUserRepository userRepository,
-            IHospitalIdentityBridgeService hospitalIdentityBridgeService)
+    /// <summary>
+    /// Lấy danh sách người dùng phân trang và lọc theo vai trò.
+    /// </summary>
+    [HttpGet]
+    [Authorize(Policy = AppPermissions.AdminUsers.Read)]
+    public async Task<IActionResult> GetUsers(
+        [FromQuery] PaginationRequest request,
+        [FromQuery] string? role,
+        CancellationToken ct)
+    {
+        try
         {
-            _userRepository = userRepository;
-            _hospitalIdentityBridgeService = hospitalIdentityBridgeService;
-        }
-
-        [HttpGet]
-        [Authorize(Policy = AppPermissions.AdminUsers.Read)]
-        public async Task<IActionResult> GetUsers(
-            [FromQuery] PaginationRequest request,
-            [FromQuery] string? role,
-            CancellationToken ct)
-        {
-            if (!string.IsNullOrWhiteSpace(role) &&
-                !string.Equals(role, AppRole.Doctor, StringComparison.Ordinal) &&
-                !string.Equals(role, AppRole.Cashier, StringComparison.Ordinal) &&
-                !string.Equals(role, AppRole.Patient, StringComparison.Ordinal))
-            {
-                return BadRequest("Role filter must be Doctor, Cashier or Patient.");
-            }
-
-            var (items, totalCount) = await _userRepository.GetPagedAsync(
-                request.PageNumber,
-                request.PageSize,
-                role,
-                request.TextSearch,
-                ct);
-
-            var mapped = items
-                .Select(u => new AdminUserDto
-                {
-                    Id = u.Id,
-                    Username = u.Username,
-                    Name = u.Name,
-                    Role = u.Role
-                });
-
-            var result = new PaginatedResult<AdminUserDto>(
-                mapped,
-                totalCount,
-                request.PageNumber,
-                request.PageSize);
-
+            var result = await _adminUserService.GetUsersAsync(request, role, ct);
             return Ok(result);
         }
-
-        [HttpPost]
-        [Authorize(Policy = AppPermissions.AdminUsers.Create)]
-        public async Task<IActionResult> CreateUser([FromBody] CreateAdminUserDto dto, CancellationToken ct)
+        catch (ArgumentException ex)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
+            return BadRequest(ex.Message);
+        }
+    }
 
-            if (await _userRepository.UsernameExistsAsync(dto.Username))
-            {
-                return Conflict($"Username '{dto.Username}' is already taken.");
-            }
+    /// <summary>
+    /// Tạo người dùng mới trong hệ thống.
+    /// </summary>
+    [HttpPost]
+    [Authorize(Policy = AppPermissions.AdminUsers.Create)]
+    public async Task<IActionResult> CreateUser([FromBody] CreateAdminUserDto dto, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
 
-            var user = new AppUser
-            {
-                Id = Guid.NewGuid(),
-                Username = dto.Username.Trim(),
-                Name = dto.Name.Trim(),
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                Role = dto.Role
-            };
-
-            await _userRepository.AddAsync(user);
-            await _hospitalIdentityBridgeService.SyncInternalUserAsync(user, ct: ct);
-
-            var created = new AdminUserDto
-            {
-                Id = user.Id,
-                Username = user.Username,
-                Name = user.Name,
-                Role = user.Role
-            };
-
+        try
+        {
+            var created = await _adminUserService.CreateUserAsync(dto, ct);
             return CreatedAtAction(nameof(GetUsers), new { id = created.Id }, created);
         }
-
-        [HttpPut("{id:guid}")]
-        [Authorize(Policy = AppPermissions.AdminUsers.Update)]
-        public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateAdminUserDto dto, CancellationToken ct)
+        catch (InvalidOperationException ex)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
+            return Conflict(ex.Message);
+        }
+    }
 
-            var user = await _userRepository.GetByIdAsync(id, ct);
-            if (user == null)
-            {
-                return NotFound($"User with ID {id} not found.");
-            }
+    /// <summary>
+    /// Cập nhật thông tin tài khoản nhân viên y tế.
+    /// </summary>
+    [HttpPut("{id:guid}")]
+    [Authorize(Policy = AppPermissions.AdminUsers.Update)]
+    public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateAdminUserDto dto, CancellationToken ct)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
 
-            if (user.Role != AppRole.Doctor && user.Role != AppRole.Cashier)
-            {
-                return BadRequest("Only Doctor and Cashier accounts can be updated here.");
-            }
-
-            if (await _userRepository.UsernameExistsAsync(dto.Username, id, ct))
-            {
-                return Conflict($"Username '{dto.Username}' is already taken.");
-            }
-
-            var previousUsername = user.Username;
-            user.Username = dto.Username.Trim();
-            user.Name = dto.Name.Trim();
-
-            if (!string.IsNullOrWhiteSpace(dto.Role))
-            {
-                user.Role = dto.Role;
-            }
-
-            if (!string.IsNullOrWhiteSpace(dto.Password))
-            {
-                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
-            }
-
-            await _userRepository.UpdateAsync(user, ct);
-            await _hospitalIdentityBridgeService.SyncInternalUserAsync(user, previousUsername, ct);
-
+        try
+        {
+            await _adminUserService.UpdateUserAsync(id, dto, ct);
             return NoContent();
         }
-
-        [HttpDelete("{id:guid}")]
-        [Authorize(Policy = AppPermissions.AdminUsers.Delete)]
-        public async Task<IActionResult> DeleteUser(Guid id, CancellationToken ct)
+        catch (KeyNotFoundException ex)
         {
-            var user = await _userRepository.GetByIdAsync(id, ct);
-            if (user == null)
-            {
-                return NotFound($"User with ID {id} not found.");
-            }
+            return NotFound(ex.Message);
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("taken", StringComparison.OrdinalIgnoreCase))
+        {
+            return Conflict(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
 
-            if (user.Role != AppRole.Doctor && user.Role != AppRole.Cashier && user.Role != AppRole.Patient)
-            {
-                return BadRequest("Only Doctor, Cashier and Patient accounts can be deleted here.");
-            }
-
-            await _userRepository.DeleteAsync(user, ct);
-            await _hospitalIdentityBridgeService.DeactivateInternalUserAsync(user, ct);
+    /// <summary>
+    /// Xóa tài khoản người dùng khỏi hệ thống.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AppPermissions.AdminUsers.Delete)]
+    public async Task<IActionResult> DeleteUser(Guid id, CancellationToken ct)
+    {
+        try
+        {
+            await _adminUserService.DeleteUserAsync(id, ct);
             return NoContent();
         }
-
-        [HttpPost("sync-hospital-identity")]
-        [Authorize(Policy = AppPermissions.AdminUsers.SyncIdentity)]
-        public async Task<IActionResult> SyncHospitalIdentity(CancellationToken ct)
+        catch (KeyNotFoundException ex)
         {
-            var internalUsers = await _userRepository.GetInternalUsersAsync(ct);
-            var result = await _hospitalIdentityBridgeService.SyncInternalUsersAsync(internalUsers, ct);
-            return Ok(result);
+            return NotFound(ex.Message);
         }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Đồng bộ danh bạ người dùng nội bộ sang hệ thống bệnh viện.
+    /// </summary>
+    [HttpPost("sync-hospital-identity")]
+    [Authorize(Policy = AppPermissions.AdminUsers.SyncIdentity)]
+    public async Task<IActionResult> SyncHospitalIdentity(CancellationToken ct)
+    {
+        var result = await _adminUserService.SyncHospitalIdentityAsync(ct);
+        return Ok(result);
     }
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ERMSystem.Application.Interfaces;
+using ERMSystem.Application.Utilities;
 using ERMSystem.Infrastructure.HospitalData;
 using ERMSystem.Infrastructure.HospitalData.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -183,18 +184,6 @@ public class SatisfactionSurveyCampaignService : BackgroundService
             successAtUtc: nowUtc);
     }
 
-    private static TimeZoneInfo ResolveClinicTimeZone()
-    {
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
-        }
-        catch
-        {
-            return TimeZoneInfo.Utc;
-        }
-    }
-
     private static DateTime ConvertUtcToClinicLocal(DateTime utcDateTime)
-        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), ResolveClinicTimeZone());
+        => ClinicDateTimeHelper.ConvertUtcToClinicLocal(utcDateTime);
 }

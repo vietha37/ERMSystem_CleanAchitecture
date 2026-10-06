@@ -4,8 +4,9 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { ErrorState } from "@/components/ui/DataState";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/DataState";
 import { Modal } from "@/components/ui/Modal";
+import { useTranslation } from "@/hooks/useTranslation";
 import { getApiErrorMessage } from "@/services/error";
 import { staffUserService } from "@/services/staffUserService";
 import { StaffUser, UpdateStaffUserPayload } from "@/services/types";
@@ -24,24 +25,13 @@ const initialForm: FormState = {
   role: "Doctor",
 };
 
-function getAccountRoleClass(role: StaffUser["role"]): string {
-  switch (role) {
-    case "Doctor":
-      return "border border-cyan-100 bg-cyan-50 text-cyan-700";
-    case "Cashier":
-      return "border border-amber-100 bg-amber-50 text-amber-700";
-    case "Patient":
-      return "border border-emerald-100 bg-emerald-50 text-emerald-700";
-    default:
-      return "border border-slate-100 bg-slate-50 text-slate-700";
-  }
-}
-
 export default function StaffPage() {
+  const { t } = useTranslation();
   const [items, setItems] = useState<StaffUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -75,15 +65,16 @@ export default function StaffPage() {
       setTotalPages(data.totalPages || 1);
       setListError(null);
     } catch (error) {
-      setListError(getApiErrorMessage(error, "Không thể tải danh sách tài khoản."));
+      const message = getApiErrorMessage(error, t("common.messages.error"));
+      setListError(message);
       setItems([]);
       setTotalCount(0);
       setTotalPages(1);
-      toast.error(getApiErrorMessage(error, "Không thể tải danh sách tài khoản."));
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
-  }, [pageNumber, pageSize, roleFilter, debouncedSearch]);
+  }, [pageNumber, pageSize, roleFilter, debouncedSearch, t]);
 
   useEffect(() => {
     fetchData();
@@ -98,9 +89,7 @@ export default function StaffPage() {
   };
 
   const openEditModal = (user: StaffUser) => {
-    if (user.role === "Patient") {
-      return;
-    }
+    if (user.role === "Patient") return;
 
     setMode("edit");
     setSelected(user);
@@ -125,7 +114,7 @@ export default function StaffPage() {
           password: form.password,
           role: form.role,
         });
-        toast.success("Đã tạo tài khoản nhân sự.");
+        toast.success(t("common.messages.createSuccess"));
       } else if (selected) {
         const payload: UpdateStaffUserPayload = {
           username: form.username.trim(),
@@ -136,116 +125,155 @@ export default function StaffPage() {
           payload.password = form.password.trim();
         }
         await staffUserService.update(selected.id, payload);
-        toast.success("Đã cập nhật tài khoản nhân sự.");
+        toast.success(t("common.messages.updateSuccess"));
       }
 
       setIsModalOpen(false);
       fetchData();
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Không thể lưu tài khoản nhân sự."));
+      toast.error(getApiErrorMessage(error, t("common.messages.error")));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (user: StaffUser) => {
-    const ok = window.confirm(`Xóa tài khoản ${user.username} (${user.role})?`);
-    if (!ok) {
-      return;
-    }
+    const ok = window.confirm(
+      `${t("common.confirmations.deleteMessage")} (${user.username})`
+    );
+    if (!ok) return;
 
     try {
       await staffUserService.delete(user.id);
-      toast.success("Đã xóa tài khoản nhân sự.");
+      toast.success(t("common.messages.deleteSuccess"));
       if (items.length === 1 && pageNumber > 1) {
         setPageNumber((current) => current - 1);
       } else {
         fetchData();
       }
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Không thể xóa tài khoản nhân sự."));
+      toast.error(getApiErrorMessage(error, t("common.messages.error")));
+    }
+  };
+
+  const handleSyncHospitalIdentity = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await staffUserService.syncHospitalIdentity();
+      toast.success(
+        t("common.messages.syncSuccess", {
+          synced: res.syncedUsers,
+          total: res.totalUsers,
+        })
+      );
+      fetchData();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, t("common.messages.error")));
+    } finally {
+      setIsSyncing(false);
     }
   };
 
   const titleByMode = useMemo(
-    () => (mode === "create" ? "Tạo tài khoản nhân sự" : "Cập nhật tài khoản nhân sự"),
-    [mode]
+    () => (mode === "create" ? t("staff.createStaff") : t("common.actions.edit")),
+    [mode, t]
   );
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-800">Nhân sự</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Quản trị viên có thể quản lý tài khoản bác sĩ và thu ngân.
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">
+            {t("staff.title")}
+          </h1>
+          <p className="mt-1 text-xs text-slate-500">
+            {t("staff.subtitle")}
           </p>
         </div>
-        <Button onClick={openCreateModal}>+ Thêm nhân sự</Button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            variant="secondary"
+            size="sm"
+            isLoading={isSyncing}
+            onClick={handleSyncHospitalIdentity}
+          >
+            {t("common.actions.syncHospitalIdentity")}
+          </Button>
+          <Button variant="primary" size="sm" onClick={openCreateModal}>
+            + {t("staff.createStaff")}
+          </Button>
+        </div>
       </div>
 
-      <Card className="rounded-2xl border-none bg-white p-6 shadow-sm">
-        <div className="mb-6 flex flex-col justify-between gap-3 md:flex-row">
-          <input
-            type="text"
-            placeholder="Tìm theo họ tên hoặc tên đăng nhập..."
-            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 md:w-[360px]"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
+      {/* Main Table Card */}
+      <Card padding="none">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {/* Search Input */}
+          <div className="relative w-full sm:max-w-xs">
+            <input
+              type="text"
+              placeholder={t("staff.searchPlaceholder")}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-2xs outline-none transition focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
 
-          <div className="flex items-center gap-3">
+          {/* Filters */}
+          <div className="flex items-center gap-2">
             <select
-              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-2xs outline-none transition focus:border-slate-500"
               value={roleFilter}
               onChange={(event) => {
                 setRoleFilter(event.target.value as "" | "Doctor" | "Cashier" | "Patient");
                 setPageNumber(1);
               }}
             >
-              <option value="">Tất cả vai trò</option>
-              <option value="Doctor">Bác sĩ</option>
-              <option value="Cashier">Thu ngân</option>
-              <option value="Patient">Bệnh nhân</option>
+              <option value="">{t("common.status.all")}</option>
+              <option value="Doctor">{t("auth.roles.Doctor")}</option>
+              <option value="Cashier">{t("auth.roles.Cashier")}</option>
+              <option value="Patient">{t("auth.roles.Patient")}</option>
             </select>
 
             <select
-              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 shadow-2xs outline-none transition focus:border-slate-500"
               value={pageSize}
               onChange={(event) => {
                 setPageSize(Number(event.target.value));
                 setPageNumber(1);
               }}
             >
-              <option value={5}>5 / trang</option>
               <option value={10}>10 / trang</option>
               <option value={20}>20 / trang</option>
+              <option value={50}>50 / trang</option>
             </select>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-          <table className="w-full border-collapse text-left">
-            <thead className="border-b border-gray-200 bg-gray-50">
+        {/* Table Body */}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left text-xs">
+            <thead className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
               <tr>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-gray-500">Tên đăng nhập</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-gray-500">Họ và tên</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wider text-gray-500">Vai trò</th>
-                <th className="p-4 text-right text-xs font-bold uppercase tracking-wider text-gray-500">Thao tác</th>
+                <th className="px-5 py-3">{t("staff.fields.username")}</th>
+                <th className="px-5 py-3">{t("staff.fields.name")}</th>
+                <th className="px-5 py-3">{t("staff.fields.role")}</th>
+                <th className="px-5 py-3 text-right">{t("common.labels.actions")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-slate-100 text-slate-800">
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-gray-500">
-                    Đang tải...
+                  <td colSpan={4}>
+                    <LoadingState title={t("common.actions.loading")} />
                   </td>
                 </tr>
               ) : listError ? (
                 <tr>
                   <td colSpan={4}>
                     <ErrorState
-                      title="Không thể tải danh sách tài khoản"
+                      title={t("common.messages.error")}
                       description={listError}
                       onAction={() => void fetchData()}
                     />
@@ -253,45 +281,50 @@ export default function StaffPage() {
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-gray-500">
-                    Không tìm thấy tài khoản nào.
+                  <td colSpan={4}>
+                    <EmptyState
+                      title={t("common.labels.empty")}
+                      description={t("common.labels.noResults")}
+                    />
                   </td>
                 </tr>
               ) : (
                 items.map((user) => (
-                  <tr key={user.id} className="transition-colors hover:bg-blue-50/30">
-                    <td className="p-4 font-semibold text-gray-800">{user.username}</td>
-                    <td className="p-4 text-gray-700">{user.name}</td>
-                    <td className="p-4">
-                      {user.role === "Patient" ? (
-                        <span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${getAccountRoleClass(user.role)}`}>
-                          Bệnh nhân
-                        </span>
-                      ) : (
-                      <span
-                        className={`rounded-lg px-2.5 py-1 text-xs font-bold ${getAccountRoleClass(
-                          user.role
-                        )}`}
-                      >
-                        {user.role === "Doctor" ? "Bác sĩ" : "Thu ngân"}
-                      </span>
-                      )}
+                  <tr key={user.id} className="transition-colors hover:bg-slate-50/70">
+                    <td className="px-5 py-3.5 font-semibold text-slate-900 font-mono">
+                      {user.username}
                     </td>
-                    <td className="space-x-2 p-4 text-right">
+                    <td className="px-5 py-3.5 font-medium">{user.name}</td>
+                    <td className="px-5 py-3.5">
+                      <span
+                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ${
+                          user.role === "Doctor"
+                            ? "bg-sky-50 text-sky-700 border border-sky-100"
+                            : user.role === "Cashier"
+                            ? "bg-amber-50 text-amber-700 border border-amber-100"
+                            : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                        }`}
+                      >
+                        {t(`auth.roles.${user.role}`) || user.role}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right space-x-1.5">
                       {user.role !== "Patient" && (
-                      <button
-                        onClick={() => openEditModal(user)}
-                        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-600 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        Sửa
-                      </button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => openEditModal(user)}
+                        >
+                          {t("common.actions.edit")}
+                        </Button>
                       )}
-                      <button
+                      <Button
+                        variant="danger"
+                        size="sm"
                         onClick={() => handleDelete(user)}
-                        className="rounded-lg border border-red-100 bg-white px-3 py-1.5 text-sm font-semibold text-red-500 shadow-sm transition-colors hover:border-red-600 hover:bg-red-500 hover:text-white"
                       >
-                        Xóa
-                      </button>
+                        {t("common.actions.delete")}
+                      </Button>
                     </td>
                   </tr>
                 ))
@@ -300,82 +333,82 @@ export default function StaffPage() {
           </table>
         </div>
 
+        {/* Pagination Footer */}
         {!isLoading && totalPages > 0 && (
-          <div className="mt-5 flex items-center justify-between text-sm">
-            <div className="font-medium text-gray-500">
-              Hiển thị{" "}
-              <span className="font-bold text-gray-900">
-                {totalCount === 0 ? 0 : (pageNumber - 1) * pageSize + 1}
-              </span>{" "}
-              đến{" "}
-              <span className="font-bold text-gray-900">{Math.min(pageNumber * pageSize, totalCount)}</span>{" "}
-              trong tổng số <span className="font-bold text-blue-600">{totalCount}</span> tài khoản
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-t border-slate-100 px-5 py-3.5 text-xs text-slate-600">
+            <div>
+              {t("common.labels.totalRecords", { count: totalCount })}
             </div>
-            <div className="flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
-              <button
-                disabled={pageNumber === 1}
-                onClick={() => setPageNumber(1)}
-                className="rounded-lg px-3 py-1.5 font-bold text-gray-600 disabled:opacity-40 hover:bg-white"
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={pageNumber <= 1}
+                onClick={() => setPageNumber((c) => Math.max(1, c - 1))}
               >
-                «
-              </button>
-              <button
-                disabled={pageNumber === 1}
-                onClick={() => setPageNumber((current) => current - 1)}
-                className="rounded-lg px-3 py-1.5 font-bold text-gray-600 disabled:opacity-40 hover:bg-white"
-              >
-                Trước
-              </button>
-              <span className="rounded-lg bg-blue-100/50 px-4 py-1.5 font-bold text-blue-700">
+                {t("common.labels.previous")}
+              </Button>
+              <span className="px-2 font-medium">
                 {pageNumber} / {totalPages}
               </span>
-              <button
-                disabled={pageNumber === totalPages}
-                onClick={() => setPageNumber((current) => current + 1)}
-                className="rounded-lg px-3 py-1.5 font-bold text-gray-600 disabled:opacity-40 hover:bg-white"
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={pageNumber >= totalPages}
+                onClick={() => setPageNumber((c) => Math.min(totalPages, c + 1))}
               >
-                Tiếp
-              </button>
+                {t("common.labels.next")}
+              </Button>
             </div>
           </div>
         )}
       </Card>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={titleByMode}>
-        <form onSubmit={handleSubmit} className="mt-2 space-y-4 px-1 pb-2">
+      {/* Create / Edit Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={titleByMode}
+        badge={t("nav.staff")}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm font-bold text-gray-700">
-              Tên đăng nhập <span className="text-red-500">*</span>
+            <label className="mb-1 block text-xs font-semibold text-slate-700">
+              {t("staff.fields.username")} <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
-              className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-gray-800 outline-none"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-900 shadow-2xs outline-none focus:border-slate-500"
               value={form.username}
-              onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, username: event.target.value }))
+              }
               required
             />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-bold text-gray-700">
-              Họ và tên <span className="text-red-500">*</span>
+            <label className="mb-1 block text-xs font-semibold text-slate-700">
+              {t("staff.fields.name")} <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
-              className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-gray-800 outline-none"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-900 shadow-2xs outline-none focus:border-slate-500"
               value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, name: event.target.value }))
+              }
               required
               minLength={3}
             />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-bold text-gray-700">
-              Vai trò <span className="text-red-500">*</span>
+            <label className="mb-1 block text-xs font-semibold text-slate-700">
+              {t("staff.fields.role")} <span className="text-rose-500">*</span>
             </label>
             <select
-              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-800 outline-none"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-2xs outline-none focus:border-slate-500"
               value={form.role}
               onChange={(event) =>
                 setForm((current) => ({
@@ -385,57 +418,62 @@ export default function StaffPage() {
               }
               required
             >
-              <option value="Doctor">Bác sĩ</option>
-              <option value="Cashier">Thu ngân</option>
+              <option value="Doctor">{t("auth.roles.Doctor")}</option>
+              <option value="Cashier">{t("auth.roles.Cashier")}</option>
             </select>
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-bold text-gray-700">
+            <label className="mb-1 block text-xs font-semibold text-slate-700">
               {mode === "create" ? (
                 <>
-                  Mật khẩu <span className="text-red-500">*</span>
+                  {t("staff.fields.password")}{" "}
+                  <span className="text-rose-500">*</span>
                 </>
               ) : (
-                "Mật khẩu mới (không bắt buộc)"
+                `${t("staff.fields.password")} (${t("common.labels.optional")})`
               )}
             </label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
-                className="w-full rounded-xl border border-gray-300 px-4 py-2.5 pr-16 text-gray-800 outline-none"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-14 text-xs text-slate-900 shadow-2xs outline-none focus:border-slate-500"
                 value={form.password}
-                onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, password: event.target.value }))
+                }
                 required={mode === "create"}
                 minLength={6}
               />
               <button
                 type="button"
-                onClick={() => setShowPassword((value) => !value)}
-                className="absolute inset-y-0 right-0 px-3 text-xs font-semibold text-gray-500 transition-colors hover:text-blue-600"
-                aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute inset-y-0 right-0 px-3 text-[11px] font-semibold text-slate-500 hover:text-slate-800"
               >
                 {showPassword ? "Ẩn" : "Hiện"}
               </button>
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-gray-100 pt-6">
-            <button
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={() => setIsModalOpen(false)}
-              className="rounded-xl bg-gray-100 px-5 py-2.5 font-bold text-gray-600 hover:bg-gray-200"
             >
-              Hủy
-            </button>
-            <button
+              {t("common.actions.cancel")}
+            </Button>
+            <Button
               type="submit"
-              disabled={isSubmitting}
-              className="rounded-xl bg-blue-600 px-6 py-2.5 font-bold text-white disabled:opacity-50 hover:bg-blue-700"
+              variant="primary"
+              size="sm"
+              isLoading={isSubmitting}
             >
-              {isSubmitting ? "Đang lưu..." : mode === "create" ? "Tạo tài khoản" : "Lưu thay đổi"}
-            </button>
+              {mode === "create"
+                ? t("common.actions.create")
+                : t("common.actions.save")}
+            </Button>
           </div>
         </form>
       </Modal>

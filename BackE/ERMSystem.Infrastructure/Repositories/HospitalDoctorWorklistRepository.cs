@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using ERMSystem.Application.Interfaces;
+using ERMSystem.Application.Utilities;
 using ERMSystem.Infrastructure.HospitalData;
 using Microsoft.EntityFrameworkCore;
 
@@ -129,20 +130,8 @@ public class HospitalDoctorWorklistRepository : IHospitalDoctorWorklistRepositor
         }).ToArray();
     }
 
-    private static TimeZoneInfo ResolveClinicTimeZone()
-    {
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
-        }
-        catch
-        {
-            return TimeZoneInfo.Utc;
-        }
-    }
-
     private static DateTime ConvertLocalClinicTimeToUtc(DateTime localDateTime)
-        => TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localDateTime, DateTimeKind.Unspecified), ResolveClinicTimeZone());
+        => ClinicDateTimeHelper.ConvertClinicLocalToUtc(localDateTime);
 
     private static (DateTime FromUtc, DateTime ToUtc) BuildUtcRange(DateOnly localDate)
     {

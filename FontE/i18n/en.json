@@ -1,0 +1,274 @@
+{
+  "common": {
+    "actions": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "create": "Create",
+      "edit": "Edit",
+      "delete": "Delete",
+      "confirm": "Confirm",
+      "close": "Close",
+      "search": "Search",
+      "filter": "Filter",
+      "reset": "Reset",
+      "refresh": "Refresh",
+      "reload": "Reload",
+      "view": "View Details",
+      "export": "Export",
+      "import": "Import",
+      "back": "Back",
+      "submit": "Submit",
+      "sync": "Sync",
+      "syncHospitalIdentity": "Sync Hospital Identity",
+      "processing": "Processing...",
+      "loading": "Loading data...",
+      "logout": "Log Out"
+    },
+    "status": {
+      "all": "All Statuses",
+      "pending": "Pending",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "active": "Active",
+      "inactive": "Inactive",
+      "inProgress": "In Progress",
+      "draft": "Draft",
+      "locked": "Locked",
+      "paid": "Paid",
+      "unpaid": "Unpaid",
+      "partial": "Partial",
+      "refunded": "Refunded"
+    },
+    "labels": {
+      "actions": "Actions",
+      "status": "Status",
+      "createdAt": "Created At",
+      "updatedAt": "Updated At",
+      "notes": "Notes",
+      "details": "Details",
+      "description": "Description",
+      "empty": "No data available",
+      "noResults": "No matching records found",
+      "totalRecords": "Total: {{count}} records",
+      "page": "Page {{current}} / {{total}}",
+      "previous": "Previous",
+      "next": "Next",
+      "all": "All",
+      "required": "Required",
+      "optional": "Optional"
+    },
+    "confirmations": {
+      "deleteTitle": "Confirm Deletion",
+      "deleteMessage": "Are you sure you want to delete this record? This action cannot be undone.",
+      "discardTitle": "Discard Changes",
+      "discardMessage": "Unsaved changes will be lost. Do you want to continue?"
+    },
+    "messages": {
+      "success": "Operation successful",
+      "createSuccess": "Created successfully",
+      "updateSuccess": "Updated successfully",
+      "deleteSuccess": "Deleted successfully",
+      "syncSuccess": "Identity sync complete: {{synced}}/{{total}} users synced.",
+      "error": "An error occurred, please try again.",
+      "networkError": "Unable to connect to the server.",
+      "unauthorized": "Session expired. Please log in again.",
+      "forbidden": "You do not have permission to perform this action."
+    }
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "doctorWorklist": "Doctor Worklist",
+    "staff": "Staff & Identity",
+    "security": "Security",
+    "patients": "Patients",
+    "appointments": "Appointments",
+    "medicalRecords": "Medical Records",
+    "prescriptions": "Prescriptions",
+    "clinicalOrders": "Clinical Orders",
+    "billing": "Billing & Invoices",
+    "notifications": "Notifications",
+    "portal": "Patient Portal",
+    "home": "Home",
+    "services": "Medical Services",
+    "doctors": "Doctors & Specialists",
+    "booking": "Book Appointment"
+  },
+  "auth": {
+    "login": "Sign In",
+    "loginTitle": "ERM Hospital Management System",
+    "loginSubtitle": "Access clinical portal or internal staff workspaces",
+    "username": "Username / ID",
+    "password": "Password",
+    "usernamePlaceholder": "Enter username...",
+    "passwordPlaceholder": "Enter password...",
+    "rememberMe": "Remember this session",
+    "forgotPassword": "Forgot password?",
+    "submitLogin": "Sign in to workspace",
+    "mfaRequired": "Two-Factor Authentication (2FA) Required",
+    "mfaPrompt": "Enter the 6-digit code from your authenticator app",
+    "mfaPlaceholder": "000000",
+    "verifyMfa": "Verify 2FA Code",
+    "roles": {
+      "Admin": "Administrator",
+      "Doctor": "Attending Doctor",
+      "Cashier": "Cashier & Reception",
+      "Patient": "Patient"
+    }
+  },
+  "dashboard": {
+    "title": "Hospital Operations Command",
+    "subtitle": "Real-time clinical patient throughput, encounters, and financial performance",
+    "stats": {
+      "totalPatients": "Total Patients",
+      "appointmentsToday": "Today's Appointments",
+      "pendingAppointments": "Pending Intake",
+      "completedAppointments": "Completed",
+      "cancelledAppointments": "Cancelled",
+      "revisitToday": "Revisits Today",
+      "completionRate": "Completion Rate",
+      "cancellationRate": "Cancellation Rate",
+      "revisitRate": "Revisit Rate",
+      "issuedAmount": "Invoiced Volume",
+      "collectedAmount": "Collected This Month",
+      "outstandingBalance": "Outstanding Balance",
+      "collectionRate": "Collection Rate"
+    },
+    "sections": {
+      "operationalFlow": "Today's Clinical Intake Flow",
+      "financialOverview": "Hospital Billing & Financials",
+      "topDiagnoses": "Frequent Clinical Diagnoses",
+      "trend": "7-Day Patient Throughput Trend",
+      "quickActions": "Quick Commands"
+    }
+  },
+  "staff": {
+    "title": "Staff Directory & Roles",
+    "subtitle": "Manage clinical personnel, access permissions, and hospital identity mapping",
+    "createStaff": "Add Staff Member",
+    "syncTitle": "Hospital Identity Sync",
+    "syncDescription": "Synchronize internal staff accounts with the hospital enterprise directory.",
+    "syncButton": "Sync with Identity Service",
+    "fields": {
+      "username": "Username",
+      "name": "Full Name",
+      "role": "Assigned Role",
+      "password": "Initial Password",
+      "specialty": "Clinical Specialty",
+      "licenseNumber": "Medical License Number"
+    },
+    "filterRole": "Filter by Role",
+    "searchPlaceholder": "Search by name or username..."
+  },
+  "appointments": {
+    "title": "Appointment Coordination & Intake",
+    "subtitle": "Manage patient check-ins, clinic scheduling, rescheduling, and queue flow",
+    "createAppointment": "Book Appointment",
+    "checkIn": "Patient Check-in",
+    "reschedule": "Reschedule",
+    "cancelAppointment": "Cancel Booking",
+    "fields": {
+      "patient": "Patient",
+      "doctor": "Attending Physician",
+      "date": "Appointment Date & Time",
+      "reason": "Chief Complaint",
+      "status": "Intake Status"
+    }
+  },
+  "doctorWorklist": {
+    "title": "Physician Worklist",
+    "subtitle": "Queue of assigned patients, active encounters, and vital signs monitoring",
+    "startEncounter": "Start Encounter",
+    "continueEncounter": "Resume Encounter",
+    "vitals": "Vital Signs",
+    "queueNumber": "Queue #",
+    "waiting": "Waiting in Queue",
+    "examining": "In Examination Room"
+  },
+  "patients": {
+    "title": "Patient Master Registry",
+    "subtitle": "Lookup medical IDs, manage administrative profiles, and review clinical histories",
+    "registerPatient": "Register New Patient",
+    "fields": {
+      "fullName": "Full Name",
+      "dob": "Date of Birth",
+      "gender": "Gender",
+      "phone": "Phone Number",
+      "address": "Residential Address",
+      "medicalCode": "Patient Code",
+      "genderMale": "Male",
+      "genderFemale": "Female",
+      "genderOther": "Other"
+    }
+  },
+  "medicalRecords": {
+    "title": "Electronic Medical Records (EMR)",
+    "subtitle": "Document clinical symptoms, ICD-10 diagnostic codes, orders, and encounter locking",
+    "createRecord": "Open Medical Record",
+    "lockRecord": "Lock Encounter Record",
+    "fields": {
+      "symptoms": "Presenting Symptoms",
+      "diagnosis": "Clinical Diagnosis",
+      "notes": "Progress Notes & Clinical Plan",
+      "icdCode": "ICD-10 Code"
+    }
+  },
+  "prescriptions": {
+    "title": "E-Prescriptions Management",
+    "subtitle": "Formulate therapeutic prescriptions, specify dosages, schedules, and pharmacy directions",
+    "createPrescription": "Issue Prescription",
+    "addMedicine": "Add Medication",
+    "fields": {
+      "medicineName": "Medication",
+      "dosage": "Dosage & Regimen",
+      "duration": "Duration (days)",
+      "instructions": "Directions for Patient"
+    }
+  },
+  "clinicalOrders": {
+    "title": "Clinical Lab & Imaging Orders",
+    "subtitle": "Order pathology labs, diagnostic imaging, and view structured laboratory findings",
+    "createOrder": "New Clinical Order",
+    "fields": {
+      "orderType": "Order Modality",
+      "service": "Test / Procedure",
+      "results": "Findings & Results",
+      "status": "Order Status"
+    }
+  },
+  "billing": {
+    "title": "Hospital Billing & Invoicing",
+    "subtitle": "Invoice outpatient encounters, pharmacy charges, lab procedures, and process payments",
+    "createInvoice": "Generate Invoice",
+    "payInvoice": "Collect Payment",
+    "fields": {
+      "invoiceNumber": "Invoice #",
+      "totalAmount": "Total Invoiced",
+      "paidAmount": "Amount Paid",
+      "paymentMethod": "Payment Method",
+      "cash": "Cash",
+      "transfer": "Bank Transfer",
+      "card": "Credit/Debit Card",
+      "insurance": "Health Insurance"
+    }
+  },
+  "security": {
+    "title": "Security & Access Safeguards",
+    "subtitle": "Configure two-factor TOTP authentication, review active sessions, and access audits",
+    "enableMfa": "Enable 2FA Protection",
+    "disableMfa": "Disable 2FA Protection",
+    "mfaStatus": "Two-Factor Security Status",
+    "mfaEnabled": "2FA Safeguards Active",
+    "mfaDisabled": "2FA Inactive (Recommended to enable)",
+    "scanQr": "Scan the QR code with Google Authenticator or any TOTP app",
+    "auditLogs": "Security Access Audit Log"
+  },
+  "public": {
+    "hospitalName": "ERM International Hospital",
+    "tagline": "Clinical Precision — Compassionate Care",
+    "emergencyPhone": "24/7 Hotline: 1900 6868",
+    "address": "ERM Medical Center Tower, District 1, Ho Chi Minh City",
+    "portalButton": "Patient Portal",
+    "staffLoginButton": "Staff Workspace",
+    "bookAppointment": "Schedule a Visit"
+  }
+}

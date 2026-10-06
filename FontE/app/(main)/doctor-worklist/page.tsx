@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/DataState";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 import { formatDateTimeValue } from "@/lib/dateFormatting";
 import { getApiErrorMessage } from "@/services/error";
 import { hospitalDoctorService } from "@/services/hospitalDoctorService";
@@ -13,7 +15,6 @@ import {
   HospitalDoctorWorklistItem,
   HospitalDoctorWorklistResponse,
 } from "@/services/types";
-import toast from "react-hot-toast";
 
 function toDateInputValue(date: Date): string {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -31,7 +32,7 @@ function getStatusClass(stage: string): string {
     case "Cho mo ho so":
       return "border border-amber-200 bg-amber-50 text-amber-700";
     case "Dang kham":
-      return "border border-cyan-200 bg-cyan-50 text-cyan-700";
+      return "border border-sky-200 bg-sky-50 text-sky-700";
     case "Cho ke don":
       return "border border-violet-200 bg-violet-50 text-violet-700";
     case "Da ke don":
@@ -45,6 +46,7 @@ function getStatusClass(stage: string): string {
 
 export default function DoctorWorklistPage() {
   const { role } = useAuth();
+  const { t } = useTranslation();
   const [workDate, setWorkDate] = useState("");
   const [doctorFilter, setDoctorFilter] = useState("");
   const [doctors, setDoctors] = useState<
@@ -63,9 +65,7 @@ export default function DoctorWorklistPage() {
 
   const fetchPageData = useCallback(
     async (showRefreshState = false) => {
-      if (!workDate) {
-        return;
-      }
+      if (!workDate) return;
 
       if (showRefreshState) {
         setIsRefreshing(true);
@@ -86,7 +86,7 @@ export default function DoctorWorklistPage() {
         setWorklist(worklistData);
         setListError(null);
       } catch (error: unknown) {
-        const message = getApiErrorMessage(error, "Không thể tải danh sách công việc bác sĩ.");
+        const message = getApiErrorMessage(error, t("common.messages.error"));
         setListError(message);
         toast.error(message);
       } finally {
@@ -94,14 +94,11 @@ export default function DoctorWorklistPage() {
         setIsRefreshing(false);
       }
     },
-    [canSelectDoctor, doctorFilter, workDate]
+    [canSelectDoctor, doctorFilter, workDate, t]
   );
 
   useEffect(() => {
-    if (!workDate) {
-      return;
-    }
-
+    if (!workDate) return;
     void fetchPageData();
   }, [fetchPageData, workDate]);
 
@@ -115,193 +112,195 @@ export default function DoctorWorklistPage() {
   }, [items]);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div className="rounded-[2rem] border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-6 shadow-sm">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.26em] text-blue-700">
-              Lâm sàng
-            </p>
-            <h1 className="mt-3 text-3xl font-bold text-slate-950">
-              Danh sách công việc
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">
-              Lịch hẹn, hồ sơ khám và đơn thuốc của bác sĩ.
-            </p>
-          </div>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">
+            {t("doctorWorklist.title")}
+          </h1>
+          <p className="mt-1 text-xs text-slate-500">
+            {t("doctorWorklist.subtitle")}
+          </p>
+        </div>
 
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
-            <input
-              type="date"
-              value={workDate}
-              onChange={(event) => setWorkDate(event.target.value)}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-            />
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="date"
+            value={workDate}
+            onChange={(e) => setWorkDate(e.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-900 shadow-2xs outline-none focus:border-slate-500"
+          />
 
-            {canSelectDoctor && (
-              <select
-                value={doctorFilter}
-                onChange={(event) => setDoctorFilter(event.target.value)}
-                className="min-w-[280px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-              >
-                <option value="">Tất cả bác sĩ</option>
-                {doctors.map((doctor) => (
-                  <option key={doctor.doctorProfileId} value={doctor.doctorProfileId}>
-                    {doctor.fullName} - {doctor.specialtyName}
-                  </option>
-                ))}
-              </select>
-            )}
-
-            <Button
-              variant="secondary"
-              onClick={() => void fetchPageData(true)}
-              disabled={isRefreshing}
+          {canSelectDoctor && (
+            <select
+              value={doctorFilter}
+              onChange={(e) => setDoctorFilter(e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 shadow-2xs outline-none focus:border-slate-500"
             >
-              {isRefreshing ? "Đang làm mới..." : "Làm mới"}
-            </Button>
-          </div>
+              <option value="">Tất cả bác sĩ</option>
+              {doctors.map((doctor) => (
+                <option key={doctor.doctorProfileId} value={doctor.doctorProfileId}>
+                  {doctor.fullName} - {doctor.specialtyName}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void fetchPageData(true)}
+            disabled={isRefreshing}
+          >
+            {isRefreshing ? t("common.actions.processing") : t("common.actions.refresh")}
+          </Button>
         </div>
       </div>
 
       {worklist && !worklist.isDoctorResolved && (
-        <Card className="border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800 shadow-sm">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-xs text-amber-800">
           {worklist.resolutionMessage || "Chưa xác định được hồ sơ bác sĩ hiện tại."}
-        </Card>
+        </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <MetricCard label="Tổng lịch hẹn" value={worklist?.totalAppointments ?? 0} tone="slate" />
-        <MetricCard label="Đã check-in" value={worklist?.checkedInAppointments ?? 0} tone="amber" />
-        <MetricCard
-          label="Đang khám"
-          value={worklist?.inProgressEncounters ?? 0}
-          tone="cyan"
-        />
-        <MetricCard
-          label="Đã chốt hồ sơ"
-          value={worklist?.finalizedEncounters ?? 0}
-          tone="violet"
-        />
-        <MetricCard
-          label="Đã kê đơn"
-          value={worklist?.issuedPrescriptions ?? 0}
-          tone="emerald"
-        />
+      {/* Metric Cards */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <Card className="flex flex-col justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Tổng lịch hẹn
+          </p>
+          <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+            {worklist?.totalAppointments ?? 0}
+          </p>
+        </Card>
+        <Card className="flex flex-col justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Đã check-in
+          </p>
+          <p className="mt-1 text-2xl font-bold tracking-tight text-amber-700">
+            {worklist?.checkedInAppointments ?? 0}
+          </p>
+        </Card>
+        <Card className="flex flex-col justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Đang khám
+          </p>
+          <p className="mt-1 text-2xl font-bold tracking-tight text-sky-700">
+            {worklist?.inProgressEncounters ?? 0}
+          </p>
+        </Card>
+        <Card className="flex flex-col justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Đã kê đơn
+          </p>
+          <p className="mt-1 text-2xl font-bold tracking-tight text-purple-700">
+            {worklist?.issuedPrescriptions ?? 0}
+          </p>
+        </Card>
+        <Card className="flex flex-col justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Hoàn thành
+          </p>
+          <p className="mt-1 text-2xl font-bold tracking-tight text-emerald-700">
+            {worklist?.finalizedEncounters ?? 0}
+          </p>
+        </Card>
       </div>
 
-      <Card className="border border-slate-100 p-5 shadow-sm">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      {/* Main Table Card */}
+      <Card padding="none">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">
-              {worklist?.doctorName
-                ? `Công việc của ${worklist.doctorName}`
-                : "Công việc theo ngày"}
+            <h2 className="text-sm font-semibold text-slate-900">
+              {worklist?.doctorName || "Hồ sơ công việc"}
             </h2>
-            <p className="text-sm text-slate-500">
-              {worklist?.specialtyName || "Tất cả chuyên khoa"} / {workDate}
+            <p className="text-xs text-slate-500 mt-0.5">
+              {worklist?.specialtyName || "Tất cả chuyên khoa"} &middot; {workDate}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {Object.entries(groupedSummary).map(([stage, count]) => (
               <span
                 key={stage}
-                className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${getStatusClass(stage)}`}
+                className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ${getStatusClass(
+                  stage
+                )}`}
               >
                 {stage}: {count}
               </span>
             ))}
           </div>
         </div>
-      </Card>
 
-      <Card className="overflow-hidden border border-slate-100 p-0 shadow-sm">
         {isLoading ? (
-          <LoadingState title="Đang tải công việc bác sĩ..." tone="blue" />
+          <LoadingState title={t("common.actions.loading")} />
         ) : listError ? (
           <ErrorState
-            title="Không thể tải công việc bác sĩ"
+            title={t("common.messages.error")}
             description={listError}
             onAction={() => void fetchPageData(true)}
           />
         ) : items.length === 0 ? (
           <EmptyState
-            title="Không tìm thấy ca khám."
-            description="Thay đổi bộ lọc để tìm ca khám."
-            tone="blue"
+            title={t("common.labels.empty")}
+            description={t("common.labels.noResults")}
           />
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-[1240px] w-full border-collapse text-left">
-              <thead>
-                <tr className="bg-slate-50">
-                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                    Thời gian
-                  </th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                    Bệnh nhân
-                  </th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                    Bác sĩ / phòng
-                  </th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                    Hồ sơ khám
-                  </th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                    Đơn thuốc
-                  </th>
-                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                    Trạng thái luồng
-                  </th>
+            <table className="w-full border-collapse text-left text-xs">
+              <thead className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
+                <tr>
+                  <th className="px-5 py-3">Thời gian</th>
+                  <th className="px-5 py-3">Bệnh nhân</th>
+                  <th className="px-5 py-3">Bác sĩ / Phòng</th>
+                  <th className="px-5 py-3">Hồ sơ khám</th>
+                  <th className="px-5 py-3">Đơn thuốc</th>
+                  <th className="px-5 py-3">Trạng thái luồng</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100 text-slate-800">
                 {items.map((item: HospitalDoctorWorklistItem) => (
                   <tr
                     key={item.appointmentId}
-                    className="border-t border-slate-100 align-top transition-colors hover:bg-blue-50/30"
+                    className="transition-colors hover:bg-slate-50/70"
                   >
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900">
+                    <td className="px-5 py-3.5">
+                      <div className="font-semibold text-slate-900 font-mono">
                         {formatDateTime(item.appointmentStartLocal)}
                       </div>
-                      <div className="mt-1 text-sm text-slate-500">
+                      <div className="mt-0.5 text-[11px] text-slate-500">
                         {item.appointmentNumber}
                       </div>
-                      <div className="mt-1 text-xs text-slate-400">
-                        {item.appointmentStatus}
-                      </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900">{item.patientName}</div>
-                      <div className="mt-1 text-sm text-slate-500">
+                    <td className="px-5 py-3.5">
+                      <div className="font-semibold text-slate-900">
+                        {item.patientName}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-slate-500 font-mono">
                         {item.medicalRecordNumber}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900">{item.doctorName}</div>
-                      <div className="mt-1 text-sm text-slate-500">{item.specialtyName}</div>
-                      <div className="mt-1 text-sm text-slate-500">{item.clinicName}</div>
+                    <td className="px-5 py-3.5">
+                      <div className="font-medium text-slate-900">{item.doctorName}</div>
+                      <div className="mt-0.5 text-[11px] text-slate-500">
+                        {item.clinicName || item.specialtyName}
+                      </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900">
+                    <td className="px-5 py-3.5">
+                      <div className="font-medium text-slate-900">
                         {item.encounterNumber || "--"}
                       </div>
-                      <div className="mt-1 text-sm text-slate-500">
+                      <div className="text-[11px] text-slate-500">
                         {item.encounterStatus || "Chưa mở hồ sơ"}
                       </div>
-                      <div className="mt-1 text-xs text-slate-400">
-                        {item.primaryDiagnosisName || "--"}
-                      </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900">
-                        {item.prescriptionNumber || "--"}
-                      </div>
+                    <td className="px-5 py-3.5 font-mono text-slate-700">
+                      {item.prescriptionNumber || "--"}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-3.5">
                       <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${getStatusClass(
+                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ${getStatusClass(
                           item.workflowStage
                         )}`}
                       >
@@ -316,30 +315,5 @@ export default function DoctorWorklistPage() {
         )}
       </Card>
     </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "slate" | "amber" | "cyan" | "violet" | "emerald";
-}) {
-  const toneClasses = {
-    slate: "border-slate-100 bg-slate-50/70 text-slate-700",
-    amber: "border-amber-100 bg-amber-50/70 text-amber-700",
-    cyan: "border-cyan-100 bg-cyan-50/70 text-cyan-700",
-    violet: "border-violet-100 bg-violet-50/70 text-violet-700",
-    emerald: "border-emerald-100 bg-emerald-50/70 text-emerald-700",
-  };
-
-  return (
-    <Card className={`border p-5 shadow-sm hover:shadow-sm ${toneClasses[tone]}`}>
-      <p className="text-xs font-bold uppercase tracking-[0.2em]">{label}</p>
-      <p className="mt-3 text-3xl font-bold text-slate-950">{value}</p>
-    </Card>
   );
 }

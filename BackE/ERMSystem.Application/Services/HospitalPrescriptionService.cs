@@ -6,13 +6,14 @@ using ERMSystem.Application.DTOs;
 using ERMSystem.Application.DTOs.Common;
 using ERMSystem.Application.Interfaces;
 using ERMSystem.Application.Utilities;
+using ERMSystem.Domain.Constants;
 
 namespace ERMSystem.Application.Services;
 
 public class HospitalPrescriptionService : IHospitalPrescriptionService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly string[] AllowedStatuses = ["Issued", "Dispensed", "Cancelled"];
+    private static readonly string[] AllowedStatuses = PrescriptionStatuses.AllowedStatuses;
     private static readonly PrescriptionInteractionRule[] InteractionRules =
     [
         new(
@@ -1308,20 +1309,8 @@ public class HospitalPrescriptionService : IHospitalPrescriptionService
     private static string GeneratePrescriptionNumber(DateTime nowUtc)
         => CompactCodeGenerator.Generate("RX", nowUtc);
 
-    private static TimeZoneInfo ResolveClinicTimeZone()
-    {
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
-        }
-        catch
-        {
-            return TimeZoneInfo.Utc;
-        }
-    }
-
     private static DateTime ConvertUtcToClinicLocal(DateTime utcDateTime)
-        => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc), ResolveClinicTimeZone());
+        => ClinicDateTimeHelper.ConvertUtcToClinicLocal(utcDateTime);
 
     private readonly record struct PrescriptionInteractionRule(
         string[] PrimaryMatchers,
