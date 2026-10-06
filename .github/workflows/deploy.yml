@@ -65,9 +65,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Downcase Repo Name for Image Registry
+      - name: Set Image Registry Prefix
         run: |
-          echo "REGISTRY_IMAGE_PREFIX=ghcr.io/${{ github.repository_owner }}/ermsystem" | tr '[:upper:]' '[:lower:]' >> $GITHUB_ENV
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "REGISTRY_IMAGE_PREFIX=ghcr.io/${OWNER_LC}/ermsystem" >> $GITHUB_ENV
 
       - name: Build & Push Backend API Image
         uses: docker/build-push-action@v5
@@ -99,14 +100,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Downcase Repo Name
+      - name: Set Image Registry Prefix
         run: |
-          echo "REGISTRY_IMAGE_PREFIX=ghcr.io/${{ github.repository_owner }}/ermsystem" | tr '[:upper:]' '[:lower:]' >> $GITHUB_ENV
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "REGISTRY_IMAGE_PREFIX=ghcr.io/${OWNER_LC}/ermsystem" >> $GITHUB_ENV
+
+      - name: Check SSH Configuration
+        id: check_ssh
+        run: |
+          if [ -n "${{ secrets.SSH_HOST }}" ] && [ -n "${{ secrets.SSH_KEY }}" ]; then
+            echo "has_ssh=true" >> $GITHUB_OUTPUT
+            echo "SSH credentials found. Proceeding with deployment."
+          else
+            echo "has_ssh=false" >> $GITHUB_OUTPUT
+            echo "SSH_HOST or SSH_KEY not configured. Skipping remote VPS deployment."
+          fi
 
       - name: Deploy via SSH
-        if: env.HAS_SSH == 'true'
-        env:
-          HAS_SSH: ${{ secrets.SSH_HOST != '' && secrets.SSH_KEY != '' }}
+        if: steps.check_ssh.outputs.has_ssh == 'true'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -133,9 +144,7 @@ jobs:
             EOF
 
       - name: Copy docker-compose.prod.yml to Server
-        if: env.HAS_SSH == 'true'
-        env:
-          HAS_SSH: ${{ secrets.SSH_HOST != '' && secrets.SSH_KEY != '' }}
+        if: steps.check_ssh.outputs.has_ssh == 'true'
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -146,9 +155,7 @@ jobs:
           target: "~/ermsystem/"
 
       - name: Start Containers & Verify Health
-        if: env.HAS_SSH == 'true'
-        env:
-          HAS_SSH: ${{ secrets.SSH_HOST != '' && secrets.SSH_KEY != '' }}
+        if: steps.check_ssh.outputs.has_ssh == 'true'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
