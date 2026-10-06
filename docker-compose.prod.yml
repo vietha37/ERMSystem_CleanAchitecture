@@ -1,0 +1,91 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: ermsystem-prod-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-ermuser}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-ermsecurepass2026}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_prod_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: ermsystem-prod-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-ermredis2026}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-ermredis2026}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+
+  api:
+    image: ${REGISTRY_PREFIX:-ghcr.io/vietha37/ermsystem_cleanachitecture}/api:${IMAGE_TAG:-latest}
+    container_name: ermsystem-prod-api
+    restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__HospitalConnection: ${ERM_HOSPITAL_DB_CONNECTION_STRING}
+      Jwt__Key: ${JWT_SECRET_KEY}
+      Jwt__Issuer: ${JWT_ISSUER:-ERMSystem}
+      Jwt__Audience: ${JWT_AUDIENCE:-ERMSystemClient}
+      Redis__Enabled: "true"
+      Redis__AllowInMemoryFallback: "false"
+      Redis__ConnectionString: redis:6379,password=${REDIS_PASSWORD:-ermredis2026}
+      RabbitMQ__Enabled: "true"
+      RabbitMQ__Host: rabbitmq
+      RabbitMQ__Port: 5672
+      RabbitMQ__Username: ${RABBITMQ_USER:-ermuser}
+      RabbitMQ__Password: ${RABBITMQ_PASSWORD:-ermsecurepass2026}
+      Cors__AllowedOrigins__0: ${FRONTEND_PUBLIC_URL:-http://localhost:3000}
+    ports:
+      - "5219:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  frontend:
+    image: ${REGISTRY_PREFIX:-ghcr.io/vietha37/ermsystem_cleanachitecture}/frontend:${IMAGE_TAG:-latest}
+    container_name: ermsystem-prod-frontend
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+volumes:
+  rabbitmq_prod_data:
+  redis_prod_data:

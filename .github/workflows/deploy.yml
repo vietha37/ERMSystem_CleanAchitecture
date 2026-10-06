@@ -1,0 +1,168 @@
+name: deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: "Target environment to deploy"
+        required: true
+        default: "production"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  verify:
+    name: Verify Tests & Lints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Backend Test
+        working-directory: BackE
+        run: |
+          dotnet restore ERMSystem.sln
+          dotnet build ERMSystem.sln --configuration Release --no-restore
+          dotnet test ERMSystem.Tests/ERMSystem.Tests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: FontE/package-lock.json
+
+      - name: Frontend Lint & Build Check
+        working-directory: FontE
+        run: |
+          npm ci
+          npm run lint
+          npm run build
+
+  build-and-push:
+    name: Build & Push Docker Images
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Downcase Repo Name for Image Registry
+        run: |
+          echo "REGISTRY_IMAGE_PREFIX=ghcr.io/${{ github.repository_owner }}/ermsystem" | tr '[:upper:]' '[:lower:]' >> $GITHUB_ENV
+
+      - name: Build & Push Backend API Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: BackE/ERMSystem.API/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY_IMAGE_PREFIX }}/api:latest
+            ${{ env.REGISTRY_IMAGE_PREFIX }}/api:${{ github.sha }}
+
+      - name: Build & Push Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: FontE/Dockerfile
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ secrets.PROD_API_PUBLIC_URL || 'http://localhost:5219/api' }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY_IMAGE_PREFIX }}/frontend:latest
+            ${{ env.REGISTRY_IMAGE_PREFIX }}/frontend:${{ github.sha }}
+
+  deploy:
+    name: Deploy to Production Server
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' && github.repository_owner != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Downcase Repo Name
+        run: |
+          echo "REGISTRY_IMAGE_PREFIX=ghcr.io/${{ github.repository_owner }}/ermsystem" | tr '[:upper:]' '[:lower:]' >> $GITHUB_ENV
+
+      - name: Deploy via SSH
+        if: env.HAS_SSH == 'true'
+        env:
+          HAS_SSH: ${{ secrets.SSH_HOST != '' && secrets.SSH_KEY != '' }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER || 'ubuntu' }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            mkdir -p ~/ermsystem
+            cd ~/ermsystem
+
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+            cat << 'EOF' > .env
+            REGISTRY_PREFIX=${{ env.REGISTRY_IMAGE_PREFIX }}
+            IMAGE_TAG=latest
+            ERM_HOSPITAL_DB_CONNECTION_STRING=${{ secrets.ERM_HOSPITAL_DB_CONNECTION_STRING }}
+            JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+            JWT_ISSUER=${{ secrets.JWT_ISSUER || 'ERMSystem' }}
+            JWT_AUDIENCE=${{ secrets.JWT_AUDIENCE || 'ERMSystemClient' }}
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD || 'ermredis2026' }}
+            RABBITMQ_USER=${{ secrets.RABBITMQ_USER || 'ermuser' }}
+            RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_PASSWORD || 'ermsecurepass2026' }}
+            FRONTEND_PUBLIC_URL=${{ secrets.FRONTEND_PUBLIC_URL || 'http://localhost:3000' }}
+            EOF
+
+      - name: Copy docker-compose.prod.yml to Server
+        if: env.HAS_SSH == 'true'
+        env:
+          HAS_SSH: ${{ secrets.SSH_HOST != '' && secrets.SSH_KEY != '' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER || 'ubuntu' }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          source: "docker-compose.prod.yml"
+          target: "~/ermsystem/"
+
+      - name: Start Containers & Verify Health
+        if: env.HAS_SSH == 'true'
+        env:
+          HAS_SSH: ${{ secrets.SSH_HOST != '' && secrets.SSH_KEY != '' }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER || 'ubuntu' }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            cd ~/ermsystem
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            echo "Waiting for services to become healthy..."
+            sleep 15
+            docker compose -f docker-compose.prod.yml ps
+
+            curl -f http://localhost:5219/health/live || exit 1
+            echo "Deployment successful! All healthchecks passed."
