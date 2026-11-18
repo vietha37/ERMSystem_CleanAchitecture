@@ -198,6 +198,7 @@ else
 }
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddHealthChecks()
     .AddCheck<DependencyReadinessHealthCheck>("dependency-readiness", tags: ["ready"]);
 

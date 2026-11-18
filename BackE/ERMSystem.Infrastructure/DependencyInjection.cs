@@ -1,4 +1,5 @@
 using ERMSystem.Application.Interfaces;
+using ERMSystem.Infrastructure.HospitalData;
 using ERMSystem.Infrastructure.Messaging;
 using ERMSystem.Infrastructure.Repositories;
 using ERMSystem.Infrastructure.Services;
@@ -14,6 +15,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services)
     {
+        // ── Unit of Work ───────────────────────────────────────────────────────────
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+
         // ── Security & Passwords ───────────────────────────────────────────────────
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IUserRepository, UserRepository>();
