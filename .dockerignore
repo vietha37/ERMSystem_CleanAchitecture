@@ -1,0 +1,23 @@
+**/.git
+**/.github
+**/.vscode
+**/.idea
+
+# .NET artifacts
+**/bin/
+**/obj/
+**/*.user
+**/*.suo
+**/App_Data/DataProtectionKeys/
+
+# Node.js artifacts
+**/node_modules/
+**/.next/
+**/dist/
+**/out/
+**/coverage/
+
+# Misc
+**/.DS_Store
+**/Thumbs.db
+**/*.log

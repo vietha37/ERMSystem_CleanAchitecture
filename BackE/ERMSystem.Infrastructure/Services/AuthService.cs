@@ -367,7 +367,7 @@ namespace ERMSystem.Infrastructure.Services
                 throw new UnauthorizedAccessException("Reset token is invalid.");
             }
 
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            user.UpdatePasswordHash(BCrypt.Net.BCrypt.HashPassword(request.NewPassword));
             user.RefreshTokenHash = null;
             user.RefreshTokenExpiresAt = null;
             user.RefreshTokenRevokedAt = DateTime.UtcNow;

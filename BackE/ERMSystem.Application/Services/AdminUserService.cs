@@ -124,7 +124,7 @@ public class AdminUserService : IAdminUserService
 
         if (!string.IsNullOrWhiteSpace(dto.Password))
         {
-            user.PasswordHash = _passwordHasher.HashPassword(dto.Password);
+            user.UpdatePasswordHash(_passwordHasher.HashPassword(dto.Password));
         }
 
         await _userRepository.UpdateAsync(user, ct);

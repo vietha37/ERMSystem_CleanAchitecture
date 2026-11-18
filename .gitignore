@@ -18,3 +18,4 @@ BackE/ERMSystem.API/App_Data/DataProtectionKeys/
 !HUONG_DAN_DEMO_HOI_DONG.md
 !test_evaluation.md
 !CICD_GUIDE.md
+!docs/refactoring/*.md

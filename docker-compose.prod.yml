@@ -6,9 +6,9 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-ermuser}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-ermsecurepass2026}
+    # Security: Do not expose AMQP 5672 to public host. Management UI bound strictly to localhost for maintenance.
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "127.0.0.1:15672:15672"
     volumes:
       - rabbitmq_prod_data:/var/lib/rabbitmq
     healthcheck:
@@ -23,8 +23,7 @@ services:
     container_name: ermsystem-prod-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-ermredis2026}
-    ports:
-      - "6379:6379"
+    # Security: Redis port 6379 is purely internal to the docker network, not exposed to host.
     volumes:
       - redis_prod_data:/data
     healthcheck:

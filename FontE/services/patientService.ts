@@ -17,8 +17,7 @@ export const patientService = {
     let url = `/patients?pageNumber=${pageNumber}&pageSize=${pageSize}`;
     if (search) {
       const encoded = encodeURIComponent(search.trim());
-      // Send both keys for compatibility across backend versions.
-      url += `&textSearch=${encoded}&textSeach=${encoded}`;
+      url += `&textSearch=${encoded}`;
     }
 
     const response = await api.get<PaginatedResult<Patient>>(url);

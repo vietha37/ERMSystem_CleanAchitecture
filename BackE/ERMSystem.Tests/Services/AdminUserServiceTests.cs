@@ -152,4 +152,24 @@ public class AdminUserServiceTests
         _userRepoMock.Verify(r => r.DeleteAsync(user, It.IsAny<CancellationToken>()), Times.Once);
         _identityBridgeMock.Verify(b => b.DeactivateInternalUserAsync(user, It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public void AppUser_UpdatePasswordHash_WithValidHash_UpdatesProperty()
+    {
+        var user = new AppUser { Username = "testuser", PasswordHash = "initial_hash" };
+        user.UpdatePasswordHash("new_valid_hash");
+
+        Assert.Equal("new_valid_hash", user.PasswordHash);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AppUser_UpdatePasswordHash_WithNullOrWhitespace_ThrowsArgumentException(string? invalidHash)
+    {
+        var user = new AppUser { Username = "testuser", PasswordHash = "initial_hash" };
+
+        Assert.Throws<ArgumentException>(() => user.UpdatePasswordHash(invalidHash!));
+    }
 }
