@@ -13,6 +13,22 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/features/*/*/**"],
+              message:
+                "Deep cross-feature internal imports are forbidden by Clean Architecture rules. Import from the public feature barrel '@/features/<feature-name>' or promote to '@/shared/'.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;
