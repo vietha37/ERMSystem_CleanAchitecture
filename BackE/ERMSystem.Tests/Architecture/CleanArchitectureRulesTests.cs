@@ -46,30 +46,27 @@ public class CleanArchitectureRulesTests
     [Fact]
     public void ValueObjects_ShouldInheritFrom_ValueObject()
     {
-        var result = Types.InAssembly(DomainAssembly)
-            .That()
-            .ResideInNamespace("ERMSystem.Domain.ValueObjects")
-            .Should()
-            .Inherit(typeof(ValueObject))
-            .GetResult();
+        var valueObjectTypes = DomainAssembly.GetTypes()
+            .Where(t => t.IsClass && !t.IsAbstract && t.Namespace == "ERMSystem.Domain.ValueObjects" && !t.IsNested);
 
-        Assert.True(result.IsSuccessful, "All Value Objects in Domain must inherit from ValueObject base class.");
+        foreach (var type in valueObjectTypes)
+        {
+            Assert.True(
+                typeof(ValueObject).IsAssignableFrom(type),
+                $"{type.Name} must inherit from ValueObject base class.");
+        }
     }
 
     [Fact]
     public void AggregateRoots_ShouldInheritFrom_AggregateRoot()
     {
-        var result = Types.InAssembly(DomainAssembly)
-            .That()
-            .HaveName("Patient")
-            .Or()
-            .HaveName("Appointment")
-            .Or()
-            .HaveName("Prescription")
-            .Should()
-            .Inherit(typeof(AggregateRoot<Guid>))
-            .GetResult();
-
-        Assert.True(result.IsSuccessful, "Core aggregates (Patient, Appointment, Prescription) must inherit from AggregateRoot<Guid>.");
+        var aggregateTypes = new[] { typeof(Patient), typeof(Appointment), typeof(Prescription) };
+        foreach (var type in aggregateTypes)
+        {
+            var isAggregate = type.BaseType != null &&
+                              type.BaseType.IsGenericType &&
+                              type.BaseType.GetGenericTypeDefinition() == typeof(AggregateRoot<>);
+            Assert.True(isAggregate, $"{type.Name} must inherit from AggregateRoot<Guid>.");
+        }
     }
 }

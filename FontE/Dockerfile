@@ -1,6 +1,6 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
-COPY FontE/package.json FontE/package-lock.json ./
+COPY FontE/.npmrc FontE/package.json FontE/package-lock.json ./
 RUN npm ci
 
 FROM node:22-alpine AS build
