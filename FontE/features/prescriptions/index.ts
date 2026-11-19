@@ -7,5 +7,6 @@ export * from "./components/PrescriptionMetrics";
 export * from "./components/PrescriptionTableRow";
 export * from "./components/PrescriptionTable";
 export * from "./components/PrescriptionCreateModal";
+export * from "./components/PrescriptionItemRow";
 export * from "./components/PrescriptionDetailModal";
 export * from "./views/PrescriptionsView";

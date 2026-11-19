@@ -1,8 +1,8 @@
 "use client";
 
-import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/DataState";
+import { TablePagination } from "@/shared/ui/Table/TablePagination";
 import { HospitalEncounterSummary } from "../types";
 import { MedicalRecordTableRow } from "./MedicalRecordTableRow";
 
@@ -11,8 +11,8 @@ interface MedicalRecordTableProps {
   isLoading: boolean;
   listError: string | null;
   approvingEncounterId: string | null;
-  startItem: number;
-  endItem: number;
+  startItem?: number;
+  endItem?: number;
   totalCount: number;
   pageNumber: number;
   pageSize: number;
@@ -29,8 +29,6 @@ export function MedicalRecordTable({
   isLoading,
   listError,
   approvingEncounterId,
-  startItem,
-  endItem,
   totalCount,
   pageNumber,
   pageSize,
@@ -42,24 +40,18 @@ export function MedicalRecordTable({
   onApprove,
 }: MedicalRecordTableProps) {
   return (
-    <Card className="overflow-hidden border border-slate-100 p-0 shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-5 md:flex-row md:items-center md:justify-between">
+    <Card className="overflow-hidden border border-slate-200 bg-white p-0 shadow-xs">
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-6 py-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-lg font-bold text-slate-900">Danh sách hồ sơ khám</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Hiển thị {startItem}-{endItem} / {totalCount} hồ sơ.
+          <h2 className="text-base font-bold text-slate-900">Danh sách hồ sơ khám</h2>
+          <p className="text-xs text-slate-500">
+            Tổng cộng {totalCount} hồ sơ khám theo bộ lọc hiện tại.
           </p>
         </div>
 
-        <select
-          value={pageSize}
-          onChange={(event) => onPageSizeChange(Number(event.target.value))}
-          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-        >
-          <option value={10}>10 dòng / trang</option>
-          <option value={20}>20 dòng / trang</option>
-          <option value={50}>50 dòng / trang</option>
-        </select>
+        <div className="rounded-md bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+          Trang {pageNumber} / {Math.max(1, totalPages)}
+        </div>
       </div>
 
       {isLoading ? (
@@ -80,31 +72,31 @@ export function MedicalRecordTable({
         <div className="overflow-x-auto">
           <table className="min-w-[1260px] w-full border-collapse text-left">
             <thead>
-              <tr className="bg-slate-50">
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+              <tr className="border-b border-slate-200 bg-slate-50/75">
+                <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Hồ sơ khám
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Bệnh nhân
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Bác sĩ
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Chẩn đoán
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Trạng thái
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Cập nhật
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Tác vụ
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               {encounters.map((encounter) => (
                 <MedicalRecordTableRow
                   key={encounter.encounterId}
@@ -119,34 +111,17 @@ export function MedicalRecordTable({
         </div>
       )}
 
-      <div className="flex flex-col gap-3 border-t border-slate-100 px-6 py-4 md:flex-row md:items-center md:justify-between">
-        <p className="text-sm text-slate-500">
-          Trang {pageNumber}/{totalPages}
-        </p>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => onPageChange(1)}
-            disabled={pageNumber === 1}
-          >
-            Đầu
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => onPageChange(pageNumber - 1)}
-            disabled={pageNumber === 1}
-          >
-            Trước
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => onPageChange(pageNumber + 1)}
-            disabled={pageNumber >= totalPages}
-          >
-            Sau
-          </Button>
-        </div>
+      <div className="border-t border-slate-200 px-6 py-3">
+        <TablePagination
+          currentPage={pageNumber}
+          totalPages={totalPages}
+          totalItems={totalCount}
+          pageSize={pageSize}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+          pageSizeOptions={[10, 20, 50]}
+          itemName="hồ sơ"
+        />
       </div>
     </Card>
   );

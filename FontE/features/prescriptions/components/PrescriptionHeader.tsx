@@ -23,16 +23,16 @@ export function PrescriptionHeader({
   onCreateOpen,
 }: PrescriptionHeaderProps) {
   return (
-    <div className="rounded-3xl border border-sky-100 bg-gradient-to-br from-cyan-50 via-white to-blue-50 p-6 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-700">
             Quản lý dược
           </p>
-          <h1 className="mt-3 text-3xl font-bold text-slate-900">
+          <h1 className="mt-2 text-2xl font-bold text-slate-900">
             Đơn thuốc bệnh viện
           </h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-slate-600">
             Phát hành, theo dõi cấp phát và quản lý danh mục đơn thuốc khám chữa bệnh.
           </p>
         </div>
@@ -43,14 +43,16 @@ export function PrescriptionHeader({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Tìm theo mã đơn, bệnh nhân, bác sĩ..."
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-2xs outline-none focus:border-slate-500"
+            aria-label="Tìm kiếm đơn thuốc"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
           />
           <select
             value={statusFilter}
             onChange={(e) =>
               onStatusChange(e.target.value as HospitalPrescriptionStatus | "All")
             }
-            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 shadow-2xs outline-none focus:border-slate-500"
+            aria-label="Lọc trạng thái đơn thuốc"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100"
           >
             {STATUS_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -60,14 +62,13 @@ export function PrescriptionHeader({
           </select>
           <Button
             variant="secondary"
-            size="sm"
             onClick={onRefresh}
             disabled={isRefreshing}
           >
             {isRefreshing ? "Đang làm mới..." : "Làm mới"}
           </Button>
-          <Button size="sm" onClick={onCreateOpen}>
-            + Phát hành đơn thuốc
+          <Button onClick={onCreateOpen}>
+            Kê đơn mới
           </Button>
         </div>
       </div>

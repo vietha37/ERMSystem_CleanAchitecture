@@ -1,8 +1,8 @@
 "use client";
 
-import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/DataState";
+import { TablePagination } from "@/shared/ui/Table/TablePagination";
 import { HospitalInvoiceSummary } from "../types";
 import { BillingTableRow } from "./BillingTableRow";
 
@@ -11,8 +11,11 @@ interface BillingTableProps {
   isLoading: boolean;
   listError: string | null;
   pageNumber: number;
+  pageSize?: number;
+  totalCount?: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
   onRetry: () => void;
   onOpenDetail: (id: string) => void;
   onOpenPayment: (invoice: HospitalInvoiceSummary) => void;
@@ -24,15 +27,31 @@ export function BillingTable({
   isLoading,
   listError,
   pageNumber,
+  pageSize = 10,
+  totalCount = 0,
   totalPages,
   onPageChange,
+  onPageSizeChange,
   onRetry,
   onOpenDetail,
   onOpenPayment,
   onOpenGateway,
 }: BillingTableProps) {
   return (
-    <Card className="overflow-hidden border border-slate-100 p-0 shadow-sm">
+    <Card className="overflow-hidden border border-slate-200 bg-white p-0 shadow-xs">
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-6 py-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-base font-bold text-slate-900">Danh sách hóa đơn</h2>
+          <p className="text-xs text-slate-500">
+            Tổng cộng {totalCount} hóa đơn theo bộ lọc hiện tại.
+          </p>
+        </div>
+
+        <div className="rounded-md bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+          Trang {pageNumber} / {Math.max(1, totalPages)}
+        </div>
+      </div>
+
       {isLoading ? (
         <LoadingState title="Đang tải danh sách hóa đơn..." tone="emerald" />
       ) : listError ? (
@@ -51,25 +70,25 @@ export function BillingTable({
         <div className="overflow-x-auto">
           <table className="min-w-[1160px] w-full border-collapse text-left">
             <thead>
-              <tr className="bg-slate-50">
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+              <tr className="border-b border-slate-200 bg-slate-50/75">
+                <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Hóa đơn
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Bệnh nhân
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Số tiền
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Trạng thái
                 </th>
-                <th className="px-6 py-4 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                <th className="px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Thao tác
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               {invoices.map((invoice) => (
                 <BillingTableRow
                   key={invoice.invoiceId}
@@ -84,26 +103,17 @@ export function BillingTable({
         </div>
       )}
 
-      <div className="flex items-center justify-between border-t border-slate-100 px-6 py-5">
-        <div className="text-sm text-slate-500">
-          Trang {pageNumber} / {Math.max(1, totalPages)}
-        </div>
-        <div className="flex gap-3">
-          <Button
-            variant="secondary"
-            disabled={pageNumber <= 1}
-            onClick={() => onPageChange(Math.max(1, pageNumber - 1))}
-          >
-            Trang trước
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={pageNumber >= totalPages}
-            onClick={() => onPageChange(Math.min(totalPages, pageNumber + 1))}
-          >
-            Trang sau
-          </Button>
-        </div>
+      <div className="border-t border-slate-200 px-6 py-3">
+        <TablePagination
+          currentPage={pageNumber}
+          totalPages={totalPages}
+          totalItems={totalCount}
+          pageSize={pageSize}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+          pageSizeOptions={[10, 20, 50]}
+          itemName="hóa đơn"
+        />
       </div>
     </Card>
   );

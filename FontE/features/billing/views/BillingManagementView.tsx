@@ -25,6 +25,8 @@ export function BillingManagementView() {
     setStatusFilter,
     pageNumber,
     setPageNumber,
+    pageSize,
+    totalCount,
     totalPages,
     metrics,
     fetchData,
@@ -98,6 +100,8 @@ export function BillingManagementView() {
         isLoading={isLoading}
         listError={listError}
         pageNumber={pageNumber}
+        pageSize={pageSize}
+        totalCount={totalCount}
         totalPages={totalPages}
         onPageChange={setPageNumber}
         onRetry={() => void fetchData(true)}
