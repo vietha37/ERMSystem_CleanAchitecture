@@ -230,15 +230,12 @@ namespace ERMSystem.Infrastructure.Repositories
 
         public async Task DeleteAsync(Patient patient, CancellationToken ct = default)
         {
-            var entity = await _context.Patients.FirstOrDefaultAsync(x => x.Id == patient.Id, ct);
-            if (entity == null)
-            {
-                return;
-            }
-
-            entity.DeletedAtUtc ??= DateTime.UtcNow;
-            entity.UpdatedAtUtc = DateTime.UtcNow;
-            await _context.SaveChangesAsync(ct);
+            var nowUtc = DateTime.UtcNow;
+            await _context.Patients
+                .Where(x => x.Id == patient.Id)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(p => p.DeletedAtUtc, nowUtc)
+                    .SetProperty(p => p.UpdatedAtUtc, nowUtc), ct);
         }
 
         private IQueryable<PatientJoinRow> BuildPatientQuery()

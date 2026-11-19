@@ -156,15 +156,12 @@ namespace ERMSystem.Infrastructure.Repositories
 
         public async Task DeleteAsync(Appointment appointment, CancellationToken ct = default)
         {
-            var entity = await _context.Appointments.FirstOrDefaultAsync(x => x.Id == appointment.Id, ct);
-            if (entity == null)
-            {
-                return;
-            }
-
-            entity.Status = "Cancelled";
-            entity.UpdatedAtUtc = DateTime.UtcNow;
-            await _context.SaveChangesAsync(ct);
+            var nowUtc = DateTime.UtcNow;
+            await _context.Appointments
+                .Where(x => x.Id == appointment.Id)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(a => a.Status, "Cancelled")
+                    .SetProperty(a => a.UpdatedAtUtc, nowUtc), ct);
         }
 
         public Task<bool> PatientExistsAsync(Guid patientId, CancellationToken ct = default)

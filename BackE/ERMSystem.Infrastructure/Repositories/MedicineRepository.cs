@@ -69,14 +69,9 @@ namespace ERMSystem.Infrastructure.Repositories
 
         public async Task DeleteAsync(Medicine medicine, CancellationToken ct = default)
         {
-            var entity = await _context.Medicines.FirstOrDefaultAsync(x => x.Id == medicine.Id, ct);
-            if (entity == null)
-            {
-                return;
-            }
-
-            entity.IsActive = false;
-            await _context.SaveChangesAsync(ct);
+            await _context.Medicines
+                .Where(x => x.Id == medicine.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.IsActive, false), ct);
         }
     }
 }

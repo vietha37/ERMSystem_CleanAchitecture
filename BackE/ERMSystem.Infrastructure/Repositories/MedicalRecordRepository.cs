@@ -162,18 +162,9 @@ namespace ERMSystem.Infrastructure.Repositories
 
         public async Task DeleteAsync(MedicalRecord record, CancellationToken ct = default)
         {
-            var encounter = await _context.Encounters.FirstOrDefaultAsync(x => x.Id == record.Id, ct);
-            if (encounter == null)
-            {
-                return;
-            }
-
-            var diagnoses = _context.Diagnoses.Where(x => x.EncounterId == record.Id);
-            var notes = _context.ClinicalNotes.Where(x => x.EncounterId == record.Id);
-            _context.Diagnoses.RemoveRange(diagnoses);
-            _context.ClinicalNotes.RemoveRange(notes);
-            _context.Encounters.Remove(encounter);
-            await _context.SaveChangesAsync(ct);
+            await _context.Diagnoses.Where(x => x.EncounterId == record.Id).ExecuteDeleteAsync(ct);
+            await _context.ClinicalNotes.Where(x => x.EncounterId == record.Id).ExecuteDeleteAsync(ct);
+            await _context.Encounters.Where(x => x.Id == record.Id).ExecuteDeleteAsync(ct);
         }
 
         public Task<bool> AppointmentExistsAsync(Guid appointmentId, CancellationToken ct = default)

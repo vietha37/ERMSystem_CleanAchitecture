@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<IPrescriptionRepository, PrescriptionRepository>();
         services.AddScoped<IPrescriptionItemRepository, PrescriptionItemRepository>();
         services.AddScoped<IDashboardQueryCache, DashboardQueryCache>();
+        services.AddScoped<ICatalogQueryCache, CatalogQueryCache>();
 
         // ── Hospital Specialized Repositories ─────────────────────────────────────
         services.AddScoped<IHospitalCatalogRepository, HospitalCatalogRepository>();

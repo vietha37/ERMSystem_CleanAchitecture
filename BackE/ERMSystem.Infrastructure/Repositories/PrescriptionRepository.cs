@@ -92,16 +92,8 @@ namespace ERMSystem.Infrastructure.Repositories
 
         public async Task DeleteAsync(Prescription prescription, CancellationToken ct = default)
         {
-            var entity = await _context.Prescriptions.FirstOrDefaultAsync(x => x.Id == prescription.Id, ct);
-            if (entity == null)
-            {
-                return;
-            }
-
-            var items = _context.PrescriptionItems.Where(x => x.PrescriptionId == entity.Id);
-            _context.PrescriptionItems.RemoveRange(items);
-            _context.Prescriptions.Remove(entity);
-            await _context.SaveChangesAsync(ct);
+            await _context.PrescriptionItems.Where(x => x.PrescriptionId == prescription.Id).ExecuteDeleteAsync(ct);
+            await _context.Prescriptions.Where(x => x.Id == prescription.Id).ExecuteDeleteAsync(ct);
         }
 
         public Task<bool> MedicalRecordExistsAsync(Guid medicalRecordId, CancellationToken ct = default)
