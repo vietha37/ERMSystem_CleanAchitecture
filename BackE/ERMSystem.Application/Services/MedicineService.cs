@@ -33,12 +33,7 @@ namespace ERMSystem.Application.Services
 
         public async Task<MedicineDto> CreateMedicineAsync(CreateMedicineDto dto, CancellationToken ct = default)
         {
-            var medicine = new Medicine
-            {
-                Id = Guid.NewGuid(),
-                Name = dto.Name,
-                Description = dto.Description
-            };
+            var medicine = Medicine.Create(dto.Name, dto.Description);
 
             await _medicineRepository.AddAsync(medicine, ct);
             return MapToDto(medicine);
@@ -50,8 +45,7 @@ namespace ERMSystem.Application.Services
             if (medicine == null)
                 throw new KeyNotFoundException($"Medicine with ID {id} not found.");
 
-            medicine.Name = dto.Name;
-            medicine.Description = dto.Description;
+            medicine.Update(dto.Name, dto.Description);
 
             await _medicineRepository.UpdateAsync(medicine, ct);
         }

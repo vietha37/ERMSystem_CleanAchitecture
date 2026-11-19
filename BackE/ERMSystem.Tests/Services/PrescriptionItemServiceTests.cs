@@ -55,13 +55,7 @@ namespace ERMSystem.Tests.Services
         {
             var prescriptionId = Guid.NewGuid();
             var medicineId = Guid.NewGuid();
-            var prescription = new Prescription
-            {
-                Id = prescriptionId,
-                MedicalRecordId = Guid.NewGuid(),
-                CreatedAt = DateTime.UtcNow,
-                PrescriptionItems = new List<PrescriptionItem>()
-            };
+            var prescription = Prescription.Reconstitute(prescriptionId, Guid.NewGuid(), DateTime.UtcNow);
 
             _itemRepoMock.Setup(r => r.PrescriptionExistsAsync(prescriptionId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
             _itemRepoMock.Setup(r => r.MedicineExistsAsync(medicineId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
@@ -90,7 +84,7 @@ namespace ERMSystem.Tests.Services
         {
             var prescriptionId = Guid.NewGuid();
             var itemId = Guid.NewGuid();
-            var item = new PrescriptionItem { Id = itemId, PrescriptionId = Guid.NewGuid(), MedicineId = Guid.NewGuid(), Dosage = "X", Duration = "X" };
+            var item = PrescriptionItem.Reconstitute(itemId, Guid.NewGuid(), Guid.NewGuid(), "X", "X");
             _itemRepoMock.Setup(r => r.GetByIdAsync(itemId, It.IsAny<CancellationToken>())).ReturnsAsync(item);
 
             await Assert.ThrowsAsync<KeyNotFoundException>(() =>
@@ -102,8 +96,8 @@ namespace ERMSystem.Tests.Services
         {
             var prescriptionId = Guid.NewGuid();
             var itemId = Guid.NewGuid();
-            var item = new PrescriptionItem { Id = itemId, PrescriptionId = prescriptionId, MedicineId = Guid.NewGuid(), Dosage = "X", Duration = "X" };
-            var prescription = new Prescription { Id = prescriptionId, MedicalRecordId = Guid.NewGuid(), CreatedAt = DateTime.UtcNow, PrescriptionItems = new List<PrescriptionItem>() };
+            var item = PrescriptionItem.Reconstitute(itemId, prescriptionId, Guid.NewGuid(), "X", "X");
+            var prescription = Prescription.Reconstitute(prescriptionId, Guid.NewGuid(), DateTime.UtcNow);
 
             _itemRepoMock.Setup(r => r.GetByIdAsync(itemId, It.IsAny<CancellationToken>())).ReturnsAsync(item);
             _prescriptionRepoMock.Setup(r => r.GetByIdAsync(prescriptionId, It.IsAny<CancellationToken>())).ReturnsAsync(prescription);

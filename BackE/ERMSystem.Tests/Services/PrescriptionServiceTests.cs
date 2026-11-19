@@ -30,7 +30,7 @@ namespace ERMSystem.Tests.Services
         {
             var prescriptions = new List<Prescription>
             {
-                new Prescription { Id = Guid.NewGuid(), MedicalRecordId = Guid.NewGuid(), CreatedAt = DateTime.UtcNow }
+                Prescription.Reconstitute(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow)
             };
             _repoMock.Setup(r => r.GetPagedAsync(1, 10, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(((IEnumerable<Prescription>)prescriptions, 1));
@@ -45,7 +45,7 @@ namespace ERMSystem.Tests.Services
         {
             var id = Guid.NewGuid();
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Prescription { Id = id, MedicalRecordId = Guid.NewGuid(), CreatedAt = DateTime.UtcNow });
+                .ReturnsAsync(Prescription.Reconstitute(id, Guid.NewGuid(), DateTime.UtcNow));
 
             var result = await _service.GetPrescriptionByIdAsync(id);
             Assert.NotNull(result);
@@ -64,7 +64,7 @@ namespace ERMSystem.Tests.Services
         {
             var mrId = Guid.NewGuid();
             _repoMock.Setup(r => r.GetByMedicalRecordIdAsync(mrId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Prescription { Id = Guid.NewGuid(), MedicalRecordId = mrId, CreatedAt = DateTime.UtcNow });
+                .ReturnsAsync(Prescription.Reconstitute(Guid.NewGuid(), mrId, DateTime.UtcNow));
 
             var result = await _service.GetPrescriptionByMedicalRecordIdAsync(mrId);
             Assert.NotNull(result);
@@ -118,7 +118,7 @@ namespace ERMSystem.Tests.Services
         public async Task DeletePrescriptionAsync_Found_Deletes()
         {
             var id = Guid.NewGuid();
-            var prescription = new Prescription { Id = id, MedicalRecordId = Guid.NewGuid(), CreatedAt = DateTime.UtcNow };
+            var prescription = Prescription.Reconstitute(id, Guid.NewGuid(), DateTime.UtcNow);
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(prescription);
 
             await _service.DeletePrescriptionAsync(id);

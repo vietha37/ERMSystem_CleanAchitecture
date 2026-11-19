@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ERMSystem.Application.DTOs;
@@ -33,7 +32,7 @@ namespace ERMSystem.Tests.Services
         {
             var patients = new List<Patient>
             {
-                new Patient { Id = Guid.NewGuid(), FullName = "Nguyen Van A", DateOfBirth = new DateTime(1990, 1, 1), Gender = "Male", Phone = "0901234567", Address = "HCM" }
+                Patient.Reconstitute(Guid.NewGuid(), "Nguyen Van A", new DateTime(1990, 1, 1), "Male", "0901234567", "HCM")
             };
             _repoMock.Setup(r => r.GetPagedAsync(1, 10, null, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(((IEnumerable<Patient>)patients, 1));
@@ -49,7 +48,7 @@ namespace ERMSystem.Tests.Services
         {
             var id = Guid.NewGuid();
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Patient { Id = id, FullName = "Test", DateOfBirth = DateTime.UtcNow, Gender = "Male", Phone = "123", Address = "Addr" });
+                .ReturnsAsync(Patient.Reconstitute(id, "Test", DateTime.UtcNow, "Male", "123", "Addr"));
 
             var result = await _service.GetPatientByIdAsync(id);
 
@@ -72,7 +71,7 @@ namespace ERMSystem.Tests.Services
         {
             var userId = Guid.NewGuid();
             _repoMock.Setup(r => r.GetByAppUserIdAsync(userId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Patient { Id = Guid.NewGuid(), AppUserId = userId, FullName = "User", DateOfBirth = DateTime.UtcNow, Gender = "Male", Phone = "123", Address = "Addr" });
+                .ReturnsAsync(Patient.Reconstitute(Guid.NewGuid(), "User", DateTime.UtcNow, "Male", "123", "Addr", appUserId: userId));
 
             var result = await _service.GetPatientByAppUserIdAsync(userId);
 
@@ -113,7 +112,7 @@ namespace ERMSystem.Tests.Services
         public async Task UpdatePatientAsync_Found_UpdatesFields()
         {
             var id = Guid.NewGuid();
-            var patient = new Patient { Id = id, FullName = "Old", DateOfBirth = DateTime.UtcNow, Gender = "Male", Phone = "0", Address = "Old" };
+            var patient = Patient.Reconstitute(id, "Old", DateTime.UtcNow, "Male", "0", "Old");
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(patient);
 
             await _service.UpdatePatientAsync(id, new UpdatePatientDto { FullName = "New", DateOfBirth = new DateTime(1995, 1, 1), Gender = "Female", Phone = "111", Address = "New" });
@@ -135,7 +134,7 @@ namespace ERMSystem.Tests.Services
         public async Task DeletePatientAsync_Found_Deletes()
         {
             var id = Guid.NewGuid();
-            var patient = new Patient { Id = id, FullName = "Del", DateOfBirth = DateTime.UtcNow, Gender = "Male", Phone = "0", Address = "X" };
+            var patient = Patient.Reconstitute(id, "Del", DateTime.UtcNow, "Male", "0", "X");
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(patient);
 
             await _service.DeletePatientAsync(id);
@@ -170,7 +169,7 @@ namespace ERMSystem.Tests.Services
             var sourceId = Guid.NewGuid();
             var targetId = Guid.NewGuid();
             _repoMock.Setup(r => r.GetByIdAsync(sourceId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Patient { Id = sourceId, FullName = "S", DateOfBirth = DateTime.UtcNow, Gender = "M", Phone = "1", Address = "A" });
+                .ReturnsAsync(Patient.Reconstitute(sourceId, "S", DateTime.UtcNow, "M", "1", "A"));
             _repoMock.Setup(r => r.GetByIdAsync(targetId, It.IsAny<CancellationToken>())).ReturnsAsync((Patient?)null);
 
             var dto = new MergePatientsRequestDto { SourcePatientId = sourceId, TargetPatientId = targetId };
@@ -184,8 +183,8 @@ namespace ERMSystem.Tests.Services
         {
             var sourceId = Guid.NewGuid();
             var targetId = Guid.NewGuid();
-            var source = new Patient { Id = sourceId, FullName = "Source", DateOfBirth = DateTime.UtcNow, Gender = "M", Phone = "1", Address = "A", AppUserId = Guid.NewGuid() };
-            var target = new Patient { Id = targetId, FullName = "Target", DateOfBirth = DateTime.UtcNow, Gender = "F", Phone = "2", Address = "B", AppUserId = null };
+            var source = Patient.Reconstitute(sourceId, "Source", DateTime.UtcNow, "M", "1", "A", appUserId: Guid.NewGuid());
+            var target = Patient.Reconstitute(targetId, "Target", DateTime.UtcNow, "F", "2", "B", appUserId: null);
             _repoMock.Setup(r => r.GetByIdAsync(sourceId, It.IsAny<CancellationToken>())).ReturnsAsync(source);
             _repoMock.Setup(r => r.GetByIdAsync(targetId, It.IsAny<CancellationToken>())).ReturnsAsync(target);
             _repoMock.Setup(r => r.ReassignAppointmentsAsync(sourceId, targetId, It.IsAny<CancellationToken>())).ReturnsAsync(3);

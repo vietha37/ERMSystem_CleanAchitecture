@@ -10,42 +10,36 @@ internal static class HospitalLegacyRepositoryMapper
         Guid? appUserId = null,
         HospitalPatientEmergencyContactEntity? emergencyContact = null)
     {
-        return new Patient
-        {
-            Id = patient.Id,
-            AppUserId = appUserId,
-            FullName = patient.FullName,
-            DateOfBirth = patient.DateOfBirth.ToDateTime(TimeOnly.MinValue),
-            Gender = patient.Gender,
-            Phone = patient.Phone ?? string.Empty,
-            Address = BuildAddress(patient),
-            EmergencyContactName = emergencyContact?.FullName,
-            EmergencyContactPhone = emergencyContact?.Phone,
-            EmergencyContactRelationship = emergencyContact?.Relationship,
-            CreatedAt = patient.CreatedAtUtc
-        };
+        return Patient.Reconstitute(
+            patient.Id,
+            patient.FullName,
+            patient.DateOfBirth.ToDateTime(TimeOnly.MinValue),
+            patient.Gender,
+            patient.Phone ?? string.Empty,
+            BuildAddress(patient),
+            appUserId,
+            emergencyContact?.FullName,
+            emergencyContact?.Phone,
+            emergencyContact?.Relationship,
+            patient.CreatedAtUtc);
     }
 
     public static Doctor MapDoctor(HospitalDoctorProfileEntity doctorProfile)
     {
-        return new Doctor
-        {
-            Id = doctorProfile.Id,
-            FullName = doctorProfile.StaffProfile.FullName,
-            Specialty = doctorProfile.Specialty.Name
-        };
+        return Doctor.Reconstitute(
+            doctorProfile.Id,
+            doctorProfile.StaffProfile.FullName,
+            doctorProfile.Specialty.Name);
     }
 
     public static Appointment MapAppointment(HospitalAppointmentEntity appointment)
     {
-        return new Appointment
-        {
-            Id = appointment.Id,
-            PatientId = appointment.PatientId,
-            DoctorId = appointment.DoctorProfileId,
-            AppointmentDate = appointment.AppointmentStartUtc,
-            Status = MapAppointmentStatus(appointment.Status)
-        };
+        return Appointment.Reconstitute(
+            appointment.Id,
+            appointment.PatientId,
+            appointment.DoctorProfileId,
+            appointment.AppointmentStartUtc,
+            MapAppointmentStatus(appointment.Status));
     }
 
     public static MedicalRecord MapMedicalRecord(
@@ -53,50 +47,44 @@ internal static class HospitalLegacyRepositoryMapper
         HospitalClinicalNoteEntity? note,
         HospitalDiagnosisEntity? diagnosis)
     {
-        return new MedicalRecord
-        {
-            Id = encounter.Id,
-            AppointmentId = encounter.AppointmentId ?? Guid.Empty,
-            CreatedAt = encounter.CreatedAtUtc,
-            Symptoms = FirstNonEmpty(note?.Subjective, encounter.Appointment?.ChiefComplaint),
-            Diagnosis = diagnosis?.DiagnosisName ?? string.Empty,
-            Notes = FirstNonEmpty(note?.CarePlan, note?.Assessment, encounter.Summary)
-        };
+        return MedicalRecord.Reconstitute(
+            encounter.Id,
+            encounter.AppointmentId ?? Guid.Empty,
+            FirstNonEmpty(note?.Subjective, encounter.Appointment?.ChiefComplaint),
+            diagnosis?.DiagnosisName ?? string.Empty,
+            FirstNonEmpty(note?.CarePlan, note?.Assessment, encounter.Summary),
+            encounter.CreatedAtUtc);
     }
 
     public static Prescription MapPrescription(HospitalPrescriptionEntity prescription)
     {
-        return new Prescription
-        {
-            Id = prescription.Id,
-            MedicalRecordId = prescription.OrderHeader.EncounterId,
-            CreatedAt = prescription.CreatedAtUtc,
-            PrescriptionItems = prescription.PrescriptionItems
-                .Select(MapPrescriptionItem)
-                .ToList()
-        };
+        var items = prescription.PrescriptionItems
+            .Select(MapPrescriptionItem)
+            .ToList();
+
+        return Prescription.Reconstitute(
+            prescription.Id,
+            prescription.OrderHeader.EncounterId,
+            prescription.CreatedAtUtc,
+            items);
     }
 
     public static PrescriptionItem MapPrescriptionItem(HospitalPrescriptionItemEntity item)
     {
-        return new PrescriptionItem
-        {
-            Id = item.Id,
-            PrescriptionId = item.PrescriptionId,
-            MedicineId = item.MedicineId,
-            Dosage = item.DoseInstruction,
-            Duration = BuildDuration(item)
-        };
+        return PrescriptionItem.Reconstitute(
+            item.Id,
+            item.PrescriptionId,
+            item.MedicineId,
+            item.DoseInstruction,
+            BuildDuration(item));
     }
 
     public static Medicine MapMedicine(HospitalMedicineEntity medicine)
     {
-        return new Medicine
-        {
-            Id = medicine.Id,
-            Name = medicine.Name,
-            Description = BuildMedicineDescription(medicine)
-        };
+        return Medicine.Reconstitute(
+            medicine.Id,
+            medicine.Name,
+            BuildMedicineDescription(medicine));
     }
 
     public static string MapAppointmentStatus(string status)

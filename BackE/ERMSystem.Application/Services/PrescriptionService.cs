@@ -54,12 +54,7 @@ namespace ERMSystem.Application.Services
                 throw new InvalidOperationException(
                     $"A Prescription already exists for MedicalRecord {dto.MedicalRecordId}.");
 
-            var prescription = new Prescription
-            {
-                Id = Guid.NewGuid(),
-                MedicalRecordId = dto.MedicalRecordId,
-                CreatedAt = DateTime.UtcNow
-            };
+            var prescription = Prescription.Create(dto.MedicalRecordId);
 
             await _prescriptionRepository.AddAsync(prescription, ct);
             await _dashboardQueryCache.InvalidateAsync(ct);

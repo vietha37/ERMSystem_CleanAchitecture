@@ -34,14 +34,7 @@ namespace ERMSystem.Application.Services
             if (!medicineExists)
                 throw new KeyNotFoundException($"Medicine with ID {dto.MedicineId} not found.");
 
-            var item = new PrescriptionItem
-            {
-                Id = Guid.NewGuid(),
-                PrescriptionId = prescriptionId,
-                MedicineId = dto.MedicineId,
-                Dosage = dto.Dosage,
-                Duration = dto.Duration
-            };
+            var item = PrescriptionItem.Create(prescriptionId, dto.MedicineId, dto.Dosage, dto.Duration);
 
             await _itemRepository.AddAsync(item, ct);
 

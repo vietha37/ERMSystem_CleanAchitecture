@@ -30,7 +30,7 @@ namespace ERMSystem.Tests.Services
         {
             var records = new List<MedicalRecord>
             {
-                new MedicalRecord { Id = Guid.NewGuid(), AppointmentId = Guid.NewGuid(), Symptoms = "Fever", Diagnosis = "Flu", Notes = "Rest" }
+                MedicalRecord.Reconstitute(Guid.NewGuid(), Guid.NewGuid(), "Fever", "Flu", "Rest")
             };
             _repoMock.Setup(r => r.GetPagedAsync(1, 10, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(((IEnumerable<MedicalRecord>)records, 1));
@@ -45,7 +45,7 @@ namespace ERMSystem.Tests.Services
         {
             var id = Guid.NewGuid();
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new MedicalRecord { Id = id, AppointmentId = Guid.NewGuid(), Symptoms = "S", Diagnosis = "D", Notes = "N" });
+                .ReturnsAsync(MedicalRecord.Reconstitute(id, Guid.NewGuid(), "S", "D", "N"));
 
             var result = await _service.GetMedicalRecordByIdAsync(id);
 
@@ -65,7 +65,7 @@ namespace ERMSystem.Tests.Services
         {
             var appointmentId = Guid.NewGuid();
             _repoMock.Setup(r => r.GetByAppointmentIdAsync(appointmentId, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new MedicalRecord { Id = Guid.NewGuid(), AppointmentId = appointmentId, Symptoms = "S", Diagnosis = "D", Notes = "N" });
+                .ReturnsAsync(MedicalRecord.Reconstitute(Guid.NewGuid(), appointmentId, "S", "D", "N"));
 
             var result = await _service.GetMedicalRecordByAppointmentIdAsync(appointmentId);
 
@@ -125,7 +125,7 @@ namespace ERMSystem.Tests.Services
         public async Task UpdateMedicalRecordAsync_Found_UpdatesFields()
         {
             var id = Guid.NewGuid();
-            var record = new MedicalRecord { Id = id, Symptoms = "Old", Diagnosis = "Old", Notes = "Old" };
+            var record = MedicalRecord.Reconstitute(id, Guid.NewGuid(), "Old", "Old", "Old");
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(record);
 
             await _service.UpdateMedicalRecordAsync(id, new UpdateMedicalRecordDto { Symptoms = "New", Diagnosis = "New", Notes = "New" });
@@ -145,7 +145,7 @@ namespace ERMSystem.Tests.Services
         public async Task DeleteMedicalRecordAsync_Found_Deletes()
         {
             var id = Guid.NewGuid();
-            var record = new MedicalRecord { Id = id, Symptoms = "S", Diagnosis = "D", Notes = "N" };
+            var record = MedicalRecord.Reconstitute(id, Guid.NewGuid(), "S", "D", "N");
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(record);
 
             await _service.DeleteMedicalRecordAsync(id);

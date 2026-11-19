@@ -53,14 +53,11 @@ namespace ERMSystem.Application.Services
             if (!doctorExists)
                 throw new KeyNotFoundException($"Doctor with ID {dto.DoctorId} not found.");
 
-            var appointment = new Appointment
-            {
-                Id = Guid.NewGuid(),
-                PatientId = dto.PatientId,
-                DoctorId = dto.DoctorId,
-                AppointmentDate = dto.AppointmentDate,
-                Status = dto.Status
-            };
+            var appointment = Appointment.Create(
+                dto.PatientId,
+                dto.DoctorId,
+                dto.AppointmentDate,
+                dto.Status);
 
             await _appointmentRepository.AddAsync(appointment, ct);
             await _dashboardQueryCache.InvalidateAsync(ct);
@@ -85,10 +82,7 @@ namespace ERMSystem.Application.Services
             if (!doctorExists)
                 throw new KeyNotFoundException($"Doctor with ID {dto.DoctorId} not found.");
 
-            appointment.PatientId = dto.PatientId;
-            appointment.DoctorId = dto.DoctorId;
-            appointment.AppointmentDate = dto.AppointmentDate;
-            appointment.Status = dto.Status;
+            appointment.UpdateDetails(dto.PatientId, dto.DoctorId, dto.AppointmentDate, dto.Status);
 
             await _appointmentRepository.UpdateAsync(appointment, ct);
             await _dashboardQueryCache.InvalidateAsync(ct);

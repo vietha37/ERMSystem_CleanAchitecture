@@ -116,17 +116,13 @@ namespace ERMSystem.Infrastructure.Services
                 Role = AppRole.Patient
             };
 
-            var patient = new Patient
-            {
-                Id = Guid.NewGuid(),
-                AppUserId = user.Id,
-                FullName = registerDto.FullName.Trim(),
-                DateOfBirth = registerDto.DateOfBirth,
-                Gender = registerDto.Gender.Trim(),
-                Phone = registerDto.Phone.Trim(),
-                Address = registerDto.Address.Trim(),
-                CreatedAt = DateTime.UtcNow
-            };
+            var patient = Patient.Create(
+                registerDto.FullName.Trim(),
+                registerDto.DateOfBirth,
+                registerDto.Gender.Trim(),
+                registerDto.Phone.Trim(),
+                registerDto.Address.Trim(),
+                appUserId: user.Id);
 
             await _userRepository.AddAsync(user);
 

@@ -22,6 +22,12 @@ namespace ERMSystem.Infrastructure.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            modelBuilder.Ignore<ERMSystem.Domain.Common.IDomainEvent>();
+            modelBuilder.Entity<Patient>().Ignore(p => p.DomainEvents);
+            modelBuilder.Entity<Patient>().Ignore(p => p.EmergencyContactInfo);
+            modelBuilder.Entity<Appointment>().Ignore(a => a.DomainEvents);
+            modelBuilder.Entity<Prescription>().Ignore(p => p.DomainEvents);
+
             // A patient has many appointments.
             modelBuilder.Entity<Appointment>()
                 .HasOne(a => a.Patient)

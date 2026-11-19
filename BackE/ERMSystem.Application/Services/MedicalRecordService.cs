@@ -53,15 +53,11 @@ namespace ERMSystem.Application.Services
                 throw new InvalidOperationException(
                     $"A MedicalRecord already exists for Appointment {dto.AppointmentId}.");
 
-            var record = new MedicalRecord
-            {
-                Id = Guid.NewGuid(),
-                AppointmentId = dto.AppointmentId,
-                CreatedAt = DateTime.UtcNow,
-                Symptoms = dto.Symptoms,
-                Diagnosis = dto.Diagnosis,
-                Notes = dto.Notes
-            };
+            var record = MedicalRecord.Create(
+                dto.AppointmentId,
+                dto.Symptoms,
+                dto.Diagnosis,
+                dto.Notes);
 
             await _medicalRecordRepository.AddAsync(record, ct);
             await _dashboardQueryCache.InvalidateAsync(ct);
@@ -74,9 +70,7 @@ namespace ERMSystem.Application.Services
             if (record == null)
                 throw new KeyNotFoundException($"MedicalRecord with ID {id} not found.");
 
-            record.Symptoms = dto.Symptoms;
-            record.Diagnosis = dto.Diagnosis;
-            record.Notes = dto.Notes;
+            record.UpdateClinicalNotes(dto.Symptoms, dto.Diagnosis, dto.Notes);
 
             await _medicalRecordRepository.UpdateAsync(record, ct);
             await _dashboardQueryCache.InvalidateAsync(ct);

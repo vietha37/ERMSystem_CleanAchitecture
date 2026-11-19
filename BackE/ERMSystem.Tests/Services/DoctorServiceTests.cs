@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ERMSystem.Application.DTOs;
@@ -28,8 +29,8 @@ namespace ERMSystem.Tests.Services
         {
             var doctors = new List<Doctor>
             {
-                new Doctor { Id = Guid.NewGuid(), FullName = "Dr. A", Specialty = "Cardiology" },
-                new Doctor { Id = Guid.NewGuid(), FullName = "Dr. B", Specialty = "Neurology" }
+                Doctor.Reconstitute(Guid.NewGuid(), "Dr. A", "Cardiology"),
+                Doctor.Reconstitute(Guid.NewGuid(), "Dr. B", "Neurology")
             };
             _repoMock.Setup(r => r.GetPagedAsync(1, 10, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(((IEnumerable<Doctor>)doctors, 2));
@@ -45,7 +46,7 @@ namespace ERMSystem.Tests.Services
         {
             var id = Guid.NewGuid();
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Doctor { Id = id, FullName = "Dr. Test", Specialty = "Surgery" });
+                .ReturnsAsync(Doctor.Reconstitute(id, "Dr. Test", "Surgery"));
 
             var result = await _service.GetDoctorByIdAsync(id);
 
@@ -91,7 +92,7 @@ namespace ERMSystem.Tests.Services
         public async Task UpdateDoctorAsync_Found_UpdatesFields()
         {
             var id = Guid.NewGuid();
-            var doctor = new Doctor { Id = id, FullName = "Old", Specialty = "Old" };
+            var doctor = Doctor.Reconstitute(id, "Old", "Old");
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(doctor);
 
             await _service.UpdateDoctorAsync(id, new UpdateDoctorDto { FullName = "New", Specialty = "New" });
@@ -113,7 +114,7 @@ namespace ERMSystem.Tests.Services
         public async Task DeleteDoctorAsync_Found_DeletesDoctor()
         {
             var id = Guid.NewGuid();
-            var doctor = new Doctor { Id = id, FullName = "Del", Specialty = "Del" };
+            var doctor = Doctor.Reconstitute(id, "Del", "Del");
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(doctor);
 
             await _service.DeleteDoctorAsync(id);

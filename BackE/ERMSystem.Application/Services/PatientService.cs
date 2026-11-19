@@ -78,20 +78,15 @@ namespace ERMSystem.Application.Services
 
         public async Task<PatientDto> CreatePatientAsync(CreatePatientDto dto, CancellationToken ct = default)
         {
-            var patient = new Patient
-            {
-                Id = Guid.NewGuid(),
-                AppUserId = null,
-                FullName = dto.FullName,
-                DateOfBirth = dto.DateOfBirth,
-                Gender = dto.Gender,
-                Phone = dto.Phone,
-                Address = dto.Address,
-                EmergencyContactName = dto.EmergencyContactName,
-                EmergencyContactPhone = dto.EmergencyContactPhone,
-                EmergencyContactRelationship = dto.EmergencyContactRelationship,
-                CreatedAt = DateTime.UtcNow
-            };
+            var patient = Patient.Create(
+                dto.FullName,
+                dto.DateOfBirth,
+                dto.Gender,
+                dto.Phone,
+                dto.Address,
+                dto.EmergencyContactName,
+                dto.EmergencyContactPhone,
+                dto.EmergencyContactRelationship);
 
             await _patientRepository.AddAsync(patient, ct);
             await _dashboardQueryCache.InvalidateAsync(ct);
@@ -104,14 +99,15 @@ namespace ERMSystem.Application.Services
             if (patient == null)
                 throw new KeyNotFoundException($"Patient with ID {id} not found.");
 
-            patient.FullName = dto.FullName;
-            patient.DateOfBirth = dto.DateOfBirth;
-            patient.Gender = dto.Gender;
-            patient.Phone = dto.Phone;
-            patient.Address = dto.Address;
-            patient.EmergencyContactName = dto.EmergencyContactName;
-            patient.EmergencyContactPhone = dto.EmergencyContactPhone;
-            patient.EmergencyContactRelationship = dto.EmergencyContactRelationship;
+            patient.UpdateProfile(
+                dto.FullName,
+                dto.DateOfBirth,
+                dto.Gender,
+                dto.Phone,
+                dto.Address,
+                dto.EmergencyContactName,
+                dto.EmergencyContactPhone,
+                dto.EmergencyContactRelationship);
 
             await _patientRepository.UpdateAsync(patient, ct);
             await _dashboardQueryCache.InvalidateAsync(ct);
@@ -140,31 +136,12 @@ namespace ERMSystem.Application.Services
                 throw new KeyNotFoundException($"Target patient with ID {request.TargetPatientId} not found.");
             }
 
-            if (sourcePatient.AppUserId.HasValue &&
-                targetPatient.AppUserId.HasValue &&
-                sourcePatient.AppUserId != targetPatient.AppUserId)
-            {
-                throw new InvalidOperationException("Cannot merge patients that are linked to different app users.");
-            }
+            var wasAppUserLinked = targetPatient.AppUserId.HasValue;
 
-            var appUserLinkMoved = false;
-            if (!targetPatient.AppUserId.HasValue && sourcePatient.AppUserId.HasValue)
-            {
-                targetPatient.AppUserId = sourcePatient.AppUserId;
-                appUserLinkMoved = true;
-            }
+            // Encapsulated domain logic on the Patient Aggregate Root
+            targetPatient.MergeWith(sourcePatient, actorUsername ?? "unknown");
 
-            targetPatient.FullName = SelectPreferredRequiredValue(targetPatient.FullName, sourcePatient.FullName);
-            targetPatient.Phone = SelectPreferredRequiredValue(targetPatient.Phone, sourcePatient.Phone);
-            targetPatient.Address = SelectPreferredRequiredValue(targetPatient.Address, sourcePatient.Address);
-            targetPatient.Gender = SelectPreferredRequiredValue(targetPatient.Gender, sourcePatient.Gender);
-            targetPatient.EmergencyContactName = SelectPreferredValue(targetPatient.EmergencyContactName, sourcePatient.EmergencyContactName);
-            targetPatient.EmergencyContactPhone = SelectPreferredValue(targetPatient.EmergencyContactPhone, sourcePatient.EmergencyContactPhone);
-            targetPatient.EmergencyContactRelationship = SelectPreferredValue(targetPatient.EmergencyContactRelationship, sourcePatient.EmergencyContactRelationship);
-            if (targetPatient.DateOfBirth == default && sourcePatient.DateOfBirth != default)
-            {
-                targetPatient.DateOfBirth = sourcePatient.DateOfBirth;
-            }
+            var appUserLinkMoved = !wasAppUserLinked && targetPatient.AppUserId.HasValue;
 
             var reassignedAppointmentCount = await _patientRepository.ReassignAppointmentsAsync(
                 sourcePatient.Id,
@@ -257,11 +234,5 @@ namespace ERMSystem.Application.Services
 
         private static string NormalizeText(string value)
             => (value ?? string.Empty).Trim().ToUpperInvariant();
-
-        private static string SelectPreferredRequiredValue(string currentValue, string fallbackValue)
-            => string.IsNullOrWhiteSpace(currentValue) ? fallbackValue : currentValue;
-
-        private static string? SelectPreferredValue(string? currentValue, string? fallbackValue)
-            => string.IsNullOrWhiteSpace(currentValue) ? fallbackValue : currentValue;
     }
 }

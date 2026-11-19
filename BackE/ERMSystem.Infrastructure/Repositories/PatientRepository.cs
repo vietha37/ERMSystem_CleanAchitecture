@@ -264,27 +264,27 @@ namespace ERMSystem.Infrastructure.Repositories
 
         private static Patient MapPatient(PatientJoinRow row)
         {
-            return new Patient
+            var address = string.Join(", ", new[]
             {
-                Id = row.Patient.Id,
-                AppUserId = row.AppUserId,
-                FullName = row.Patient.FullName,
-                DateOfBirth = row.Patient.DateOfBirth.ToDateTime(TimeOnly.MinValue),
-                Gender = row.Patient.Gender,
-                Phone = row.Patient.Phone ?? string.Empty,
-                Address = string.Join(", ", new[]
-                {
-                    row.Patient.AddressLine1,
-                    row.Patient.AddressLine2,
-                    row.Patient.Ward,
-                    row.Patient.District,
-                    row.Patient.Province
-                }.Where(value => !string.IsNullOrWhiteSpace(value))),
-                EmergencyContactName = row.EmergencyContact?.FullName,
-                EmergencyContactPhone = row.EmergencyContact?.Phone,
-                EmergencyContactRelationship = row.EmergencyContact?.Relationship,
-                CreatedAt = row.Patient.CreatedAtUtc
-            };
+                row.Patient.AddressLine1,
+                row.Patient.AddressLine2,
+                row.Patient.Ward,
+                row.Patient.District,
+                row.Patient.Province
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+            return Patient.Reconstitute(
+                row.Patient.Id,
+                row.Patient.FullName,
+                row.Patient.DateOfBirth.ToDateTime(TimeOnly.MinValue),
+                row.Patient.Gender,
+                row.Patient.Phone ?? string.Empty,
+                address,
+                row.AppUserId,
+                row.EmergencyContact?.FullName,
+                row.EmergencyContact?.Phone,
+                row.EmergencyContact?.Relationship,
+                row.Patient.CreatedAtUtc);
         }
 
         private void AddOrUpdateEmergencyContact(Guid patientId, Patient patient)

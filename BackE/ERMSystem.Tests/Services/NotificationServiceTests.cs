@@ -27,14 +27,14 @@ namespace ERMSystem.Tests.Services
             var today = DateTime.UtcNow.Date.AddHours(10);
             var appointments = new List<Appointment>
             {
-                new Appointment
-                {
-                    Id = Guid.NewGuid(),
-                    AppointmentDate = today,
-                    Status = "Pending",
-                    Patient = new Patient { FullName = "Patient A" },
-                    Doctor = new Doctor { FullName = "Doctor B" }
-                }
+                Appointment.Reconstitute(
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    today,
+                    "Pending",
+                    patient: Patient.Reconstitute(Guid.NewGuid(), "Patient A", DateTime.UtcNow, "Other", "000", "Addr"),
+                    doctor: Doctor.Reconstitute(Guid.NewGuid(), "Doctor B", "General"))
             };
 
             _appointmentRepoMock.Setup(r => r.GetByDateRangeAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
@@ -55,22 +55,22 @@ namespace ERMSystem.Tests.Services
             var today = DateTime.UtcNow.Date.AddHours(10);
             var appointments = new List<Appointment>
             {
-                new Appointment
-                {
-                    Id = Guid.NewGuid(),
-                    AppointmentDate = today,
-                    Status = "Pending",
-                    Patient = new Patient { FullName = "Patient 1" },
-                    Doctor = new Doctor { FullName = "Dr. John Doe" }
-                },
-                new Appointment
-                {
-                    Id = Guid.NewGuid(),
-                    AppointmentDate = today,
-                    Status = "Pending",
-                    Patient = new Patient { FullName = "Patient 2" },
-                    Doctor = new Doctor { FullName = "Dr. Jane Smith" }
-                }
+                Appointment.Reconstitute(
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    today,
+                    "Pending",
+                    patient: Patient.Reconstitute(Guid.NewGuid(), "Patient 1", DateTime.UtcNow, "Other", "000", "Addr"),
+                    doctor: Doctor.Reconstitute(Guid.NewGuid(), "Dr. John Doe", "General")),
+                Appointment.Reconstitute(
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    today,
+                    "Pending",
+                    patient: Patient.Reconstitute(Guid.NewGuid(), "Patient 2", DateTime.UtcNow, "Other", "000", "Addr"),
+                    doctor: Doctor.Reconstitute(Guid.NewGuid(), "Dr. Jane Smith", "General"))
             };
 
             _appointmentRepoMock.Setup(r => r.GetByDateRangeAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))

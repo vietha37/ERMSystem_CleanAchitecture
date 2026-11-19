@@ -28,7 +28,7 @@ namespace ERMSystem.Tests.Services
         {
             var medicines = new List<Medicine>
             {
-                new Medicine { Id = Guid.NewGuid(), Name = "Paracetamol", Description = "Pain relief" }
+                Medicine.Reconstitute(Guid.NewGuid(), "Paracetamol", "Pain relief")
             };
             _repoMock.Setup(r => r.GetPagedAsync(1, 10, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(((IEnumerable<Medicine>)medicines, 1));
@@ -44,7 +44,7 @@ namespace ERMSystem.Tests.Services
         {
             var id = Guid.NewGuid();
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Medicine { Id = id, Name = "Aspirin", Description = "Blood thinner" });
+                .ReturnsAsync(Medicine.Reconstitute(id, "Aspirin", "Blood thinner"));
 
             var result = await _service.GetMedicineByIdAsync(id);
 
@@ -88,7 +88,7 @@ namespace ERMSystem.Tests.Services
         public async Task UpdateMedicineAsync_Found_UpdatesFields()
         {
             var id = Guid.NewGuid();
-            var medicine = new Medicine { Id = id, Name = "Old", Description = "Old" };
+            var medicine = Medicine.Reconstitute(id, "Old", "Old");
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(medicine);
 
             await _service.UpdateMedicineAsync(id, new UpdateMedicineDto { Name = "New", Description = "New" });
@@ -109,7 +109,7 @@ namespace ERMSystem.Tests.Services
         public async Task DeleteMedicineAsync_Found_Deletes()
         {
             var id = Guid.NewGuid();
-            var medicine = new Medicine { Id = id, Name = "Del", Description = "Del" };
+            var medicine = Medicine.Reconstitute(id, "Del", "Del");
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(medicine);
 
             await _service.DeleteMedicineAsync(id);

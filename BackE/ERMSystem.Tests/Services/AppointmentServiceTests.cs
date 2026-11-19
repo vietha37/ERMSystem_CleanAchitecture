@@ -6,6 +6,7 @@ using ERMSystem.Application.DTOs;
 using ERMSystem.Application.DTOs.Common;
 using ERMSystem.Application.Interfaces;
 using ERMSystem.Application.Services;
+using ERMSystem.Domain.Constants;
 using ERMSystem.Domain.Entities;
 using Moq;
 using Xunit;
@@ -30,7 +31,7 @@ namespace ERMSystem.Tests.Services
         {
             var appointments = new List<Appointment>
             {
-                new Appointment { Id = Guid.NewGuid(), PatientId = Guid.NewGuid(), DoctorId = Guid.NewGuid(), AppointmentDate = DateTime.UtcNow, Status = "Pending" }
+                Appointment.Reconstitute(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow, AppointmentStatuses.Pending)
             };
             _repoMock.Setup(r => r.GetPagedAsync(1, 10, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(((IEnumerable<Appointment>)appointments, 1));
@@ -47,14 +48,14 @@ namespace ERMSystem.Tests.Services
         public async Task GetAppointmentByIdAsync_Found_ReturnsDto()
         {
             var id = Guid.NewGuid();
-            var appointment = new Appointment { Id = id, PatientId = Guid.NewGuid(), DoctorId = Guid.NewGuid(), AppointmentDate = DateTime.UtcNow, Status = "Pending" };
+            var appointment = Appointment.Reconstitute(id, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow, AppointmentStatuses.Pending);
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(appointment);
 
             var result = await _service.GetAppointmentByIdAsync(id);
 
             Assert.NotNull(result);
             Assert.Equal(id, result!.Id);
-            Assert.Equal("Pending", result.Status);
+            Assert.Equal(AppointmentStatuses.Pending, result.Status);
         }
 
         [Fact]
@@ -75,12 +76,12 @@ namespace ERMSystem.Tests.Services
             _repoMock.Setup(r => r.PatientExistsAsync(patientId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
             _repoMock.Setup(r => r.DoctorExistsAsync(doctorId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
-            var dto = new CreateAppointmentDto { PatientId = patientId, DoctorId = doctorId, AppointmentDate = DateTime.UtcNow.AddDays(1), Status = "Pending" };
+            var dto = new CreateAppointmentDto { PatientId = patientId, DoctorId = doctorId, AppointmentDate = DateTime.UtcNow.AddDays(1), Status = AppointmentStatuses.Pending };
             var result = await _service.CreateAppointmentAsync(dto);
 
             Assert.NotNull(result);
             Assert.Equal(patientId, result.PatientId);
-            Assert.Equal("Pending", result.Status);
+            Assert.Equal(AppointmentStatuses.Pending, result.Status);
             _repoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()), Times.Once);
             _cacheMock.Verify(c => c.InvalidateAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
@@ -99,7 +100,7 @@ namespace ERMSystem.Tests.Services
             var patientId = Guid.NewGuid();
             _repoMock.Setup(r => r.PatientExistsAsync(patientId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
-            var dto = new CreateAppointmentDto { PatientId = patientId, DoctorId = Guid.NewGuid(), AppointmentDate = DateTime.UtcNow, Status = "Pending" };
+            var dto = new CreateAppointmentDto { PatientId = patientId, DoctorId = Guid.NewGuid(), AppointmentDate = DateTime.UtcNow, Status = AppointmentStatuses.Pending };
 
             await Assert.ThrowsAsync<KeyNotFoundException>(() => _service.CreateAppointmentAsync(dto));
         }
@@ -112,7 +113,7 @@ namespace ERMSystem.Tests.Services
             _repoMock.Setup(r => r.PatientExistsAsync(patientId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
             _repoMock.Setup(r => r.DoctorExistsAsync(doctorId, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
-            var dto = new CreateAppointmentDto { PatientId = patientId, DoctorId = doctorId, AppointmentDate = DateTime.UtcNow, Status = "Pending" };
+            var dto = new CreateAppointmentDto { PatientId = patientId, DoctorId = doctorId, AppointmentDate = DateTime.UtcNow, Status = AppointmentStatuses.Pending };
 
             await Assert.ThrowsAsync<KeyNotFoundException>(() => _service.CreateAppointmentAsync(dto));
         }
@@ -122,7 +123,7 @@ namespace ERMSystem.Tests.Services
         {
             _repoMock.Setup(r => r.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync((Appointment?)null);
 
-            var dto = new UpdateAppointmentDto { PatientId = Guid.NewGuid(), DoctorId = Guid.NewGuid(), AppointmentDate = DateTime.UtcNow, Status = "Pending" };
+            var dto = new UpdateAppointmentDto { PatientId = Guid.NewGuid(), DoctorId = Guid.NewGuid(), AppointmentDate = DateTime.UtcNow, Status = AppointmentStatuses.Pending };
 
             await Assert.ThrowsAsync<KeyNotFoundException>(() => _service.UpdateAppointmentAsync(Guid.NewGuid(), dto));
         }
@@ -131,7 +132,7 @@ namespace ERMSystem.Tests.Services
         public async Task UpdateAppointmentAsync_InvalidStatus_ThrowsArgumentException()
         {
             var id = Guid.NewGuid();
-            var appointment = new Appointment { Id = id, PatientId = Guid.NewGuid(), DoctorId = Guid.NewGuid(), AppointmentDate = DateTime.UtcNow, Status = "Pending" };
+            var appointment = Appointment.Reconstitute(id, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow, AppointmentStatuses.Pending);
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(appointment);
 
             var dto = new UpdateAppointmentDto { PatientId = Guid.NewGuid(), DoctorId = Guid.NewGuid(), AppointmentDate = DateTime.UtcNow, Status = "BadStatus" };
@@ -145,15 +146,16 @@ namespace ERMSystem.Tests.Services
             var id = Guid.NewGuid();
             var patientId = Guid.NewGuid();
             var doctorId = Guid.NewGuid();
-            var appointment = new Appointment { Id = id, PatientId = Guid.NewGuid(), DoctorId = Guid.NewGuid(), AppointmentDate = DateTime.UtcNow, Status = "Pending" };
+            var appointment = Appointment.Reconstitute(id, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow, AppointmentStatuses.Pending);
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(appointment);
             _repoMock.Setup(r => r.PatientExistsAsync(patientId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
             _repoMock.Setup(r => r.DoctorExistsAsync(doctorId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
-            var dto = new UpdateAppointmentDto { PatientId = patientId, DoctorId = doctorId, AppointmentDate = DateTime.UtcNow.AddDays(2), Status = "Completed" };
+            var dto = new UpdateAppointmentDto { PatientId = patientId, DoctorId = doctorId, AppointmentDate = DateTime.UtcNow.AddDays(2), Status = AppointmentStatuses.Completed };
 
             await _service.UpdateAppointmentAsync(id, dto);
 
+            Assert.Equal(AppointmentStatuses.Completed, appointment.Status);
             _repoMock.Verify(r => r.UpdateAsync(It.IsAny<Appointment>(), It.IsAny<CancellationToken>()), Times.Once);
             _cacheMock.Verify(c => c.InvalidateAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
@@ -170,7 +172,7 @@ namespace ERMSystem.Tests.Services
         public async Task DeleteAppointmentAsync_Found_DeletesAndInvalidatesCache()
         {
             var id = Guid.NewGuid();
-            var appointment = new Appointment { Id = id, Status = "Pending" };
+            var appointment = Appointment.Reconstitute(id, Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow, AppointmentStatuses.Pending);
             _repoMock.Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>())).ReturnsAsync(appointment);
 
             await _service.DeleteAppointmentAsync(id);
